@@ -1,0 +1,22 @@
+client: Wendy Wu Tours
+report_title: Quarterly PPC Performance Report
+agency: Summon Digital
+campaign_types:
+  - Brand
+  - Generic
+  - Performance Max
+  - Demand Gen
+destinations:
+  - China
+  - Japan
+  - SE Asia
+  - India
+slides:
+  - overview
+  - campaign_mix
+  - campaign_summary
+  - destination_summary
+competitors:
+  - Trafalgar
+  - Audley
+  - Intrepid

@@ -1,0 +1,88 @@
+{
+  "clients": [
+    {
+      "id": "wendy_wu",
+      "name": "Wendy Wu Tours",
+      "country": "UK",
+      "site_domain": "wendywu.co.uk",
+      "report_title": "Quarterly PPC Performance Report",
+      "agency": "Summon Digital",
+      "template_path": "templates/report_template.pptx",
+      "campaign_types": [
+        "Brand",
+        "Generic",
+        "Performance Max",
+        "Demand Gen"
+      ],
+      "destinations": [
+        "China",
+        "Japan",
+        "SE Asia",
+        "India"
+      ],
+      "brand_trends": {
+        "enabled": true,
+        "terms": [
+          "wendy wu tours"
+        ]
+      },
+      "destination_trends": {
+        "enabled": true,
+        "destinations": [
+          {
+            "name": "Japan",
+            "terms": [
+              "japan holidays",
+              "japan tours"
+            ]
+          },
+          {
+            "name": "China",
+            "terms": [
+              "china holidays",
+              "china tours"
+            ]
+          },
+          {
+            "name": "SE Asia",
+            "terms": [
+              "south east asia holidays",
+              "south east asia tours"
+            ]
+          },
+          {
+            "name": "India",
+            "terms": [
+              "india holidays",
+              "india tours"
+            ]
+          }
+        ]
+      },
+      "auction_insights": {
+        "enabled": true,
+        "client_domain": "wendywu.co.uk",
+        "known_competitors": [
+          "travelclubelite.com",
+          "riviera.co.uk",
+          "distantjourneys.co.uk",
+          "intrepidtravel.com"
+        ]
+      },
+      "slides": {
+        "include_performance": true,
+        "include_overview": true,
+        "include_campaign_mix": true,
+        "include_campaign_summary": true,
+        "include_destination_summary": true,
+        "include_trends": true,
+        "include_auction_insights": true,
+        "include_recommendations": true
+      },
+      "source_notes": {
+        "google_trends": "Source: Google Trends",
+        "auction_insights": "Source: Google Ads Auction Insights"
+      }
+    }
+  ]
+}

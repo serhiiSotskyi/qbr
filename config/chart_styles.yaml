@@ -1,0 +1,16 @@
+colors:
+  cpl: "#0E7490"
+  cvr: "#1D4ED8"
+  cost: "#14B8A6"
+  leads: "#0F172A"
+  table_header: "#DBE6F4"
+  table_total: "#EBF1FA"
+  text_primary: "#142A4D"
+  text_secondary: "#5A5A5A"
+  text_body: "#2D2D2D"
+figure_size:
+  width: 10
+  height: 5
+fonts:
+  title_size: 16
+  body_size: 11
