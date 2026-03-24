@@ -1,0 +1,420 @@
+----------------------------------------
+
+Wendy Wu Tours | Quarterly PPC Performance Report
+Q1 2026 (Jan - Mar 2026) | Summon Digital
+
+----------------------------------------
+
+PERFORMANCE
+
+----------------------------------------
+
+Overall Performance Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions  Clicks   CTR   CPC        Cost Sales Leads    CPL   CVR
+  Jan   4,733,048  79,502 1.68% £1.26 £100,208.74       2,406 £41.65 3.03%
+  Feb   4,790,487  59,192 1.24% £1.24  £73,305.47       1,818 £40.32 3.07%
+  Mar   1,322,401  16,257 1.23% £1.06  £17,259.59         498 £34.66 3.06%
+Total  10,845,936 154,951 1.43% £1.23 £190,773.79       4,722 £40.40 3.05%
+- Best efficiency was in Mar (£34.66 CPL), while Jan was highest at £41.65.
+- Quarter total: 4,722 leads from £190,773.79 spend at a blended CPL of £40.40.
+- YoY vs same quarter last year: leads +34.00% and spend +27.16%.
+- Brand generated the highest share of leads (58.5%).
+
+----------------------------------------
+
+Overall Quarter Summary
+Q1 2026 (Jan - Mar 2026)
+Month Impressions  Clicks   CTR   CPC        Cost Sales Leads    CPL   CVR
+  Jan   4,733,048  79,502 1.68% £1.26 £100,208.74       2,406 £41.65 3.03%
+  Feb   4,790,487  59,192 1.24% £1.24  £73,305.47       1,818 £40.32 3.07%
+  Mar   1,322,401  16,257 1.23% £1.06  £17,259.59         498 £34.66 3.06%
+Total  10,845,936 154,951 1.43% £1.23 £190,773.79       4,722 £40.40 3.05%
+- Overall generated 4,722 leads from £190,773.79 with a quarter CPL of £40.40.
+- Best efficiency was in Mar (£34.66 CPL), while Jan was highest at £41.65.
+- YoY vs same quarter last year: leads +34.00%, spend +27.16%.
+
+----------------------------------------
+
+Campaign Type Mix
+Q1 2026 (Jan - Mar 2026)
+  Campaign Type        Cost Sales Leads Cost Share Lead Share     CPL
+        Generic £124,147.15       1,112     65.08%     23.55% £111.64
+Performance Max  £31,672.69         524     16.60%     11.10%  £60.44
+     Demand Gen  £24,911.65         257     13.06%      5.44%  £96.93
+          Brand  £10,042.30       2,764      5.26%     58.53%   £3.63
+          Other       £0.00          65      0.00%      1.38%   £0.00
+- Generic represented the largest share of spend (65.1%).
+- Brand delivered the largest share of leads (58.5%).
+- Spend and lead mix are concentrated in different campaign types, indicating different efficiency profiles.
+
+----------------------------------------
+
+Brand Summary
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks    CTR   CPC       Cost Sales Leads   CPL    CVR
+  Jan      29,361 15,291 52.08% £0.38  £5,737.22       1,430 £4.01  9.35%
+  Feb      22,554 11,520 51.08% £0.29  £3,384.96       1,015 £3.33  8.81%
+  Mar       5,995  3,154 52.61% £0.29    £920.12         319 £2.88 10.11%
+Total      57,910 29,965 51.74% £0.34 £10,042.30       2,764 £3.63  9.22%
+- Brand generated 2,764 leads from £10,042.30 with a quarter CPL of £3.63.
+- Best efficiency was in Mar (£2.88 CPL), while Jan was highest at £4.01.
+- YoY vs same quarter last year: leads +302.33%, spend +16.11%.
+
+----------------------------------------
+
+Brand Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks    CTR   CPC       Cost Sales Leads   CPL    CVR
+  Jan      29,361 15,291 52.08% £0.38  £5,737.22       1,430 £4.01  9.35%
+  Feb      22,554 11,520 51.08% £0.29  £3,384.96       1,015 £3.33  8.81%
+  Mar       5,995  3,154 52.61% £0.29    £920.12         319 £2.88 10.11%
+Total      57,910 29,965 51.74% £0.34 £10,042.30       2,764 £3.63  9.22%
+- Brand generated 2,764 leads from £10,042.30 with a quarter CPL of £3.63.
+- Best efficiency was in Mar (£2.88 CPL), while Jan was highest at £4.01.
+- YoY vs same quarter last year: leads +302.33%, spend +16.11%.
+
+----------------------------------------
+
+Generic Summary
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC        Cost Sales Leads     CPL   CVR
+  Jan     404,712 22,167 5.48% £2.97  £65,788.14         524 £125.55 2.36%
+  Feb     354,493 19,784 5.58% £2.40  £47,474.65         478  £99.32 2.42%
+  Mar     154,992  5,264 3.40% £2.07  £10,884.36         110  £98.95 2.09%
+Total     914,197 47,215 5.16% £2.63 £124,147.15       1,112 £111.64 2.36%
+- Generic generated 1,112 leads from £124,147.15 with a quarter CPL of £111.64.
+- Best efficiency was in Mar (£98.95 CPL), while Jan was highest at £125.55.
+- YoY vs same quarter last year: leads -1.68%, spend +5.61%.
+
+----------------------------------------
+
+Generic Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC        Cost Sales Leads     CPL   CVR
+  Jan     404,712 22,167 5.48% £2.97  £65,788.14         524 £125.55 2.36%
+  Feb     354,493 19,784 5.58% £2.40  £47,474.65         478  £99.32 2.42%
+  Mar     154,992  5,264 3.40% £2.07  £10,884.36         110  £98.95 2.09%
+Total     914,197 47,215 5.16% £2.63 £124,147.15       1,112 £111.64 2.36%
+- Generic generated 1,112 leads from £124,147.15 with a quarter CPL of £111.64.
+- Best efficiency was in Mar (£98.95 CPL), while Jan was highest at £125.55.
+- YoY vs same quarter last year: leads -1.68%, spend +5.61%.
+
+----------------------------------------
+
+Performance Max Summary
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads    CPL   CVR
+  Jan   1,525,966 17,022 1.12% £0.89 £15,223.55         271 £56.18 1.59%
+  Feb   2,813,840 16,230 0.58% £0.82 £13,350.29         210 £63.57 1.29%
+  Mar     571,869  3,582 0.63% £0.87  £3,098.86          43 £72.07 1.20%
+Total   4,911,675 36,834 0.75% £0.86 £31,672.69         524 £60.44 1.42%
+- Performance Max generated 524 leads from £31,672.69 with a quarter CPL of £60.44.
+- Best efficiency was in Jan (£56.18 CPL), while Mar was highest at £72.07.
+- YoY vs same quarter last year: leads -64.06%, spend +43.99%.
+
+----------------------------------------
+
+Performance Max Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads    CPL   CVR
+  Jan   1,525,966 17,022 1.12% £0.89 £15,223.55         271 £56.18 1.59%
+  Feb   2,813,840 16,230 0.58% £0.82 £13,350.29         210 £63.57 1.29%
+  Mar     571,869  3,582 0.63% £0.87  £3,098.86          43 £72.07 1.20%
+Total   4,911,675 36,834 0.75% £0.86 £31,672.69         524 £60.44 1.42%
+- Performance Max generated 524 leads from £31,672.69 with a quarter CPL of £60.44.
+- Best efficiency was in Jan (£56.18 CPL), while Mar was highest at £72.07.
+- YoY vs same quarter last year: leads -64.06%, spend +43.99%.
+
+----------------------------------------
+
+Demand Gen Summary
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan   2,773,009 25,022 0.90% £0.54 £13,459.83         147  £91.56 0.59%
+  Feb   1,599,600 11,658 0.73% £0.78  £9,095.57          92  £98.86 0.79%
+  Mar     589,545  4,257 0.72% £0.55  £2,356.26          18 £130.90 0.42%
+Total   4,962,154 40,937 0.82% £0.61 £24,911.65         257  £96.93 0.63%
+- Demand Gen generated 257 leads from £24,911.65 with a quarter CPL of £96.93.
+- Best efficiency was in Jan (£91.56 CPL), while Mar was highest at £130.90.
+- YoY vs same quarter last year: leads +729.03%, spend +1267.38%.
+
+----------------------------------------
+
+Demand Gen Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan   2,773,009 25,022 0.90% £0.54 £13,459.83         147  £91.56 0.59%
+  Feb   1,599,600 11,658 0.73% £0.78  £9,095.57          92  £98.86 0.79%
+  Mar     589,545  4,257 0.72% £0.55  £2,356.26          18 £130.90 0.42%
+Total   4,962,154 40,937 0.82% £0.61 £24,911.65         257  £96.93 0.63%
+- Demand Gen generated 257 leads from £24,911.65 with a quarter CPL of £96.93.
+- Best efficiency was in Jan (£91.56 CPL), while Mar was highest at £130.90.
+- YoY vs same quarter last year: leads +729.03%, spend +1267.38%.
+
+----------------------------------------
+
+Other Summary
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks CTR CPC  Cost Sales Leads   CPL CVR
+  Jan           0      0 n/a n/a £0.00          34 £0.00 n/a
+  Feb           0      0 n/a n/a £0.00          23 £0.00 n/a
+  Mar           0      0 n/a n/a £0.00           8 £0.00 n/a
+Total           0      0 n/a n/a £0.00          65 £0.00 n/a
+- Other generated 65 leads from £0.00 with a quarter CPL of £0.00.
+- Active months in this quarter subset were Jan, Feb, Mar.
+- YoY comparison is unavailable due to missing or zero baseline in prior year data.
+
+----------------------------------------
+
+Other Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks CTR CPC  Cost Sales Leads   CPL CVR
+  Jan           0      0 n/a n/a £0.00          34 £0.00 n/a
+  Feb           0      0 n/a n/a £0.00          23 £0.00 n/a
+  Mar           0      0 n/a n/a £0.00           8 £0.00 n/a
+Total           0      0 n/a n/a £0.00          65 £0.00 n/a
+- Other generated 65 leads from £0.00 with a quarter CPL of £0.00.
+- Active months in this quarter subset were Jan, Feb, Mar.
+- YoY comparison is unavailable due to missing or zero baseline in prior year data.
+
+----------------------------------------
+
+China Summary + YoY
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan   1,872,295 22,617 1.21% £1.56 £35,382.89         299 £118.34 1.32%
+  Feb     701,195 11,892 1.70% £1.61 £19,195.21         276  £69.55 2.32%
+  Mar     494,029  4,899 0.99% £1.17  £5,729.23          74  £77.42 1.51%
+Total   3,067,519 39,408 1.28% £1.53 £60,307.34         649  £92.92 1.65%
+- China generated 649 leads from £60,307.34 with a quarter CPL of £92.92.
+- Best efficiency was in Feb (£69.55 CPL), while Jan was highest at £118.34.
+- YoY vs same quarter last year: leads -20.07%, spend +109.19%.
+
+----------------------------------------
+
+China Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan   1,872,295 22,617 1.21% £1.56 £35,382.89         299 £118.34 1.32%
+  Feb     701,195 11,892 1.70% £1.61 £19,195.21         276  £69.55 2.32%
+  Mar     494,029  4,899 0.99% £1.17  £5,729.23          74  £77.42 1.51%
+Total   3,067,519 39,408 1.28% £1.53 £60,307.34         649  £92.92 1.65%
+- China generated 649 leads from £60,307.34 with a quarter CPL of £92.92.
+- Best efficiency was in Feb (£69.55 CPL), while Jan was highest at £118.34.
+- YoY vs same quarter last year: leads -20.07%, spend +109.19%.
+
+----------------------------------------
+
+China Campaign Mix
+Q1 2026 (Jan - Mar 2026)
+  Campaign Type       Cost Sales Leads Cost Share Lead Share     CPL
+        Generic £41,380.68         338     68.62%     52.08% £122.43
+Performance Max  £9,896.36         197     16.41%     30.35%  £50.24
+     Demand Gen  £9,030.29         114     14.97%     17.57%  £79.21
+          Other      £0.00           0      0.00%      0.00%     n/a
+- Generic represented the largest share of spend (68.6%).
+- Generic delivered the largest share of leads (52.1%).
+
+----------------------------------------
+
+Japan Summary + YoY
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads    CPL   CVR
+  Jan   1,375,199 21,412 1.56% £1.50 £32,104.77         352 £91.21 1.64%
+  Feb   1,222,264 12,209 1.00% £1.58 £19,285.56         201 £95.95 1.65%
+  Mar     355,816  2,674 0.75% £1.45  £3,871.90          44 £88.00 1.65%
+Total   2,953,279 36,295 1.23% £1.52 £55,262.22         597 £92.57 1.64%
+- Japan generated 597 leads from £55,262.22 with a quarter CPL of £92.57.
+- Best efficiency was in Mar (£88.00 CPL), while Feb was highest at £95.95.
+- YoY vs same quarter last year: leads -21.03%, spend +6.47%.
+
+----------------------------------------
+
+Japan Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads    CPL   CVR
+  Jan   1,375,199 21,412 1.56% £1.50 £32,104.77         352 £91.21 1.64%
+  Feb   1,222,264 12,209 1.00% £1.58 £19,285.56         201 £95.95 1.65%
+  Mar     355,816  2,674 0.75% £1.45  £3,871.90          44 £88.00 1.65%
+Total   2,953,279 36,295 1.23% £1.52 £55,262.22         597 £92.57 1.64%
+- Japan generated 597 leads from £55,262.22 with a quarter CPL of £92.57.
+- Best efficiency was in Mar (£88.00 CPL), while Feb was highest at £95.95.
+- YoY vs same quarter last year: leads -21.03%, spend +6.47%.
+
+----------------------------------------
+
+Japan Campaign Mix
+Q1 2026 (Jan - Mar 2026)
+  Campaign Type       Cost Sales Leads Cost Share Lead Share     CPL
+        Generic £38,922.27         362     70.43%     60.64% £107.52
+Performance Max  £8,292.63         164     15.01%     27.47%  £50.56
+     Demand Gen  £8,047.33          71     14.56%     11.89% £113.34
+          Other      £0.00           0      0.00%      0.00%     n/a
+- Generic represented the largest share of spend (70.4%).
+- Generic delivered the largest share of leads (60.6%).
+
+----------------------------------------
+
+SE Asia Summary + YoY
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan     775,452 10,117 1.30% £1.27 £12,799.91         119 £107.56 1.18%
+  Feb     971,734  8,383 0.86% £1.17  £9,847.36          99  £99.47 1.18%
+  Mar     166,502  2,007 1.21% £1.33  £2,675.11          24 £111.46 1.20%
+Total   1,913,688 20,507 1.07% £1.23 £25,322.38         242 £104.64 1.18%
+- SE Asia generated 242 leads from £25,322.38 with a quarter CPL of £104.64.
+- Best efficiency was in Feb (£99.47 CPL), while Mar was highest at £111.46.
+- YoY vs same quarter last year: leads -40.69%, spend +1.00%.
+
+----------------------------------------
+
+SE Asia Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan     775,452 10,117 1.30% £1.27 £12,799.91         119 £107.56 1.18%
+  Feb     971,734  8,383 0.86% £1.17  £9,847.36          99  £99.47 1.18%
+  Mar     166,502  2,007 1.21% £1.33  £2,675.11          24 £111.46 1.20%
+Total   1,913,688 20,507 1.07% £1.23 £25,322.38         242 £104.64 1.18%
+- SE Asia generated 242 leads from £25,322.38 with a quarter CPL of £104.64.
+- Best efficiency was in Feb (£99.47 CPL), while Mar was highest at £111.46.
+- YoY vs same quarter last year: leads -40.69%, spend +1.00%.
+
+----------------------------------------
+
+SE Asia Campaign Mix
+Q1 2026 (Jan - Mar 2026)
+  Campaign Type       Cost Sales Leads Cost Share Lead Share     CPL
+        Generic £14,454.70         119     57.08%     49.17% £121.47
+Performance Max  £6,825.66          82     26.96%     33.88%  £83.24
+     Demand Gen  £4,042.02          41     15.96%     16.94%  £98.59
+          Other      £0.00           0      0.00%      0.00%     n/a
+- Generic represented the largest share of spend (57.1%).
+- Generic delivered the largest share of leads (49.2%).
+
+----------------------------------------
+
+India Summary + YoY
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan     451,624  5,177 1.15% £1.45  £7,524.19          99  £76.00 1.91%
+  Feb   1,357,405  6,958 0.51% £1.42  £9,908.31          85 £116.57 1.22%
+  Mar      98,163  1,313 1.34% £1.65  £2,159.93          16 £135.00 1.22%
+Total   1,907,192 13,448 0.71% £1.46 £19,592.43         200  £97.96 1.49%
+- India generated 200 leads from £19,592.43 with a quarter CPL of £97.96.
+- Best efficiency was in Jan (£76.00 CPL), while Mar was highest at £135.00.
+- YoY vs same quarter last year: leads -48.72%, spend +0.90%.
+
+----------------------------------------
+
+India Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads     CPL   CVR
+  Jan     451,624  5,177 1.15% £1.45  £7,524.19          99  £76.00 1.91%
+  Feb   1,357,405  6,958 0.51% £1.42  £9,908.31          85 £116.57 1.22%
+  Mar      98,163  1,313 1.34% £1.65  £2,159.93          16 £135.00 1.22%
+Total   1,907,192 13,448 0.71% £1.46 £19,592.43         200  £97.96 1.49%
+- India generated 200 leads from £19,592.43 with a quarter CPL of £97.96.
+- Best efficiency was in Jan (£76.00 CPL), while Mar was highest at £135.00.
+- YoY vs same quarter last year: leads -48.72%, spend +0.90%.
+
+----------------------------------------
+
+India Campaign Mix
+Q1 2026 (Jan - Mar 2026)
+  Campaign Type       Cost Sales Leads Cost Share Lead Share     CPL
+        Generic £11,348.01         104     57.92%     52.00% £109.12
+Performance Max  £4,452.40          65     22.73%     32.50%  £68.50
+     Demand Gen  £3,792.01          31     19.35%     15.50% £122.32
+- Generic represented the largest share of spend (57.9%).
+- Generic delivered the largest share of leads (52.0%).
+
+----------------------------------------
+
+Other Summary + YoY
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads    CPL   CVR
+  Jan     258,478 20,179 7.81% £0.61 £12,396.98       1,537  £8.07 7.62%
+  Feb     537,889 19,750 3.67% £0.76 £15,069.02       1,157 £13.02 5.86%
+  Mar     207,891  5,364 2.58% £0.53  £2,823.42         340  £8.30 6.34%
+Total   1,004,258 45,293 4.51% £0.67 £30,289.42       3,034  £9.98 6.70%
+- Other generated 3,034 leads from £30,289.42 with a quarter CPL of £9.98.
+- Best efficiency was in Jan (£8.07 CPL), while Feb was highest at £13.02.
+- YoY vs same quarter last year: leads +162.00%, spend +22.14%.
+
+----------------------------------------
+
+Other Monthly Trend
+Q1 2026 (Jan - Mar 2026)
+Month Impressions Clicks   CTR   CPC       Cost Sales Leads    CPL   CVR
+  Jan     258,478 20,179 7.81% £0.61 £12,396.98       1,537  £8.07 7.62%
+  Feb     537,889 19,750 3.67% £0.76 £15,069.02       1,157 £13.02 5.86%
+  Mar     207,891  5,364 2.58% £0.53  £2,823.42         340  £8.30 6.34%
+Total   1,004,258 45,293 4.51% £0.67 £30,289.42       3,034  £9.98 6.70%
+- Other generated 3,034 leads from £30,289.42 with a quarter CPL of £9.98.
+- Best efficiency was in Jan (£8.07 CPL), while Feb was highest at £13.02.
+- YoY vs same quarter last year: leads +162.00%, spend +22.14%.
+
+----------------------------------------
+
+Other Campaign Mix
+Q1 2026 (Jan - Mar 2026)
+  Campaign Type       Cost Sales Leads Cost Share Lead Share     CPL
+        Generic £18,041.49         189     59.56%      6.23%  £95.46
+          Brand £10,042.30       2,764     33.15%     91.10%   £3.63
+Performance Max  £2,205.64          16      7.28%      0.53% £137.85
+          Other      £0.00          65      0.00%      2.14%   £0.00
+- Generic represented the largest share of spend (59.6%).
+- Brand delivered the largest share of leads (91.1%).
+- Spend and lead mix are concentrated in different campaign types, indicating different efficiency profiles.
+
+----------------------------------------
+
+GOOGLE TRENDS
+
+----------------------------------------
+
+Japan Demand Trend
+Q1 2026 (Jan - Mar 2026)
+Month Current Value Prior Value
+  Jan          53.0         n/a
+  Feb          44.1         n/a
+  Mar          28.7         n/a
+- Japan trend data is available for the current period, but a prior-year baseline is not available.
+- Peak interest in the quarter fell in Jan.
+- The broader trend pattern looks decreasing.
+Source: Google Trends
+
+----------------------------------------
+
+AUCTION INSIGHTS
+
+----------------------------------------
+
+Brand coverage is very strong
+Q1 2026 (Jan - Mar 2026)
+               Domain Impression Share Overlap Rate Position Above Rate Top of Page Rate Absolute Top Rate Outranking Share
+     getyourguide.com              n/a         4.0%               53.3%            85.3%             34.7%            11.0%
+            tui.co.uk              n/a         1.9%               64.1%            84.5%             32.4%            11.1%
+        greatrail.com              n/a        12.1%               48.2%            81.6%             28.2%            10.6%
+         exoticca.com              n/a        19.9%               47.4%            78.3%             21.1%            10.2%
+           saga.co.uk              n/a        13.2%               65.1%            69.6%             28.2%            10.3%
+     loveholidays.com              n/a         7.6%               57.0%            88.6%             21.8%            10.8%
+     audleytravel.com            29.1%        41.0%               70.0%            82.4%             45.1%             8.0%
+distantjourneys.co.uk            14.1%        37.2%               55.7%            76.2%             26.4%             8.9%
+- audleytravel.com, distantjourneys.co.uk and exoticca.com are the closest competitors based on overlap rate.
+- audleytravel.com, distantjourneys.co.uk and you are strongest on impression share among competitors in the file.
+- tui.co.uk, getyourguide.com and loveholidays.com show the strongest outranking presence where that metric is available.
+Source: Google Ads Auction Insights
+
+----------------------------------------
+
+RECOMMENDATIONS
+
+----------------------------------------
+
+Recommendations / Next Steps
+Q1 2026 (Jan - Mar 2026)
+- Scale efficiency: Increase budget in the campaign types that are already delivering lead growth without a CPL penalty.
+- Budget allocation: Protect investment in Brand for scale while testing incremental budget into Other where efficiency is strongest.
+- Competitive defence: Monitor overlap from audleytravel.com, distantjourneys.co.uk and protect impression share on the most valuable queries.

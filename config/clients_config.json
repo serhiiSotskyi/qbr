@@ -83,6 +83,50 @@
         "google_trends": "Source: Google Trends",
         "auction_insights": "Source: Google Ads Auction Insights"
       }
+    },
+    {
+      "id": "olympic_holidays",
+      "name": "Olympic Holidays",
+      "country": "UK",
+      "site_domain": "olympicholidays.com",
+      "report_title": "Narrative Performance Report",
+      "agency": "Summon Digital",
+      "template_path": "templates/report_template.pptx",
+      "campaign_types": [
+        "Brand",
+        "Generic",
+        "Performance Max",
+        "Demand Gen",
+        "Other"
+      ],
+      "destinations": [],
+      "brand_trends": {
+        "enabled": false,
+        "terms": []
+      },
+      "destination_trends": {
+        "enabled": false,
+        "destinations": []
+      },
+      "auction_insights": {
+        "enabled": false,
+        "client_domain": "",
+        "known_competitors": []
+      },
+      "slides": {
+        "include_performance": false,
+        "include_overview": false,
+        "include_campaign_mix": false,
+        "include_campaign_summary": false,
+        "include_destination_summary": false,
+        "include_trends": false,
+        "include_auction_insights": false,
+        "include_recommendations": false
+      },
+      "source_notes": {
+        "google_trends": "",
+        "auction_insights": ""
+      }
     }
   ]
 }

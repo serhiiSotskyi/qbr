@@ -1,0 +1,43 @@
+[Executive Summary]
+- Revenue declined across the review period, while efficiency weakened as CPA moved 71.4% from the starting month.
+- Best revenue month was Jan 2026 at £205,977.
+- YoY revenue for matched months is down 65.4% versus 2025.
+- End-period efficiency did not materially deteriorate versus the previous month.
+
+[Market Trends]
+- Cyprus: Search interest across this upload changed -6.8% YoY across matched months.
+- Peak interest occurred in Oct 2024 with an indexed value of 54.0.
+- Greece: Search interest across this upload changed -7.9% YoY across matched months.
+- Peak interest occurred in Oct 2024 with an indexed value of 145.0.
+
+[Auction Insights]
+- jet2holidays.com had the highest impression share at 64.1%.
+- jet2holidays.com had the highest overlap rate at 56.5%.
+- The average top of page rate across competitors was 80.4%.
+
+[Overall Performance]
+- Revenue fell 86.3% from Jan 2026 to Mar 2026.
+- CPA worsened 71.4% over the same period, linking spend to lower output efficiency.
+- Spend decreased 72.4%, helping explain the gap between investment and returned revenue.
+- YoY matched-month revenue moved -65.4% while CPA moved 75.6%.
+
+[End of Period]
+- Mar 2026 revenue was £28,148, versus £81,535 in Feb 2026.
+- CPA fell from £604 to £406 across the closing months.
+- Purchases moved from 45.3 to 18.6 over the same period.
+
+[Channel Performance]
+- Brand is the strongest channel, delivering 69.6% of revenue at £68 CPA.
+- Generic is the weakest budget allocation, taking 69.7% of cost while running at £1,076 CPA.
+- Generic carries the largest cost share at 69.7%, so budget discipline there has the biggest account impact.
+- Budget efficiency is strongest where revenue share materially exceeds cost share, and weakest where cost concentration is not matched by returns.
+
+[ATC Analysis]
+- Add-to-cart volume declined 87.8% from Jan 2026 to Mar 2026.
+- CPATC rose 125.2% across the same period.
+- Both add-to-cart volume and revenue decreased in the latest period.
+- Purchases totalled 179.2 across the period covered by the add-to-cart view.
+
+[Actions]
+- Review final-month efficiency by channel.
+- Carry forward budget toward highest revenue-share themes.

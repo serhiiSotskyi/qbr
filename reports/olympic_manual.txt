@@ -1,0 +1,36 @@
+[Executive Summary]
+- Revenue declined across the review period, while efficiency weakened as CPA moved 12.9% from the starting month.
+- Best revenue month was May 2025 at £221,159.
+- YoY revenue for matched months is down 59.9% versus 2025.
+- End-period efficiency did not materially deteriorate versus the previous month.
+
+[Overall Performance]
+- Revenue fell 64.7% from Feb 2025 to Mar 2026.
+- CPA worsened 12.9% over the same period, linking spend to lower output efficiency.
+- Spend decreased 55.9%, helping explain the gap between investment and returned revenue.
+- YoY matched-month revenue moved -59.9% while CPA moved 74.9%.
+
+[End of Period]
+- Mar 2026 revenue was £45,555, versus £81,535 in Feb 2026.
+- CPA fell from £604 to £442 across the closing months.
+- Purchases moved from 45.3 to 26.6 over the same period.
+
+[Channel Performance]
+- Brand is the strongest channel, delivering 72.8% of revenue at £43 CPA.
+- Demand Gen is the weakest budget allocation, taking 4.4% of cost while running at £4,777 CPA.
+- Generic carries the largest cost share at 73.0%, so budget discipline there has the biggest account impact.
+- Budget efficiency is strongest where revenue share materially exceeds cost share, and weakest where cost concentration is not matched by returns.
+
+[ATC Analysis]
+- Add-to-cart volume declined 77.3% from Feb 2025 to Mar 2026.
+- CPATC rose 94.7% across the same period.
+- Both add-to-cart volume and revenue decreased in the latest period.
+- Purchases totalled 1171.1 across the period covered by the add-to-cart view.
+
+[Trends]
+- Q4 search interest remained soft despite stable visibility.
+- Conversion pressure was concentrated in the final weeks of the period.
+
+[Actions]
+- Review final-month traffic quality by channel and query intent.
+- Hold budget on the weakest CPA segments until efficiency improves.

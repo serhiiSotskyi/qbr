@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
+import pandas as pd
+
+from report_generator.pipelines.olympic_pipeline import generate_olympic_report
+from src.config_loader import ConfigLoader
 from src.report_pipeline import ReportPipeline
+from utils.text_report import TextReportPipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,14 +33,73 @@ def run_report(
     trends_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
     output_path: Optional[str] = None,
+    manual_inputs: Optional[dict[str, Any]] = None,
 ) -> str:
     project_root = Path(__file__).resolve().parent
+    if client_id == "olympic_holidays":
+        config_loader = _build_config_loader(project_root)
+        client_config = config_loader.get_client_config(client_id)
+        resolved_output = project_root / output_path if output_path else project_root / "output" / f"{client_id}_report.pptx"
+        result = generate_olympic_report(
+            rows=pd.read_csv(performance_csv),
+            client_config={
+                **client_config,
+                "_project_root": str(project_root),
+                "_chart_styles": config_loader.get_chart_styles(),
+            },
+            output_path=resolved_output,
+            manual_inputs=manual_inputs,
+            trends_dir=trends_dir,
+            auction_csv=auction_csv,
+        )
+        return str(result["pptx_path"])
+
     pipeline = ReportPipeline(project_root=project_root)
     resolved_output = project_root / output_path if output_path else None
 
     report_path = pipeline.run(
         input_csv=performance_csv,
         output_pptx=resolved_output,
+        client_id=client_id,
+        auction_csv=auction_csv,
+        trends_dir=trends_dir,
+    )
+    return str(report_path)
+
+
+def run_text_report(
+    performance_csv: str,
+    client_id: str,
+    trends_dir: Optional[str] = None,
+    auction_csv: Optional[str] = None,
+    output_path: Optional[str] = None,
+    manual_inputs: Optional[dict[str, Any]] = None,
+) -> str:
+    project_root = Path(__file__).resolve().parent
+    if client_id == "olympic_holidays":
+        config_loader = _build_config_loader(project_root)
+        client_config = config_loader.get_client_config(client_id)
+        resolved_output = project_root / output_path if output_path else project_root / "reports" / f"{client_id}_report.txt"
+        result = generate_olympic_report(
+            rows=pd.read_csv(performance_csv),
+            client_config={
+                **client_config,
+                "_project_root": str(project_root),
+                "_chart_styles": config_loader.get_chart_styles(),
+            },
+            output_path=resolved_output,
+            manual_inputs=manual_inputs,
+            trends_dir=trends_dir,
+            auction_csv=auction_csv,
+        )
+        return str(result["text_path"])
+
+    pipeline = TextReportPipeline(project_root=project_root)
+    resolved_output = project_root / output_path if output_path else None
+
+    report_path = pipeline.run(
+        input_csv=performance_csv,
+        output_txt=resolved_output,
         client_id=client_id,
         auction_csv=auction_csv,
         trends_dir=trends_dir,
@@ -59,6 +123,14 @@ def main() -> None:
     )
 
     print(f"Report generated: {output_path}")
+
+
+def _build_config_loader(project_root: Path) -> ConfigLoader:
+    return ConfigLoader(
+        report_config_path=project_root / "config" / "report_config.yaml",
+        chart_styles_path=project_root / "config" / "chart_styles.yaml",
+        clients_config_path=project_root / "config" / "clients_config.json",
+    )
 
 
 if __name__ == "__main__":

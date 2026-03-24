@@ -1,0 +1,39 @@
+[Executive Summary]
+- Revenue declined across the review period, while efficiency declined as CPA moved 12.9% from the starting month. Both intent and conversion softened, pointing to weaker audience demand at the end of the period.
+- Best revenue month was May 2025 at £221,159.
+- YoY revenue for matched months is down 59.9% versus 2025.
+- End-period efficiency did not materially deteriorate versus the previous month.
+
+[Overall Performance]
+- Revenue fell 64.7% from Feb 2025 to Mar 2026.
+- CPA worsened 12.9% over the same period, linking spend to lower output efficiency.
+- Spend decreased 55.9%, helping explain the gap between investment and returned revenue.
+- YoY matched-month revenue moved -59.9% while CPA moved 74.9%.
+
+[End of Period]
+- Mar 2026 revenue was £45,555, versus £81,535 in Feb 2026.
+- CPA fell from £604 to £442 across the closing months.
+- Both intent and conversion softened, pointing to weaker audience demand at the end of the period.
+
+[Channel Performance]
+- Brand is the strongest channel, delivering 72.8% of revenue at £43 CPA.
+- Demand Gen is the weakest budget allocation, taking 4.4% of cost while running at £4,777 CPA.
+- Generic carries the largest cost share at 73.0%, so budget discipline there has the biggest account impact.
+- Budget efficiency is strongest where revenue share materially exceeds cost share, and weakest where cost concentration is not matched by returns.
+
+[ATC Analysis]
+- Add-to-cart volume declined 77.3% from Feb 2025 to Mar 2026.
+- CPATC rose 94.7%, showing higher cost to generate intent.
+- Upper-funnel intent and lower-funnel output both weakened, indicating a broader demand softness rather than a single-step conversion issue.
+- Any sustained gap between ATC trend and purchase trend should be treated as a funnel drop-off signal.
+
+[Trends & Insights]
+- Revenue only partially tracked spend, implying conversion efficiency shifted during the period.
+- The main anomaly was Dec 2025, when CPA peaked at £610 despite revenue of £58,520.
+- Add-to-cart volume declined 77.3%, pointing to a meaningful change in upper-funnel intent.
+- YoY matched-month revenue changed -59.9% comparing 2026 against 2025.
+
+[Actions]
+- Reallocate budget away from Demand Gen until its CPA is brought closer to account average.
+- Optimise landing pages and pre-booking journeys to recover add-to-cart volume before scaling budget.
+- Build a recovery plan for matched 2026 months, as revenue is below 2025 despite comparable seasonality.

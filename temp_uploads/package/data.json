@@ -1,0 +1,60 @@
+{
+  "summary": {
+    "client": "Wendy Wu Tours",
+    "date_range": "2024-10-01 to 2026-03-10",
+    "spend": "773875.50",
+    "clicks": 654141,
+    "impressions": 40031349,
+    "ctr": 1.63,
+    "cpc": 1.18,
+    "ctr_change": -49.43,
+    "cpc_change": -32.38
+  },
+  "top_campaigns": [
+    {
+      "campaign_type": "Generic",
+      "spend": 523366.566878,
+      "clicks": 230387,
+      "impressions": 4976635,
+      "sales_leads": 5723,
+      "ctr": 4.63,
+      "cpc": 2.27
+    },
+    {
+      "campaign_type": "Performance Max",
+      "spend": 112195.882248,
+      "clicks": 163268,
+      "impressions": 18217048,
+      "sales_leads": 5989,
+      "ctr": 0.9,
+      "cpc": 0.69
+    },
+    {
+      "campaign_type": "Demand Gen",
+      "spend": 76963.326751,
+      "clicks": 165100,
+      "impressions": 16648143,
+      "sales_leads": 1035,
+      "ctr": 0.99,
+      "cpc": 0.47
+    },
+    {
+      "campaign_type": "Brand",
+      "spend": 61349.720679,
+      "clicks": 95386,
+      "impressions": 189523,
+      "sales_leads": 8569,
+      "ctr": 50.33,
+      "cpc": 0.64
+    },
+    {
+      "campaign_type": "Other",
+      "spend": 0.0,
+      "clicks": 0,
+      "impressions": 0,
+      "sales_leads": 598,
+      "ctr": 0.0,
+      "cpc": 0.0
+    }
+  ]
+}
