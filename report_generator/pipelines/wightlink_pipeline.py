@@ -11,18 +11,10 @@ from report_generator.narratives.wightlink_narratives import (
     build_all_performance_narrative,
     build_all_performance_yoy_narrative,
     build_brand_auction_narrative,
-    build_brand_device_narrative,
-    build_brand_location_narrative,
     build_brand_narrative,
-    build_competitor_narrative,
     build_generic_auction_narrative,
-    build_generic_device_narrative,
-    build_generic_location_narrative,
     build_generics_narrative,
-    build_opportunities_narrative,
     build_pmax_narrative,
-    build_seo_narrative,
-    build_test_narrative,
     build_trends_narrative,
 )
 from report_generator.parsers.generic_trends_parser import parse_trends_inputs
@@ -107,6 +99,11 @@ def _build_slides(
     pmax = performance["campaigns"]["Performance Max"]
     brand_prior = performance["campaigns_prior_year"].get("Brand")
     generic_prior = performance["campaigns_prior_year"].get("Generic")
+    agenda_items = [
+        "Trends",
+        "Auction Insights",
+        "Performance",
+    ]
 
     trend_chart = ppt_builder.build_trend_chart(trends_section, "trends.png") if trends_section else None
     overall_charts = {
@@ -137,7 +134,7 @@ def _build_slides(
         "section_title": "Agenda",
         "title": "What We'll Cover Today",
         "subtitle": subtitle,
-        "bullets": list(manual.get("agenda", [])),
+        "bullets": agenda_items,
     })
     slides.append({"type": "divider", "section": "trends", "section_title": "Trends", "title": "Trends"})
     slides.append({
@@ -218,7 +215,6 @@ def _build_slides(
         "table": {"rows": generic.get("table_rows", [])},
         "bullets": build_generics_narrative(generic, generic_prior),
     })
-    slides.append({"type": "divider", "section": "tests", "section_title": "Tests", "title": "Tests"})
     slides.append({
         "type": "table_bullets",
         "section": "performance",
@@ -227,49 +223,6 @@ def _build_slides(
         "subtitle": subtitle,
         "table": {"rows": pmax.get("table_rows", [])},
         "bullets": build_pmax_narrative(pmax),
-    })
-    slides.append(_manual_table_slide("generic_location", subtitle, manual, build_generic_location_narrative))
-    slides.append(_manual_table_slide("generic_device", subtitle, manual, build_generic_device_narrative))
-    slides.append(_manual_table_slide("brand_location", subtitle, manual, build_brand_location_narrative))
-    slides.append(_manual_table_slide("brand_device", subtitle, manual, build_brand_device_narrative))
-    slides.append(_test_slide("brand_tcpa", subtitle, manual))
-    slides.append(_test_slide("target_roas", subtitle, manual))
-    slides.append({"type": "divider", "section": "seo", "section_title": "SEO", "title": "SEO"})
-    slides.append({
-        "type": "image_bullets",
-        "section": "seo",
-        "section_title": "SEO Overview",
-        "title": manual["seo"]["overview_title"],
-        "subtitle": subtitle,
-        "bullets": list(manual["seo"]["overview_bullets"]),
-        "image_path": manual["seo"].get("overview_image_path"),
-    })
-    slides.append({
-        "type": "bullets_only",
-        "section": "seo",
-        "section_title": "SEO Summary",
-        "title": manual["seo"]["summary_title"],
-        "subtitle": subtitle,
-        "bullets": build_seo_narrative(manual["seo"]),
-    })
-    slides.append({"type": "divider", "section": "opportunities", "section_title": "Opportunities", "title": "Opportunities/Tests"})
-    slides.append({
-        "type": "bullets_only",
-        "section": "opportunities",
-        "section_title": "Opportunities",
-        "title": manual["opportunities"]["title"],
-        "subtitle": subtitle,
-        "bullets": build_opportunities_narrative(manual["opportunities"]),
-    })
-    slides.append({"type": "divider", "section": "competitors", "section_title": "Competitors", "title": "Competitors"})
-    slides.append({
-        "type": "image_bullets",
-        "section": "competitor_analysis",
-        "section_title": "Competitor Analysis",
-        "title": manual["competitor_analysis"]["title"],
-        "subtitle": subtitle,
-        "bullets": build_competitor_narrative(manual["competitor_analysis"]),
-        "image_path": manual["competitor_analysis"].get("image_path"),
     })
     slides.append({"type": "closing", "section": "closing", "section_title": "Closing", "title": "Any Questions?"})
     return slides
@@ -295,38 +248,6 @@ def _auction_slide(subtype: str, subtitle: str, uploaded: dict[str, Any] | None,
         "bullets": bullets,
         "source_note": manual_section.get("source_note", ""),
     }
-
-
-def _manual_table_slide(key: str, subtitle: str, manual: dict[str, Any], narrative_builder) -> dict[str, Any]:
-    section = manual["audience"][key]
-    return {
-        "type": "table_bullets",
-        "section": "audience",
-        "subtype": key,
-        "section_title": section["title"],
-        "title": f"{section['title']} {section.get('subtitle', '')}".strip(),
-        "subtitle": subtitle,
-        "table": {"rows": section.get("table_rows", [])},
-        "bullets": narrative_builder(section),
-        "source_note": "Source: Reference deck / manual input",
-    }
-
-
-def _test_slide(key: str, subtitle: str, manual: dict[str, Any]) -> dict[str, Any]:
-    section = manual["tests"][key]
-    return {
-        "type": "table_bullets",
-        "section": "tests",
-        "subtype": key,
-        "section_title": section["title"],
-        "title": section["title"],
-        "subtitle": subtitle,
-        "table": {"rows": section.get("table_rows", [])},
-        "bullets": build_test_narrative(section),
-        "source_note": "Source: Reference deck / manual input",
-    }
-
-
 def _merge_manual_inputs(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     merged = deepcopy(base)
     for key, value in overrides.items():

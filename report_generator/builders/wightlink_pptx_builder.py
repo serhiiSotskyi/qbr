@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import math
 from pathlib import Path
 from typing import Any
 
@@ -45,15 +46,34 @@ class WightlinkPptxBuilder:
         series = trend_section.get("series", [])
         if not labels or not series:
             return self._plot_empty(output, "No trend data")
-        fig, ax = plt.subplots(figsize=(8.2, 4.2))
+        x_values = list(range(len(labels)))
+        tick_step = max(1, math.ceil(len(labels) / 8))
+        tick_positions = x_values[::tick_step]
+        if tick_positions[-1] != x_values[-1]:
+            tick_positions.append(x_values[-1])
+
+        fig, ax = plt.subplots(figsize=(7.2, 3.8))
         palette = ["#0C5460", "#94A3B8", "#1D4ED8", "#14B8A6"]
         for index, item in enumerate(series):
-            ax.plot(labels, item.get("data", []), linewidth=2.3, marker="o", label=item.get("name", f"Series {index+1}"), color=palette[index % len(palette)])
+            data = item.get("data", [])
+            marker = "o" if len(data) <= 20 else None
+            ax.plot(
+                x_values,
+                data,
+                linewidth=2.3,
+                marker=marker,
+                markersize=4.5,
+                label=item.get("name", f"Series {index+1}"),
+                color=palette[index % len(palette)],
+            )
         ax.set_title(trend_section.get("title", "Google Trends"), fontsize=15)
-        ax.tick_params(axis="x", rotation=35, labelsize=9)
+        ax.set_xticks(tick_positions, [labels[index] for index in tick_positions])
+        ax.tick_params(axis="x", rotation=35, labelsize=8)
         ax.tick_params(axis="y", labelsize=9)
         ax.grid(axis="y", alpha=0.2)
-        ax.legend(fontsize=9, loc="upper left")
+        ax.margins(x=0.02)
+        if len(series) > 1:
+            ax.legend(fontsize=9, loc="upper left")
         plt.tight_layout()
         fig.savefig(output, dpi=180)
         plt.close(fig)
@@ -122,8 +142,8 @@ class WightlinkPptxBuilder:
             self._add_bullets(slide, bullets, Inches(0.8), Inches(4.85), Inches(11.8), Inches(1.65))
         elif slide_type == "single_chart_bullets":
             if charts:
-                slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.55), Inches(1.35), width=Inches(7.4), height=Inches(4.5))
-            self._add_bullets(slide, bullets, Inches(8.2), Inches(1.55), Inches(4.3), Inches(3.9))
+                slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.6), Inches(1.5), width=Inches(6.7), height=Inches(3.8))
+            self._add_bullets(slide, bullets, Inches(7.65), Inches(1.6), Inches(4.6), Inches(3.7))
         elif slide_type == "table_bullets":
             self._render_table(slide, table_rows, Inches(0.4), Inches(1.35), Inches(12.45), Inches(3.35))
             self._add_bullets(slide, bullets, Inches(0.8), Inches(4.95), Inches(11.8), Inches(1.45))

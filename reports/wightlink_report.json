@@ -1,0 +1,537 @@
+{
+  "client_id": "wightlink",
+  "report_type": "qbr",
+  "quarter": "Q1 2026",
+  "date_range": {
+    "from": "2026-01-01",
+    "to": "2026-03-31"
+  },
+  "slides": [
+    {
+      "type": "cover",
+      "section": "cover",
+      "section_title": "Cover",
+      "title": "Wightlink QBR",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "client_name": "Wightlink"
+    },
+    {
+      "type": "agenda",
+      "section": "agenda",
+      "section_title": "Agenda",
+      "title": "What We'll Cover Today",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "bullets": [
+        "Trends",
+        "Auction Insights",
+        "Performance"
+      ]
+    },
+    {
+      "type": "divider",
+      "section": "trends",
+      "section_title": "Trends",
+      "title": "Trends"
+    },
+    {
+      "type": "single_chart_bullets",
+      "section": "trends",
+      "section_title": "Trends",
+      "title": "Google Trends - Isle Of Wight Ferry",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "charts": [
+        {
+          "title": "Google Trends - Isle Of Wight Ferry",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/trends.png"
+        }
+      ],
+      "bullets": [
+        "Peak search interest landed in 17 Feb 2026."
+      ],
+      "source_note": "Source: Google Trends"
+    },
+    {
+      "type": "table_bullets",
+      "section": "auction",
+      "subtype": "generic",
+      "section_title": "Auction Insights - Generic",
+      "title": "Auction Insights - Generic",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "table": {
+        "rows": [
+          {
+            "Display URL domain": "ferrysavers.co.uk",
+            "Impression share": "12.96%",
+            "Overlap rate": "24.15%",
+            "Position above rate": "29.04%",
+            "Top of page rate": "88.89%",
+            "Abs. Top of page rate": "11.95%",
+            "Outranking share": "34.58%"
+          },
+          {
+            "Display URL domain": "parkdeanresorts.co.uk",
+            "Impression share": "10.00%",
+            "Overlap rate": "3.50%",
+            "Position above rate": "56.09%",
+            "Top of page rate": "87.96%",
+            "Abs. Top of page rate": "41.83%",
+            "Outranking share": "36.46%"
+          },
+          {
+            "Display URL domain": "You",
+            "Impression share": "37.19%",
+            "Overlap rate": "--",
+            "Position above rate": "--",
+            "Top of page rate": "94.72%",
+            "Abs. Top of page rate": "40.20%",
+            "Outranking share": "--"
+          },
+          {
+            "Display URL domain": "directferries.co.uk",
+            "Impression share": "24.78%",
+            "Overlap rate": "40.59%",
+            "Position above rate": "45.57%",
+            "Top of page rate": "94.94%",
+            "Abs. Top of page rate": "28.67%",
+            "Outranking share": "30.31%"
+          },
+          {
+            "Display URL domain": "redfunnel.co.uk",
+            "Impression share": "24.48%",
+            "Overlap rate": "45.32%",
+            "Position above rate": "66.46%",
+            "Top of page rate": "95.62%",
+            "Abs. Top of page rate": "43.09%",
+            "Outranking share": "25.99%"
+          },
+          {
+            "Display URL domain": "booking.com",
+            "Impression share": "10.00%",
+            "Overlap rate": "1.72%",
+            "Position above rate": "62.20%",
+            "Top of page rate": "85.06%",
+            "Abs. Top of page rate": "35.00%",
+            "Outranking share": "36.80%"
+          }
+        ]
+      },
+      "bullets": [
+        "We saw 5 competitors in the supplied auction data.",
+        "redfunnel.co.uk was one of the strongest overlapping competitors at 45%, with abs. top-of-page pressure at 43%.",
+        "directferries.co.uk was one of the strongest overlapping competitors at 41%, with abs. top-of-page pressure at 29%.",
+        "Average top-of-page pressure across competitors was 90% in the supplied file."
+      ],
+      "source_note": "Source: Google Ads Auction Insights"
+    },
+    {
+      "type": "table_bullets",
+      "section": "auction",
+      "subtype": "brand",
+      "section_title": "Auction Insights - Brand",
+      "title": "Auction Insights - Brand",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "table": {
+        "rows": [
+          {
+            "Display URL domain": "You",
+            "Impression share": "80.06%",
+            "Overlap rate": "--",
+            "Position above rate": "--",
+            "Top of page rate": "91.08%",
+            "Abs. Top of page rate": "74.04%",
+            "Outranking share": "--"
+          },
+          {
+            "Display URL domain": "redfunnel.co.uk",
+            "Impression share": "35.74%",
+            "Overlap rate": "42.52%",
+            "Position above rate": "26.97%",
+            "Top of page rate": "84.11%",
+            "Abs. Top of page rate": "25.42%",
+            "Outranking share": "70.88%"
+          },
+          {
+            "Display URL domain": "awayresorts.co.uk",
+            "Impression share": "12.68%",
+            "Overlap rate": "15.36%",
+            "Position above rate": "13.38%",
+            "Top of page rate": "62.10%",
+            "Abs. Top of page rate": "12.60%",
+            "Outranking share": "78.41%"
+          },
+          {
+            "Display URL domain": "adamvacations.com",
+            "Impression share": "< 10%",
+            "Overlap rate": "11.67%",
+            "Position above rate": "11.55%",
+            "Top of page rate": "42.10%",
+            "Abs. Top of page rate": "9.31%",
+            "Outranking share": "78.98%"
+          },
+          {
+            "Display URL domain": "directferries.co.uk",
+            "Impression share": "< 10%",
+            "Overlap rate": "11.56%",
+            "Position above rate": "15.59%",
+            "Top of page rate": "72.42%",
+            "Abs. Top of page rate": "13.05%",
+            "Outranking share": "78.61%"
+          }
+        ]
+      },
+      "bullets": [
+        "Throughout the quarter we saw 4 main competitors in the market.",
+        "Red Funnel were overlapping us 43% of the time, claiming the top spot 25% of the time.",
+        "Comparing YoY, Red Funnel had an increased presence versus the reference period."
+      ],
+      "source_note": "Source: Google Ads Auction Insights"
+    },
+    {
+      "type": "divider",
+      "section": "performance",
+      "section_title": "Performance",
+      "title": "Performance"
+    },
+    {
+      "type": "dual_chart_bullets",
+      "section": "performance",
+      "section_title": "All Performance",
+      "title": "All Performance",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "charts": [
+        {
+          "title": "CPA vs CVR",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/all_cpa_cvr.png"
+        },
+        {
+          "title": "Cost vs Purchases",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/all_cost_purchases.png"
+        }
+      ],
+      "bullets": [
+        "March was the strongest month for purchase volume.",
+        "February was the most efficient month on CPA.",
+        "CVR could not be calculated from the uploaded CSV because click data was not supplied.",
+        "Quarter ROAS closed at 58.44 on £55,265 spend."
+      ],
+      "source_note": "Source: Uploaded performance CSV"
+    },
+    {
+      "type": "table_bullets",
+      "section": "performance",
+      "section_title": "All Performance YoY",
+      "title": "All Performance YoY",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "table": {
+        "rows": [
+          {
+            "Metric": "Purchases",
+            "Current": "34,929",
+            "Prior year": "25,506",
+            "YoY change": "+36.9%"
+          },
+          {
+            "Metric": "Revenue",
+            "Current": "£3,229,632.90",
+            "Prior year": "£2,207,172.42",
+            "YoY change": "+46.3%"
+          },
+          {
+            "Metric": "Cost",
+            "Current": "£55,265.24",
+            "Prior year": "£42,141.92",
+            "YoY change": "+31.1%"
+          },
+          {
+            "Metric": "CPA",
+            "Current": "£1.58",
+            "Prior year": "£1.65",
+            "YoY change": "-4.2%"
+          },
+          {
+            "Metric": "ROAS",
+            "Current": "58.44",
+            "Prior year": "52.37",
+            "YoY change": "+11.6%"
+          },
+          {
+            "Metric": "CVR",
+            "Current": "--",
+            "Prior year": "--",
+            "YoY change": "--"
+          }
+        ]
+      },
+      "bullets": [
+        "Purchases were up 37% versus the same quarter last year.",
+        "Revenue was up 46% versus the same quarter last year.",
+        "Cost was up 31% versus the same quarter last year.",
+        "CPA was down 4% versus the same quarter last year."
+      ]
+    },
+    {
+      "type": "dual_chart_bullets",
+      "section": "performance",
+      "section_title": "Brand Performance",
+      "title": "Brand Performance",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "charts": [
+        {
+          "title": "CPA vs CVR",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/brand_cpa_cvr.png"
+        },
+        {
+          "title": "Cost vs Purchases",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/brand_cost_purchases.png"
+        }
+      ],
+      "bullets": [
+        "March was the strongest month for purchase volume.",
+        "January was the most efficient month on CPA.",
+        "CVR could not be calculated from the uploaded CSV because click data was not supplied.",
+        "Quarter ROAS closed at 197.77 on £11,144 spend.",
+        "Quarter CPA was 61% lower than the same quarter last year."
+      ]
+    },
+    {
+      "type": "table_bullets",
+      "section": "performance",
+      "section_title": "Brand Summary",
+      "title": "Brand Performance Summary",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "table": {
+        "rows": [
+          {
+            "Month": "January",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£2,774.47",
+            "Purchases": "8,055",
+            "CPA": "£0.34",
+            "Purchase Revenue": "£700,297.56",
+            "ROAS": "252.41",
+            "CVR": "--"
+          },
+          {
+            "Month": "February",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£2,712.20",
+            "Purchases": "7,731",
+            "CPA": "£0.35",
+            "Purchase Revenue": "£682,664.14",
+            "ROAS": "251.70",
+            "CVR": "--"
+          },
+          {
+            "Month": "March",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£5,657.55",
+            "Purchases": "8,670",
+            "CPA": "£0.65",
+            "Purchase Revenue": "£821,032.32",
+            "ROAS": "145.12",
+            "CVR": "--"
+          },
+          {
+            "Month": "Total",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£11,144.22",
+            "Purchases": "24,457",
+            "CPA": "£0.46",
+            "Purchase Revenue": "£2,203,994.03",
+            "ROAS": "197.77",
+            "CVR": "--"
+          }
+        ]
+      },
+      "bullets": [
+        "March was the strongest month for purchase volume.",
+        "January was the most efficient month on CPA.",
+        "CVR could not be calculated from the uploaded CSV because click data was not supplied.",
+        "Quarter ROAS closed at 197.77 on £11,144 spend.",
+        "Quarter CPA was 61% lower than the same quarter last year."
+      ]
+    },
+    {
+      "type": "dual_chart_bullets",
+      "section": "performance",
+      "section_title": "Generics Performance",
+      "title": "Generics Performance",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "charts": [
+        {
+          "title": "CPA vs CVR",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/generic_cpa_cvr.png"
+        },
+        {
+          "title": "Cost vs Purchases",
+          "path": "/Users/sergeysotskiy/Documents/GitHub/qbr/reports/wightlink_report_charts/generic_cost_purchases.png"
+        }
+      ],
+      "bullets": [
+        "March was the strongest month for purchase volume.",
+        "January was the most efficient month on CPA.",
+        "CVR could not be calculated from the uploaded CSV because click data was not supplied.",
+        "Quarter ROAS closed at 26.18 on £27,700 spend.",
+        "Quarter CPA was 16% lower than the same quarter last year."
+      ]
+    },
+    {
+      "type": "table_bullets",
+      "section": "performance",
+      "section_title": "Generics Summary",
+      "title": "Generics Performance Summary",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "table": {
+        "rows": [
+          {
+            "Month": "January",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£6,866.11",
+            "Purchases": "1,861",
+            "CPA": "£3.69",
+            "Purchase Revenue": "£201,575.37",
+            "ROAS": "29.36",
+            "CVR": "--"
+          },
+          {
+            "Month": "February",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£6,806.00",
+            "Purchases": "1,671",
+            "CPA": "£4.07",
+            "Purchase Revenue": "£180,929.17",
+            "ROAS": "26.58",
+            "CVR": "--"
+          },
+          {
+            "Month": "March",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£14,027.71",
+            "Purchases": "2,871",
+            "CPA": "£4.89",
+            "Purchase Revenue": "£342,810.28",
+            "ROAS": "24.44",
+            "CVR": "--"
+          },
+          {
+            "Month": "Total",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£27,699.82",
+            "Purchases": "6,403",
+            "CPA": "£4.33",
+            "Purchase Revenue": "£725,314.83",
+            "ROAS": "26.18",
+            "CVR": "--"
+          }
+        ]
+      },
+      "bullets": [
+        "March was the strongest month for purchase volume.",
+        "January was the most efficient month on CPA.",
+        "CVR could not be calculated from the uploaded CSV because click data was not supplied.",
+        "Quarter ROAS closed at 26.18 on £27,700 spend.",
+        "Quarter CPA was 16% lower than the same quarter last year."
+      ]
+    },
+    {
+      "type": "table_bullets",
+      "section": "performance",
+      "section_title": "PMax Performance",
+      "title": "PMax Performance",
+      "subtitle": "Q1 2026 (Jan - Mar 2026)",
+      "table": {
+        "rows": [
+          {
+            "Month": "January",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£1,671.00",
+            "Purchases": "409",
+            "CPA": "£4.08",
+            "Purchase Revenue": "£31,769.23",
+            "ROAS": "19.01",
+            "CVR": "--"
+          },
+          {
+            "Month": "February",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£1,523.82",
+            "Purchases": "331",
+            "CPA": "£4.60",
+            "Purchase Revenue": "£24,628.29",
+            "ROAS": "16.16",
+            "CVR": "--"
+          },
+          {
+            "Month": "March",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£2,258.27",
+            "Purchases": "441",
+            "CPA": "£5.13",
+            "Purchase Revenue": "£39,601.87",
+            "ROAS": "17.54",
+            "CVR": "--"
+          },
+          {
+            "Month": "Total",
+            "Impressions": "--",
+            "Clicks": "--",
+            "CTR": "--",
+            "CPC": "--",
+            "Cost": "£5,453.08",
+            "Purchases": "1,181",
+            "CPA": "£4.62",
+            "Purchase Revenue": "£95,999.39",
+            "ROAS": "17.60",
+            "CVR": "--"
+          }
+        ]
+      },
+      "bullets": [
+        "March was the strongest month for purchase volume.",
+        "January was the most efficient month on CPA.",
+        "CVR could not be calculated from the uploaded CSV because click data was not supplied.",
+        "Quarter ROAS closed at 17.60 on £5,453 spend.",
+        "Performance Max should be read alongside generic activity because the source CSV is aggregated at campaign type level."
+      ]
+    },
+    {
+      "type": "closing",
+      "section": "closing",
+      "section_title": "Closing",
+      "title": "Any Questions?"
+    }
+  ]
+}

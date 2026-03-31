@@ -34,7 +34,13 @@ class TrendsLoader:
         if not directory.exists() or not directory.is_dir():
             return _empty_trends_df()
 
-        frames = [self.load_csv(csv_path) for csv_path in sorted(directory.glob("*.csv"))]
+        frames = []
+        for csv_path in sorted(directory.glob("*.csv")):
+            try:
+                frame = self.load_csv(csv_path)
+            except Exception:
+                continue
+            frames.append(frame)
         frames = [frame for frame in frames if not frame.empty]
         if not frames:
             return _empty_trends_df()
@@ -51,8 +57,6 @@ class TrendsLoader:
         df = pd.read_csv(path)
         if df.empty:
             return _empty_trends_df()
-
-        print("Available trend columns:", df.columns.tolist())
 
         date_col = _find_date_column(df.columns)
         if date_col is None:
@@ -91,14 +95,12 @@ class TrendsLoader:
             return trends_df.copy()
 
         config_terms = [str(term).strip() for term in terms if str(term).strip()]
-        print("Looking for terms:", config_terms)
         if not config_terms:
             return _empty_trends_df()
 
         matched_normalized_terms: List[str] = []
         for config_term in config_terms:
             matched_term = TrendsLoader.find_matching_term(trends_df, config_term, trend_aliases=trend_aliases)
-            print("Matched term:", matched_term)
             if matched_term is not None:
                 matched_normalized_terms.append(normalize_term(matched_term))
 

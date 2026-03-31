@@ -1,37 +1,108 @@
 [Executive Summary]
-- Revenue declined across the review period, while efficiency weakened as CPA moved 86.6% from the starting month.
-- Best revenue month was Jan 2026 at £205,977.
-- YoY revenue for matched months is down 59.9% versus 2025.
-- End-period efficiency did not materially deteriorate versus the previous month.
+- Q1 2026 delivered £372,830 revenue from 209.2 purchases on £72,456 spend.
+- Quarter efficiency closed at £346 CPA, £31 cost per ATC, and £1,782 AOV.
+- Jan 2026 was the strongest revenue month, while Jan 2026 recorded the most efficient CPA.
+- Versus Q1 2025, revenue moved -47.3%, cost moved -12.5%, and purchases moved -43.4%.
 
-[Market Trends]
-- Time Series GB 20251220 1217 20260320 1217: Peak interest occurred in Feb 2026 with an indexed value of 30.5.
-- Latest month interest fell from 30.5 to 20.4.
+[Cyprus Trends]
+- Peak interest occurred in Mar 2026 with an indexed value of 39.4.
+- Latest month interest rose from 24.4 to 39.4.
+
+[Greece Trends]
+- Peak interest occurred in Jan 2026 with an indexed value of 62.6.
+- Latest month interest fell from 46.5 to 45.4.
+
+[OH Trends]
+- Peak interest occurred in Mar 2026 with an indexed value of 30.5.
+- Latest month interest rose from 0.0 to 30.5.
 
 [Auction Insights]
-- jet2holidays.com had the highest impression share at 64.1%.
-- jet2holidays.com had the highest overlap rate at 56.5%.
-- The average top of page rate across competitors was 80.4%.
+- The uploaded auction report included 12 competitor row(s).
+- Our own row was present without a usable impression-share value, so competitor pressure is read from the surrounding auction metrics.
+- jet2holidays.com had the highest impression share at 57.3%.
+- jet2holidays.com had the highest overlap rate at 35.5%.
+- jet2holidays.com had the highest position-above rate at 83.6%.
+- jet2holidays.com had the highest absolute top-of-page rate at 52.1%.
+- Average top-of-page pressure across competitors was 69.2%.
+- icelolly.com had the highest outranking share at 9.3%.
+Table:
+Domain                | Impression Share | Overlap Rate | Position Above Rate | Top of Page Rate | Absolute Top Rate | Outranking Share
+----------------------+------------------+--------------+---------------------+------------------+-------------------+-----------------
+jet2holidays.com      | 57.3%            | 35.5%        | 83.6%               | 90.8%            | 52.1%             | 6.7%            
+loveholidays.com      | 48.8%            | 27.3%        | 71.0%               | 85.5%            | 25.1%             | 7.7%            
+tui.co.uk             | 45.7%            | 28.9%        | 78.4%               | 89.1%            | 25.5%             | 7.3%            
+easyjet.com           | 30.0%            | 18.3%        | 69.8%               | 83.5%            | 20.3%             | 8.3%            
+onthebeach.co.uk      | 16.9%            | 10.3%        | 47.7%               | 75.2%            | 8.4%              | 9.0%            
+booking.com           | 16.5%            | 11.9%        | 60.0%               | 82.6%            | 19.0%             | 8.8%            
+firstchoice.co.uk     | n/a              | 6.6%         | 44.3%               | 52.0%            | 6.0%              | 9.2%            
+you                   | n/a              | n/a          | n/a                 | 78.3%            | 22.1%             | n/a             
+thomascook.com        | n/a              | 5.7%         | 43.9%               | 56.6%            | 4.9%              | 9.3%            
+travelsupermarket.com | n/a              | 5.4%         | 40.2%               | 36.3%            | 3.0%              | 9.3%            
+icelolly.com          | n/a              | 4.1%         | 40.6%               | 31.4%            | 3.6%              | 9.3%            
+britishairways.com    | n/a              | 4.0%         | 56.8%               | 69.4%            | 16.3%             | 9.3%            
 
 [Overall Performance]
-- Revenue fell 77.9% from Jan 2026 to Mar 2026.
-- CPA worsened 86.6% over the same period, linking spend to lower output efficiency.
-- Spend decreased 57.1%, helping explain the gap between investment and returned revenue.
-- YoY matched-month revenue moved -59.9% while CPA moved 74.9%.
+- Revenue moved -58.6% from Jan 2026 to Mar 2026.
+- Spend moved -35.0% over the same period, while purchases moved -57.9%.
+- CPA moved +54.3%, and AOV closed the quarter at £1,782.
+- Add-to-cart volume reached 2331.2, with quarter cost per ATC at £31.
+
+[YoY Matched-Month Comparison]
+- The comparison covers 2 of 3 month(s) in the quarter.
+- Revenue was -47.3% versus Q1 2025.
+- Spend was -12.5% and purchases were -43.4% on matched months.
+- CPA moved +54.5%, cost per ATC moved +94.5%, and AOV moved -7.0%.
+Table:
+Metric       | Q1 2025  | Q1 2026  | Change
+-------------+----------+----------+-------
+Revenue      | £316,901 | £166,853 | -47.3%
+Cost         | £51,548  | £45,109  | -12.5%
+Purchases    | 165.6    | 93.8     | -43.4%
+Add to Cart  | 2567.7   | 1155.1   | -55.0%
+CPA          | £311     | £481     | +54.5%
+Cost per ATC | £20      | £39      | +94.5%
+AOV          | £1,913   | £1,778   | -7.0% 
 
 [End of Period]
-- Mar 2026 revenue was £45,555, versus £81,535 in Feb 2026.
-- CPA fell from £604 to £442 across the closing months.
-- Purchases moved from 45.3 to 26.6 over the same period.
+- Mar 2026 revenue was £85,318 versus £81,535 in Feb 2026.
+- Spend moved from £27,342 to £17,767, while purchases moved from 45.3 to 48.6.
+- CPA improved from £604 to £366.
+- Cost per ATC moved from £41 to £37.
 
 [Channel Performance]
-- Brand is the strongest channel, delivering 67.9% of revenue at £75 CPA.
-- Generic is the weakest budget allocation, taking 69.2% of cost while running at £1,049 CPA.
-- Generic carries the largest cost share at 69.2%, so budget discipline there has the biggest account impact.
-- Budget efficiency is strongest where revenue share materially exceeds cost share, and weakest where cost concentration is not matched by returns.
+- Brand drove the largest revenue share at 69.1% with £79 CPA.
+- Generic carried the highest cost share at 68.5% of spend.
+- Generic was the least efficient campaign type on quarter CPA at £1,036.
+- Brand delivered 69.1% of revenue, while Generic accounted for 68.5% of spend.
+Table:
+Channel         | Revenue  | Cost    | Purchases | Add to Cart | CPA    | Cost per ATC | AOV    | Cost Share | Revenue Share
+----------------+----------+---------+-----------+-------------+--------+--------------+--------+------------+--------------
+Brand           | £257,735 | £11,362 | 143.8     | 1326.8      | £79    | £9           | £1,792 | 15.7%      | 69.1%        
+Generic         | £85,032  | £49,665 | 48.0      | 746.5       | £1,036 | £67          | £1,773 | 68.5%      | 22.8%        
+Performance Max | £26,486  | £10,153 | 15.6      | 207.3       | £652   | £49          | £1,700 | 14.0%      | 7.1%         
+Other           | £3,577   | £0      | 1.8       | 24.2        | £0     | £0           | £1,955 | 0.0%       | 1.0%         
+Demand Gen      | £0       | £1,276  | 0.0       | 26.3        | -      | £49          | -      | 1.8%       | 0.0%         
+
+[Generic Performance]
+- Generic delivered £85,032 revenue from £49,665 spend at £1,036 CPA.
+- Jan 2026 was the strongest generic revenue month in the quarter.
+- From Jan 2026 to Mar 2026, generic revenue moved -36.8% and CPA moved +15.2%.
+- Generic add-to-cart volume totalled 746.5, with £67 cost per ATC and £1,773 AOV.
+Table:
+Revenue | Cost    | Purchases | Add to Cart | CPA    | Cost per ATC | AOV    | Month   
+--------+---------+-----------+-------------+--------+--------------+--------+---------
+£39,175 | £19,264 | 23.5      | 337.0       | £821   | £57          | £1,670 | Jan 2026
+£21,104 | £19,195 | 12.7      | 228.5       | £1,516 | £84          | £1,667 | Feb 2026
+£24,753 | £11,206 | 11.8      | 181.0       | £946   | £62          | £2,090 | Mar 2026
 
 [ATC Analysis]
-- Add-to-cart volume declined 77.5% from Jan 2026 to Mar 2026.
-- CPATC rose 90.5% across the same period.
-- Both add-to-cart volume and revenue decreased in the latest period.
-- Purchases totalled 187.2 across the period covered by the add-to-cart view.
+- Add-to-cart volume moved -59.0% from Jan 2026 to Mar 2026.
+- Cost per ATC moved +58.3% across the same period.
+- The quarter delivered 2331.2 total add-to-cart actions from £72,456 spend.
+- Purchases totalled 209.2, providing the downstream conversion context for ATC performance.
+Table:
+Month    | Add to Cart | Cost per ATC | Purchases
+---------+-------------+--------------+----------
+Jan 2026 | 1176.1      | £23          | 115.3    
+Feb 2026 | 672.6       | £41          | 45.3     
+Mar 2026 | 482.5       | £37          | 48.6

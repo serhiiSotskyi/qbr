@@ -12,7 +12,10 @@ from pptx.util import Inches, Pt
 from report_generator.insights.olympic_insights import (
     analyze_atc,
     analyze_channels,
-    analyze_trends,
+    analyze_end_of_period,
+    analyze_generic_performance,
+    analyze_overall_performance,
+    analyze_yoy,
     generate_executive_summary,
 )
 from src.auction_loader import load_auction_csv
@@ -116,10 +119,13 @@ def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
             "Revenue": "revenue",
             "Cost": "cost",
             "Add to cart": "add_to_cart",
+            "CPA": "cpa",
+            "Cost per ATC": "cpatc",
+            "AOV": "aov",
         }
     ).copy()
 
-    required = {"date", "channel", "purchases", "revenue", "cost", "add_to_cart"}
+    required = {"date", "channel", "purchases", "revenue", "cost", "add_to_cart", "cpa", "cpatc", "aov"}
     missing = required - set(working_df.columns)
     if missing:
         raise ValueError(f"Olympic Holidays CSV missing required columns: {sorted(missing)}")
@@ -130,24 +136,18 @@ def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
     if working_df.empty:
         raise ValueError("Olympic Holidays CSV has no valid dates.")
 
-    for column in ["purchases", "revenue", "cost", "add_to_cart"]:
-        working_df[column] = pd.to_numeric(working_df[column], errors="coerce").fillna(0.0)
+    numeric_columns = ["purchases", "revenue", "cost", "add_to_cart", "cpa", "cpatc", "aov"]
+    for column in numeric_columns:
+        working_df[column] = pd.to_numeric(working_df[column], errors="coerce")
+
     working_df["channel"] = working_df["channel"].fillna("Unknown").astype(str).str.strip()
     working_df["month_start"] = working_df["date"].dt.to_period("M").dt.to_timestamp()
     working_df["month_label"] = working_df["month_start"].dt.strftime("%b %Y")
     working_df["year"] = working_df["date"].dt.year
     working_df["quarter"] = working_df["date"].dt.quarter
 
-    all_monthly = (
-        working_df.groupby("month_start", as_index=False)[["revenue", "cost", "purchases", "add_to_cart"]]
-        .sum()
-        .sort_values("month_start")
-        .reset_index(drop=True)
-    )
+    all_monthly = _aggregate_period_metrics(working_df, ["month_start"])
     all_monthly["month_label"] = all_monthly["month_start"].dt.strftime("%b %Y")
-    all_monthly["cpa"] = _safe_divide(all_monthly["cost"], all_monthly["purchases"])
-    all_monthly["aov"] = _safe_divide(all_monthly["revenue"], all_monthly["purchases"])
-    all_monthly["cpatc"] = _safe_divide(all_monthly["cost"], all_monthly["add_to_cart"])
     all_monthly["year"] = all_monthly["month_start"].dt.year
     all_monthly["quarter"] = all_monthly["month_start"].dt.quarter
 
@@ -159,73 +159,93 @@ def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
         (working_df["date"].dt.year == selected_year) & (working_df["date"].dt.quarter == selected_quarter)
     ].copy()
 
-    channel_breakdown = (
-        quarter_rows.groupby("channel", as_index=False)[["revenue", "cost", "purchases", "add_to_cart"]]
-        .sum()
-        .sort_values(["revenue", "cost"], ascending=False)
-        .reset_index(drop=True)
-    )
-    channel_breakdown["cpa"] = _safe_divide(channel_breakdown["cost"], channel_breakdown["purchases"])
-    channel_breakdown["aov"] = _safe_divide(channel_breakdown["revenue"], channel_breakdown["purchases"])
-    channel_breakdown["cpatc"] = _safe_divide(channel_breakdown["cost"], channel_breakdown["add_to_cart"])
+    channel_breakdown = _aggregate_period_metrics(quarter_rows, ["channel"])
     channel_breakdown["cost_share"] = _share(channel_breakdown["cost"])
     channel_breakdown["revenue_share"] = _share(channel_breakdown["revenue"])
+    channel_breakdown = channel_breakdown.sort_values(["revenue", "cost"], ascending=False).reset_index(drop=True)
+
+    generic_rows = quarter_rows[quarter_rows["channel"].str.lower() == "generic"].copy()
+    generic_monthly = _aggregate_period_metrics(generic_rows, ["month_start"]) if not generic_rows.empty else pd.DataFrame()
+    if not generic_monthly.empty:
+        generic_monthly["month_label"] = generic_monthly["month_start"].dt.strftime("%b %Y")
+        generic_monthly = generic_monthly.sort_values("month_start").reset_index(drop=True)
 
     atc_trends = quarter_monthly[["month_start", "month_label", "add_to_cart", "cpatc", "purchases"]].copy()
     atc_trends = atc_trends.rename(columns={"add_to_cart": "atc"})
-
-    yearly = (
-        working_df.groupby("year", as_index=False)[["revenue", "cost", "purchases", "add_to_cart"]]
-        .sum()
-        .sort_values("year")
-        .reset_index(drop=True)
-    )
-    yearly["cpa"] = _safe_divide(yearly["cost"], yearly["purchases"])
-    yearly["aov"] = _safe_divide(yearly["revenue"], yearly["purchases"])
-    yearly["cpatc"] = _safe_divide(yearly["cost"], yearly["add_to_cart"])
 
     yoy = _build_quarter_yoy_summary(all_monthly, selected_year, selected_quarter)
     summary = {
         "selected_year": selected_year,
         "selected_quarter": selected_quarter,
+        "quarter_label": f"Q{selected_quarter} {selected_year}",
         "period_start": quarter_monthly.iloc[0]["month_label"],
         "period_end": quarter_monthly.iloc[-1]["month_label"],
         "overall_revenue": float(quarter_monthly["revenue"].sum()),
         "overall_cost": float(quarter_monthly["cost"].sum()),
         "overall_purchases": float(quarter_monthly["purchases"].sum()),
+        "overall_atc": float(quarter_monthly["add_to_cart"].sum()),
         "overall_cpa": float(_safe_scalar(quarter_monthly["cost"].sum(), quarter_monthly["purchases"].sum())),
-        "latest_revenue_change_pct": _pct_change(quarter_monthly.iloc[-2]["revenue"], quarter_monthly.iloc[-1]["revenue"]) if len(quarter_monthly) > 1 else 0.0,
-        "latest_cost_change_pct": _pct_change(quarter_monthly.iloc[-2]["cost"], quarter_monthly.iloc[-1]["cost"]) if len(quarter_monthly) > 1 else 0.0,
+        "overall_cpatc": float(_safe_scalar(quarter_monthly["cost"].sum(), quarter_monthly["add_to_cart"].sum())),
+        "overall_aov": float(_safe_scalar(quarter_monthly["revenue"].sum(), quarter_monthly["purchases"].sum())),
     }
 
-    correlations = {
-        "revenue_cost": _correlation(quarter_monthly["revenue"], quarter_monthly["cost"]),
-        "revenue_atc": _correlation(quarter_monthly["revenue"], quarter_monthly["add_to_cart"]),
-    }
+    generic_summary = None
+    if not generic_monthly.empty:
+        generic_summary = {
+            "revenue": float(generic_monthly["revenue"].sum()),
+            "cost": float(generic_monthly["cost"].sum()),
+            "purchases": float(generic_monthly["purchases"].sum()),
+            "atc": float(generic_monthly["add_to_cart"].sum()),
+            "cpa": float(_safe_scalar(generic_monthly["cost"].sum(), generic_monthly["purchases"].sum())),
+            "cpatc": float(_safe_scalar(generic_monthly["cost"].sum(), generic_monthly["add_to_cart"].sum())),
+            "aov": float(_safe_scalar(generic_monthly["revenue"].sum(), generic_monthly["purchases"].sum())),
+        }
 
     return {
+        "raw_performance": working_df,
         "all_monthly": all_monthly,
         "monthly_performance": quarter_monthly,
         "channel_breakdown": channel_breakdown,
+        "generic_monthly": generic_monthly,
+        "generic_summary": generic_summary,
         "atc_trends": atc_trends,
         "end_period": quarter_monthly.tail(min(2, len(quarter_monthly))).reset_index(drop=True),
-        "yearly_aggregates": yearly,
         "yoy_summary": yoy,
         "summary": summary,
-        "correlations": correlations,
     }
+
+
+def _aggregate_period_metrics(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=group_cols + ["revenue", "cost", "purchases", "add_to_cart", "cpa", "cpatc", "aov"])
+
+    aggregated = (
+        df.groupby(group_cols, as_index=False)[["revenue", "cost", "purchases", "add_to_cart"]]
+        .sum(min_count=1)
+        .sort_values(group_cols)
+        .reset_index(drop=True)
+    )
+    aggregated["cpa"] = _safe_divide(aggregated["cost"], aggregated["purchases"])
+    aggregated["cpatc"] = _safe_divide(aggregated["cost"], aggregated["add_to_cart"])
+    aggregated["aov"] = _safe_divide(aggregated["revenue"], aggregated["purchases"])
+    return aggregated
 
 
 def _build_performance_insights(data: dict[str, Any]) -> dict[str, Any]:
     executive = generate_executive_summary(data)
-    trends = analyze_trends(data)
+    overall = analyze_overall_performance(data)
+    yoy = analyze_yoy(data)
+    end_of_period = analyze_end_of_period(data)
     channels = analyze_channels(data)
+    generic = analyze_generic_performance(data)
     atc = analyze_atc(data)
     return {
         "executive_summary": executive["bullets"],
-        "overall_performance": trends["overall"],
-        "end_of_period": trends["end_of_period"],
+        "overall_performance": overall["bullets"],
+        "yoy_comparison": yoy["bullets"],
+        "end_of_period": end_of_period["bullets"],
         "channel_performance": channels["bullets"],
+        "generic_performance": generic["bullets"],
         "atc_analysis": atc["bullets"],
     }
 
@@ -237,15 +257,30 @@ def _build_trend_sections(
     client_id: str,
     chart_styles: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    loader = TrendsLoader(trends_dir)
-    trends_df = loader.load_from_directory()
-    if trends_df.empty:
+    if not trends_dir:
         return []
+
+    path = Path(trends_dir)
+    if not path.exists():
+        return []
+
+    loader = TrendsLoader()
+    files = sorted(path.glob("*.csv")) if path.is_dir() else [path]
 
     charts_dir = project_root / "charts" / client_id / "market_trends"
     charts_dir.mkdir(parents=True, exist_ok=True)
     sections: list[dict[str, Any]] = []
-    for source_file, source_df in trends_df.groupby("source_file"):
+
+    for file_path in files:
+        if "trend" not in file_path.stem.lower():
+            continue
+        try:
+            source_df = loader.load_csv(file_path)
+        except Exception:
+            continue
+        if source_df.empty:
+            continue
+
         monthly = (
             source_df.groupby(["month_start", "term"], as_index=False)["value"]
             .mean()
@@ -255,8 +290,8 @@ def _build_trend_sections(
         if monthly.empty:
             continue
 
-        title = _title_from_filename(source_file)
-        chart_path = _plot_market_trend_chart(charts_dir / f"{_slug(source_file)}.png", monthly, chart_styles)
+        title = _title_from_filename(file_path.name)
+        chart_path = _plot_market_trend_chart(charts_dir / f"{_slug(file_path.name)}.png", monthly, chart_styles)
         bullets = _describe_trend_source(monthly, data["summary"]["selected_quarter"])
         sections.append(
             {
@@ -287,23 +322,32 @@ def _build_auction_section(auction_csv: str | Path | None, client_config: dict[s
     if not summary:
         return None
 
-    bullets = []
+    bullets = [f"The uploaded auction report included {summary['competitor_count']} competitor row(s)."]
     if summary.get("our_impression_share") is not None:
         bullets.append(f"Our impression share in the uploaded auction report was {summary['our_impression_share'] * 100:.1f}%.")
-    if summary.get("top_impression_share_competitors"):
-        top = summary["top_impression_share_competitors"][0]
-        bullets.append(f"{top['domain']} had the highest impression share at {top['value'] * 100:.1f}%.")
-    if summary.get("top_overlap_competitors"):
-        top = summary["top_overlap_competitors"][0]
-        bullets.append(f"{top['domain']} had the highest overlap rate at {top['value'] * 100:.1f}%.")
-    if summary.get("average_top_of_page_rate") is not None:
-        bullets.append(f"The average top of page rate across competitors was {summary['average_top_of_page_rate'] * 100:.1f}%.")
+    else:
+        bullets.append("Our own row was present without a usable impression-share value, so competitor pressure is read from the surrounding auction metrics.")
+
+    prioritized_items = [
+        _top_metric_text(summary.get("top_impression_share_competitors"), "highest impression share"),
+        _top_metric_text(summary.get("top_overlap_competitors"), "highest overlap rate"),
+        _top_metric_text(summary.get("top_position_above_competitors"), "highest position-above rate"),
+        _top_metric_text(summary.get("top_absolute_top_competitors"), "highest absolute top-of-page rate"),
+        f"Average top-of-page pressure across competitors was {summary['average_top_of_page_rate'] * 100:.1f}%."
+        if summary.get("average_top_of_page_rate") is not None
+        else None,
+        _top_metric_text(summary.get("top_outranking_competitors"), "highest outranking share"),
+    ]
+    for item in prioritized_items:
+        if item:
+            bullets.append(item)
 
     return {
         "title": "Auction Insights",
         "subtitle": "Uploaded auction report",
-        "table": format_auction_table(auction_df).head(8),
-        "bullets": bullets[:4],
+        "table": format_auction_table(auction_df),
+        "table_text": _dataframe_to_text(summary["table"]),
+        "bullets": bullets,
     }
 
 
@@ -314,35 +358,32 @@ def _build_text_report(
     auction_section: dict[str, Any] | None,
     manual_content: dict[str, list[str]],
 ) -> str:
-    sections: list[tuple[str, list[str]]] = [
-        ("Executive Summary", insights["executive_summary"]),
+    sections: list[tuple[str, list[str], str | None]] = [
+        ("Executive Summary", insights["executive_summary"], None),
     ]
-    if trend_sections:
-        market_trend_bullets = []
-        for item in trend_sections:
-            market_trend_bullets.append(f"{item['title']}: {item['bullets'][0]}")
-            if len(item["bullets"]) > 1:
-                market_trend_bullets.append(item["bullets"][1])
-        sections.append(("Market Trends", market_trend_bullets[:6]))
+    for item in trend_sections:
+        sections.append((item["title"], item["bullets"], None))
     if auction_section:
-        sections.append(("Auction Insights", auction_section["bullets"]))
+        sections.append(("Auction Insights", auction_section["bullets"], auction_section.get("table_text")))
+    yoy_title = _yoy_section_title(data.get("yoy_summary"))
     sections.extend(
         [
-            ("Overall Performance", insights["overall_performance"]),
-            ("End of Period", insights["end_of_period"]),
-            ("Channel Performance", insights["channel_performance"]),
-            ("ATC Analysis", insights["atc_analysis"]),
+            ("Overall Performance", insights["overall_performance"], None),
+            (yoy_title, insights["yoy_comparison"], _yoy_table_to_text(data.get("yoy_summary"))),
+            ("End of Period", insights["end_of_period"], None),
+            ("Channel Performance", insights["channel_performance"], _dataframe_to_text(_format_channel_table(data["channel_breakdown"]))),
+            ("Generic Performance", insights["generic_performance"], _dataframe_to_text(_format_monthly_table(data["generic_monthly"]))),
+            ("ATC Analysis", insights["atc_analysis"], _dataframe_to_text(_format_atc_table(data["atc_trends"]))),
         ]
     )
-    if manual_content["actions"]:
-        sections.append(("Actions", manual_content["actions"]))
-    if manual_content["opportunities"]:
-        sections.append(("Opportunities", manual_content["opportunities"]))
 
     blocks = []
-    for title, bullets in sections:
+    for title, bullets, table_text in sections:
         clean_bullets = [str(bullet).strip() for bullet in bullets if str(bullet).strip()]
-        blocks.append("\n".join([f"[{title}]"] + [f"- {bullet}" for bullet in clean_bullets]))
+        lines = [f"[{title}]"] + [f"- {bullet}" for bullet in clean_bullets]
+        if table_text:
+            lines.extend(["Table:", table_text])
+        blocks.append("\n".join(lines))
     return "\n\n".join(blocks).strip() + "\n"
 
 
@@ -372,8 +413,7 @@ def _build_presentation(
         "total": _hex_to_rgb(colors.get("table_total", "#EBF1FA")),
     }
 
-    quarter_label = f"Q{data['summary']['selected_quarter']} {data['summary']['selected_year']}"
-    subtitle = f"{client_name} | {quarter_label}"
+    subtitle = f"{client_name} | {data['summary']['quarter_label']}"
 
     _add_text_slide(prs, "Executive Summary", subtitle, insights["executive_summary"], palette)
     for trend_section in trend_sections:
@@ -393,8 +433,19 @@ def _build_presentation(
             table_df=auction_section["table"],
             bullets=auction_section["bullets"],
             palette=palette,
+            font_size=7.5,
+            max_rows=12,
         )
     _add_chart_slide(prs, "Overall Performance", subtitle, chart_paths["overall_performance"], insights["overall_performance"], palette)
+    yoy_title = _yoy_section_title(data.get("yoy_summary"))
+    _add_table_slide(
+        prs,
+        yoy_title,
+        _yoy_section_subtitle(data.get("yoy_summary")),
+        _format_yoy_table(data.get("yoy_summary")),
+        insights["yoy_comparison"],
+        palette,
+    )
     _add_chart_slide(prs, "End of Period", "Latest months", chart_paths["end_of_period"], insights["end_of_period"], palette)
     _add_dual_chart_slide(
         prs,
@@ -405,11 +456,8 @@ def _build_presentation(
         insights["channel_performance"],
         palette,
     )
-    _add_chart_slide(prs, "ATC Analysis", "Add to cart and CPATC", chart_paths["atc_analysis"], insights["atc_analysis"], palette)
-    if manual_content["actions"]:
-        _add_text_slide(prs, "Actions", "Manual input", manual_content["actions"], palette)
-    if manual_content["opportunities"]:
-        _add_text_slide(prs, "Opportunities", "Manual input", manual_content["opportunities"], palette)
+    _add_chart_slide(prs, "Generic Performance", subtitle, chart_paths["generic_performance"], insights["generic_performance"], palette)
+    _add_chart_slide(prs, "ATC Analysis", "Add to cart and cost per ATC", chart_paths["atc_analysis"], insights["atc_analysis"], palette)
 
     pptx_path.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(pptx_path))
@@ -455,13 +503,23 @@ def _build_performance_charts(data: dict[str, Any], charts_dir: Path, chart_styl
             label_col="channel",
             colors=["#1D4ED8", "#2563EB", "#60A5FA", "#93C5FD", "#DBEAFE"],
         ),
+        "generic_performance": _plot_bar_line(
+            charts_dir / "generic_performance.png",
+            data["generic_monthly"],
+            bar_col="revenue",
+            line_col="cpa",
+            bar_label="Generic Revenue",
+            line_label="Generic CPA",
+            bar_color="#0F766E",
+            line_color="#1D4ED8",
+        ),
         "atc_analysis": _plot_bar_line(
             charts_dir / "atc_analysis.png",
             data["atc_trends"],
             bar_col="atc",
             line_col="cpatc",
             bar_label="Add to Cart",
-            line_label="CPATC",
+            line_label="Cost per ATC",
             bar_color=atc_color,
             line_color=cpa_color,
         ),
@@ -490,11 +548,14 @@ def _add_table_slide(
     table_df: pd.DataFrame,
     bullets: list[str],
     palette: dict[str, RGBColor],
+    font_size: float = 9.0,
+    max_rows: int | None = None,
 ) -> None:
     slide = _new_slide(prs)
     _add_title(slide, title, palette["title"])
     _add_subtitle(slide, subtitle, palette["subtitle"])
-    _render_table(slide, table_df, Inches(0.45), Inches(1.35), Inches(8.2), Inches(3.7), palette)
+    render_df = table_df.head(max_rows).copy() if max_rows else table_df.copy()
+    _render_table(slide, render_df, Inches(0.45), Inches(1.35), Inches(8.2), Inches(3.7), palette, font_size=font_size)
     _add_bullets(slide, bullets, left=8.95, top=1.45, width=3.25, height=4.6, text_color=palette["body"])
 
 
@@ -507,7 +568,7 @@ def _add_dual_chart_slide(prs, title: str, subtitle: str, left_chart: Path, righ
     _add_bullets(slide, bullets, left=9.3, top=1.45, width=2.95, height=4.6, text_color=palette["body"])
 
 
-def _render_table(slide, table_df: pd.DataFrame, left, top, width, height, palette: dict[str, RGBColor]) -> None:
+def _render_table(slide, table_df: pd.DataFrame, left, top, width, height, palette: dict[str, RGBColor], font_size: float = 9.0) -> None:
     safe_df = table_df.copy()
     if safe_df.empty:
         safe_df = pd.DataFrame([{"Status": "No data"}])
@@ -516,22 +577,22 @@ def _render_table(slide, table_df: pd.DataFrame, left, top, width, height, palet
     for col_idx, col_name in enumerate(safe_df.columns):
         cell = table.cell(0, col_idx)
         cell.text = str(col_name)
-        _style_cell(cell, True, palette["title"])
+        _style_cell(cell, True, palette["title"], font_size)
         cell.fill.solid()
         cell.fill.fore_color.rgb = palette["header"]
     for row_idx, (_, row) in enumerate(safe_df.iterrows(), start=1):
         for col_idx, value in enumerate(row):
             cell = table.cell(row_idx, col_idx)
             cell.text = str(value)
-            _style_cell(cell, False, palette["title"])
+            _style_cell(cell, False, palette["title"], font_size)
 
 
-def _style_cell(cell, bold: bool, color: RGBColor) -> None:
+def _style_cell(cell, bold: bool, color: RGBColor, font_size: float) -> None:
     para = cell.text_frame.paragraphs[0]
     if not para.runs:
         para.add_run()
     para.runs[0].font.bold = bold
-    para.runs[0].font.size = Pt(10)
+    para.runs[0].font.size = Pt(font_size)
     para.runs[0].font.color.rgb = color
 
 
@@ -562,7 +623,7 @@ def _add_subtitle(slide, text: str, color: RGBColor) -> None:
 
 def _add_bullets(slide, bullets: list[str], left: float, top: float, width: float, height: float, text_color: RGBColor) -> None:
     text_frame = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height)).text_frame
-    for idx, bullet in enumerate((bullets or ["No data available"])[:6]):
+    for idx, bullet in enumerate((bullets or ["No data available"])[:7]):
         paragraph = text_frame.paragraphs[0] if idx == 0 else text_frame.add_paragraph()
         paragraph.text = str(bullet)
         paragraph.level = 0
@@ -573,16 +634,20 @@ def _add_bullets(slide, bullets: list[str], left: float, top: float, width: floa
 
 def _plot_bar_line(output_path: Path, frame: pd.DataFrame, bar_col: str, line_col: str, bar_label: str, line_label: str, bar_color: str, line_color: str) -> Path:
     fig, ax1 = plt.subplots(figsize=(8.0, 4.6))
-    ax2 = ax1.twinx()
-    ax1.bar(frame["month_label"], frame[bar_col], color=bar_color, alpha=0.85, label=bar_label)
-    ax2.plot(frame["month_label"], frame[line_col], marker="o", linewidth=2.4, color=line_color, label=line_label)
-    ax1.set_ylabel(bar_label)
-    ax2.set_ylabel(line_label)
-    ax1.tick_params(axis="x", rotation=35)
-    ax1.grid(axis="y", alpha=0.2)
-    lines_1, labels_1 = ax1.get_legend_handles_labels()
-    lines_2, labels_2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
+    if frame.empty:
+        ax1.text(0.5, 0.5, "No data", ha="center", va="center")
+        ax1.axis("off")
+    else:
+        ax2 = ax1.twinx()
+        ax1.bar(frame["month_label"], frame[bar_col], color=bar_color, alpha=0.85, label=bar_label)
+        ax2.plot(frame["month_label"], frame[line_col], marker="o", linewidth=2.4, color=line_color, label=line_label)
+        ax1.set_ylabel(bar_label)
+        ax2.set_ylabel(line_label)
+        ax1.tick_params(axis="x", rotation=35)
+        ax1.grid(axis="y", alpha=0.2)
+        lines_1, labels_1 = ax1.get_legend_handles_labels()
+        lines_2, labels_2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
     plt.tight_layout()
     fig.savefig(output_path, dpi=180)
     plt.close(fig)
@@ -658,13 +723,13 @@ def _describe_trend_source(monthly: pd.DataFrame, selected_quarter: int) -> list
         matched = current.merge(prior, on="month_num", suffixes=("_current", "_prior"))
         if not matched.empty:
             yoy = _pct_change(matched["value_prior"].sum(), matched["value_current"].sum())
-            bullets.append(f"Search interest across this upload changed {yoy:.1f}% YoY across matched months.")
+            bullets.append(f"Matched-month search interest moved {yoy:+.1f}% YoY.")
 
         q_current = total_monthly[(total_monthly["year"] == current_year) & (total_monthly["quarter"] == selected_quarter)]
         q_prior = total_monthly[(total_monthly["year"] == prior_year) & (total_monthly["quarter"] == selected_quarter)]
         if not q_current.empty and not q_prior.empty:
             q_yoy = _pct_change(q_prior["value"].sum(), q_current["value"].sum())
-            bullets.append(f"Quarter-level search interest for Q{selected_quarter} changed {q_yoy:.1f}% versus the prior year.")
+            bullets.append(f"Quarter-level search interest for Q{selected_quarter} moved {q_yoy:+.1f}% versus the prior year.")
 
     peak = total_monthly.loc[total_monthly["value"].idxmax()]
     bullets.append(f"Peak interest occurred in {peak['month_start'].strftime('%b %Y')} with an indexed value of {peak['value']:.1f}.")
@@ -708,15 +773,40 @@ def _build_quarter_yoy_summary(all_monthly: pd.DataFrame, selected_year: int, se
     cost_prior = matched["cost_prior"].sum()
     purchases_current = matched["purchases_current"].sum()
     purchases_prior = matched["purchases_prior"].sum()
+    atc_current = matched["add_to_cart_current"].sum()
+    atc_prior = matched["add_to_cart_prior"].sum()
     cpa_current = _safe_scalar(cost_current, purchases_current)
     cpa_prior = _safe_scalar(cost_prior, purchases_prior)
+    cpatc_current = _safe_scalar(cost_current, atc_current)
+    cpatc_prior = _safe_scalar(cost_prior, atc_prior)
+    aov_current = _safe_scalar(revenue_current, purchases_current)
+    aov_prior = _safe_scalar(revenue_prior, purchases_prior)
     return {
         "current_year": selected_year,
         "prior_year": selected_year - 1,
+        "current_quarter": selected_quarter,
+        "prior_quarter": selected_quarter,
+        "matched_months": len(matched),
+        "expected_months": int(len(current)),
+        "is_full_quarter_match": bool(len(matched) == len(current) == 3),
         "revenue_change_pct": _pct_change(revenue_prior, revenue_current),
         "cost_change_pct": _pct_change(cost_prior, cost_current),
         "purchases_change_pct": _pct_change(purchases_prior, purchases_current),
+        "atc_change_pct": _pct_change(atc_prior, atc_current),
         "cpa_change_pct": _pct_change(cpa_prior, cpa_current),
+        "cpatc_change_pct": _pct_change(cpatc_prior, cpatc_current),
+        "aov_change_pct": _pct_change(aov_prior, aov_current),
+        "table": pd.DataFrame(
+            [
+                {"Metric": "Revenue", f"Q{selected_quarter} {selected_year - 1}": _currency(revenue_prior), f"Q{selected_quarter} {selected_year}": _currency(revenue_current), "Change": _fmt_signed_pct(_pct_change(revenue_prior, revenue_current))},
+                {"Metric": "Cost", f"Q{selected_quarter} {selected_year - 1}": _currency(cost_prior), f"Q{selected_quarter} {selected_year}": _currency(cost_current), "Change": _fmt_signed_pct(_pct_change(cost_prior, cost_current))},
+                {"Metric": "Purchases", f"Q{selected_quarter} {selected_year - 1}": f"{purchases_prior:.1f}", f"Q{selected_quarter} {selected_year}": f"{purchases_current:.1f}", "Change": _fmt_signed_pct(_pct_change(purchases_prior, purchases_current))},
+                {"Metric": "Add to Cart", f"Q{selected_quarter} {selected_year - 1}": f"{atc_prior:.1f}", f"Q{selected_quarter} {selected_year}": f"{atc_current:.1f}", "Change": _fmt_signed_pct(_pct_change(atc_prior, atc_current))},
+                {"Metric": "CPA", f"Q{selected_quarter} {selected_year - 1}": _currency(cpa_prior), f"Q{selected_quarter} {selected_year}": _currency(cpa_current), "Change": _fmt_signed_pct(_pct_change(cpa_prior, cpa_current))},
+                {"Metric": "Cost per ATC", f"Q{selected_quarter} {selected_year - 1}": _currency(cpatc_prior), f"Q{selected_quarter} {selected_year}": _currency(cpatc_current), "Change": _fmt_signed_pct(_pct_change(cpatc_prior, cpatc_current))},
+                {"Metric": "AOV", f"Q{selected_quarter} {selected_year - 1}": _currency(aov_prior), f"Q{selected_quarter} {selected_year}": _currency(aov_current), "Change": _fmt_signed_pct(_pct_change(aov_prior, aov_current))},
+            ]
+        ),
     }
 
 
@@ -761,15 +851,10 @@ def _pct_change(base: float, current: float) -> float:
     return ((current - base) / base) * 100
 
 
-def _correlation(left: pd.Series, right: pd.Series) -> float | None:
-    if len(left) < 2 or len(right) < 2:
-        return None
-    value = left.corr(right)
-    return None if pd.isna(value) else float(value)
-
-
 def _title_from_filename(filename: str) -> str:
-    stem = Path(filename).stem
+    stem = Path(filename).stem.lower().strip()
+    if stem == "oh trends":
+        return "OH Trends"
     cleaned = stem.replace("_", " ").replace("-", " ").strip()
     return " ".join(part.capitalize() if not part.isupper() else part for part in cleaned.split())
 
@@ -783,3 +868,131 @@ def _hex_to_rgb(hex_value: str) -> RGBColor:
     if len(value) != 6:
         value = "000000"
     return RGBColor(int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+
+
+def _currency(value: float) -> str:
+    if pd.isna(value):
+        return "-"
+    return f"£{value:,.0f}"
+
+
+def _fmt_signed_pct(value: float) -> str:
+    return f"{value:+.1f}%"
+
+
+def _top_metric_text(rows: list[dict[str, Any]] | None, label: str) -> str | None:
+    if not rows:
+        return None
+    top = rows[0]
+    if top.get("value") is None:
+        return None
+    return f"{top['domain']} had the {label} at {top['value'] * 100:.1f}%."
+
+
+def _format_yoy_table(yoy_summary: dict[str, Any] | None) -> pd.DataFrame:
+    if not yoy_summary:
+        return pd.DataFrame([{"Status": "No matched prior-year quarter"}])
+    return yoy_summary["table"].copy()
+
+
+def _format_channel_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    formatted = frame.copy()
+    for column in ["revenue", "cost", "cpa", "cpatc", "aov"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_currency)
+    for column in ["cost_share", "revenue_share"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(lambda value: f"{value:.1f}%")
+    for column in ["purchases", "add_to_cart"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(lambda value: f"{value:.1f}")
+    return formatted.rename(
+        columns={
+            "channel": "Channel",
+            "revenue": "Revenue",
+            "cost": "Cost",
+            "purchases": "Purchases",
+            "add_to_cart": "Add to Cart",
+            "cpa": "CPA",
+            "cpatc": "Cost per ATC",
+            "aov": "AOV",
+            "cost_share": "Cost Share",
+            "revenue_share": "Revenue Share",
+        }
+    )
+
+
+def _format_monthly_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    formatted = frame.copy()
+    if "month_start" in formatted.columns:
+        formatted = formatted.drop(columns=["month_start"])
+    for column in ["revenue", "cost", "cpa", "cpatc", "aov"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_currency)
+    for column in ["purchases", "add_to_cart"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(lambda value: f"{value:.1f}")
+    return formatted.rename(
+        columns={
+            "month_label": "Month",
+            "revenue": "Revenue",
+            "cost": "Cost",
+            "purchases": "Purchases",
+            "add_to_cart": "Add to Cart",
+            "cpa": "CPA",
+            "cpatc": "Cost per ATC",
+            "aov": "AOV",
+        }
+    )
+
+
+def _format_atc_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    formatted = frame.copy()
+    if "month_start" in formatted.columns:
+        formatted = formatted.drop(columns=["month_start"])
+    formatted["atc"] = formatted["atc"].map(lambda value: f"{value:.1f}")
+    formatted["cpatc"] = formatted["cpatc"].map(_currency)
+    formatted["purchases"] = formatted["purchases"].map(lambda value: f"{value:.1f}")
+    return formatted.rename(columns={"month_label": "Month", "atc": "Add to Cart", "cpatc": "Cost per ATC", "purchases": "Purchases"})
+
+
+def _dataframe_to_text(frame: pd.DataFrame) -> str | None:
+    if frame is None or frame.empty:
+        return None
+    headers = list(frame.columns)
+    widths = {header: max(len(str(header)), *(len(str(row.get(header, ""))) for row in frame.to_dict("records"))) for header in headers}
+    rendered = [
+        " | ".join(str(header).ljust(widths[header]) for header in headers),
+        "-+-".join("-" * widths[header] for header in headers),
+    ]
+    for row in frame.to_dict("records"):
+        rendered.append(" | ".join(str(row.get(header, "")).ljust(widths[header]) for header in headers))
+    return "\n".join(rendered)
+
+
+def _yoy_table_to_text(yoy_summary: dict[str, Any] | None) -> str | None:
+    if not yoy_summary:
+        return None
+    return _dataframe_to_text(yoy_summary["table"])
+
+
+def _yoy_section_title(yoy_summary: dict[str, Any] | None) -> str:
+    if not yoy_summary:
+        return "YoY Quarter Comparison"
+    return "YoY Quarter Comparison" if yoy_summary.get("is_full_quarter_match") else "YoY Matched-Month Comparison"
+
+
+def _yoy_section_subtitle(yoy_summary: dict[str, Any] | None) -> str:
+    if not yoy_summary:
+        return "No prior-year quarter available"
+    matched = int(yoy_summary.get("matched_months", 0))
+    expected = int(yoy_summary.get("expected_months", 0))
+    if yoy_summary.get("is_full_quarter_match"):
+        return "Full quarter matched versus prior-year quarter"
+    return f"Matched months versus prior-year quarter ({matched} of {expected} months matched)"
