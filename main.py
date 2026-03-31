@@ -7,6 +7,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from report_generator.pipelines.olympic_pipeline import generate_olympic_report
+from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
 from src.config_loader import ConfigLoader
 from src.report_pipeline import ReportPipeline
 from utils.text_report import TextReportPipeline
@@ -54,6 +55,17 @@ def run_report(
         )
         return str(result["pptx_path"])
 
+    if client_id == "wightlink":
+        resolved_output = project_root / output_path if output_path else project_root / "output" / "wightlink_qbr.pptx"
+        result = generate_wightlink_report(
+            performance_csv=performance_csv,
+            output_path=resolved_output,
+            manual_inputs=manual_inputs,
+            trends_dir=trends_dir,
+            auction_csv=auction_csv,
+        )
+        return str(result["pptx_path"])
+
     pipeline = ReportPipeline(project_root=project_root)
     resolved_output = project_root / output_path if output_path else None
 
@@ -87,6 +99,17 @@ def run_text_report(
                 "_project_root": str(project_root),
                 "_chart_styles": config_loader.get_chart_styles(),
             },
+            output_path=resolved_output,
+            manual_inputs=manual_inputs,
+            trends_dir=trends_dir,
+            auction_csv=auction_csv,
+        )
+        return str(result["text_path"])
+
+    if client_id == "wightlink":
+        resolved_output = project_root / output_path if output_path else project_root / "reports" / "wightlink_qbr.txt"
+        result = generate_wightlink_report(
+            performance_csv=performance_csv,
             output_path=resolved_output,
             manual_inputs=manual_inputs,
             trends_dir=trends_dir,

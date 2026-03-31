@@ -15,15 +15,27 @@ TEMP_DIR = BASE_DIR / "temp_uploads"
 TEMP_DIR.mkdir(exist_ok=True)
 
 
-def load_client_ids() -> list[str]:
+def load_client_options() -> list[dict[str, str]]:
     config_path = BASE_DIR / "config" / "clients_config.json"
     with config_path.open("r", encoding="utf-8") as handle:
         config = json.load(handle)
 
     clients = config.get("clients", {})
     if isinstance(clients, dict):
-        return list(clients.keys())
-    return [str(client.get("id", "")).strip() for client in clients if str(client.get("id", "")).strip()]
+        return [
+            {"id": str(client_id).strip(), "name": str(client_id).strip()}
+            for client_id in clients.keys()
+            if str(client_id).strip()
+        ]
+
+    options: list[dict[str, str]] = []
+    for client in clients:
+        client_id = str(client.get("id", "")).strip()
+        if not client_id:
+            continue
+        client_name = str(client.get("name", "")).strip() or client_id
+        options.append({"id": client_id, "name": client_name})
+    return options
 
 
 def save_uploaded_file(uploaded_file, destination: Path) -> str:
@@ -36,8 +48,9 @@ def save_uploaded_file(uploaded_file, destination: Path) -> str:
 def main() -> None:
     st.title("PPC Report Generator")
 
-    client_ids = load_client_ids()
-    client_id = st.selectbox("Client", client_ids)
+    client_options = load_client_options()
+    selected_client = st.selectbox("Client", client_options, format_func=lambda client: client["name"])
+    client_id = selected_client["id"]
 
     st.subheader("File Uploads")
     performance_file = st.file_uploader("Performance CSV", type=["csv"])

@@ -305,6 +305,48 @@ This is the main project configuration source. It supports multiple clients. Eac
 }
 ```
 
+Australia can be added as a separate client with the same structure, for example:
+
+```json
+{
+  "id": "wendy_wu_australia",
+  "name": "Wendy Wu Tours Australia",
+  "country": "Australia",
+  "site_domain": "wendywutours.com.au",
+  "template_path": "templates/report_template.pptx",
+  "campaign_types": ["Brand", "Generic", "Performance Max", "Demand Gen"],
+  "destinations": ["China", "Japan", "SE Asia", "India"],
+  "brand_trends": {
+    "enabled": true,
+    "terms": ["wendy wu tours australia"]
+  },
+  "trend_aliases": {
+    "wendy wu tours australia": ["wendy wu tours"]
+  },
+  "destination_trends": {
+    "enabled": true,
+    "destinations": [
+      {"name": "Japan", "terms": ["japan holidays", "japan tours"]}
+    ]
+  },
+  "auction_insights": {
+    "enabled": true,
+    "client_domain": "wendywutours.com.au",
+    "known_competitors": ["travelclubelite.com", "riviera.co.uk"]
+  },
+  "slides": {
+    "include_performance": true,
+    "include_overview": true,
+    "include_campaign_mix": true,
+    "include_campaign_summary": true,
+    "include_destination_summary": true,
+    "include_trends": true,
+    "include_auction_insights": true,
+    "include_recommendations": true
+  }
+}
+```
+
 ## 6.3 `report_config.yaml`
 
 This is a backward-compatibility fallback for older single-client behaviour. If `clients_config.json` does not provide clients, the project derives a legacy client configuration from this YAML.

@@ -1,0 +1,295 @@
+[Cover]
+Title: Wightlink QBR
+Subtitle: Q1 2026 (Jan - Mar 2026)
+
+[Agenda]
+Title: What We'll Cover Today
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- Trends
+- Auction Insights
+- Performance
+- Audience Insights
+- Competitor Analysis
+- Opportunities
+- SEO
+
+[Trends]
+
+[Trends]
+Title: Google Trends - Isle Of Wight Ferry
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- No Google Trends CSV was supplied for this report.
+- Upload one or more Google Trends exports to populate the trend chart and narrative.
+
+[Auction Insights - Generic]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Display URL domain    | Impression share | Overlap rate | Position above rate | Top of page rate | Abs. Top of page rate | Outranking share
+----------------------+------------------+--------------+---------------------+------------------+-----------------------+-----------------
+ferrysavers.co.uk     | 12.99%           | 24.22%       | 29.01%              | 88.84%           | 11.94%                | 34.58%          
+booking.com           | 10.00%           | 1.71%        | 62.28%              | 85.08%           | 35.00%                | 36.80%          
+parkdeanresorts.co.uk | 10.00%           | 3.49%        | 56.19%              | 88.00%           | 41.86%                | 36.47%          
+You                   | 37.20%           | --           | --                  | 94.72%           | 40.11%                | --              
+redfunnel.co.uk       | 24.49%           | 45.34%       | 66.58%              | 95.64%           | 43.09%                | 25.97%          
+directferries.co.uk   | 24.77%           | 40.55%       | 45.61%              | 94.97%           | 28.69%                | 30.32%          
+Bullets:
+- We saw 5 competitors in the supplied auction data.
+- redfunnel.co.uk was one of the strongest overlapping competitors at 45%, with abs. top-of-page pressure at 43%.
+- directferries.co.uk was one of the strongest overlapping competitors at 41%, with abs. top-of-page pressure at 29%.
+- Average top-of-page pressure across competitors was 91% in the supplied file.
+
+[Auction Insights - Brand]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Display URL domain  | Impression share | Overlap rate | Position above rate | Top of page rate | Abs. Top of page rate | Outranking share
+--------------------+------------------+--------------+---------------------+------------------+-----------------------+-----------------
+You                 | 80.06%           | --           | --                  | 91.08%           | 74.04%                | --              
+redfunnel.co.uk     | 35.74%           | 42.52%       | 26.97%              | 84.11%           | 25.42%                | 70.88%          
+awayresorts.co.uk   | 12.68%           | 15.36%       | 13.38%              | 62.10%           | 12.60%                | 78.41%          
+adamvacations.com   | < 10%            | 11.67%       | 11.55%              | 42.10%           | 9.31%                 | 78.98%          
+directferries.co.uk | < 10%            | 11.56%       | 15.59%              | 72.42%           | 13.05%                | 78.61%          
+Bullets:
+- Throughout the quarter we saw 4 main competitors in the market.
+- Red Funnel were overlapping us 43% of the time, claiming the top spot 25% of the time.
+- Comparing YoY, Red Funnel had an increased presence versus the reference period.
+
+[Performance]
+
+[All Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- CPA vs CVR
+- Cost vs Purchases
+Bullets:
+- January was the strongest month for purchase volume.
+- February was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 60.61 on £47,544 spend.
+
+[All Performance YoY]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Metric    | Current       | Prior year    | YoY change
+----------+---------------+---------------+-----------
+Purchases | 31,498        | 25,506        | +23.5%    
+Revenue   | £2,881,519.98 | £2,207,172.42 | +30.6%    
+Cost      | £47,544.04    | £42,141.92    | +12.8%    
+CPA       | £1.51         | £1.65         | -8.6%     
+ROAS      | 60.61         | 52.37         | +15.7%    
+CVR       | --            | --            | --        
+Bullets:
+- Purchases were up 23% versus the same quarter last year.
+- Revenue was up 31% versus the same quarter last year.
+- Cost was up 13% versus the same quarter last year.
+- CPA was down 9% versus the same quarter last year.
+
+[Brand Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- CPA vs CVR
+- Cost vs Purchases
+Bullets:
+- January was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 220.03 on £9,018 spend.
+- Quarter CPA was 65% lower than the same quarter last year.
+
+[Brand Summary]
+Title: Brand Performance Summary
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Month    | Impressions | Clicks | CTR | CPC | Cost      | Purchases | CPA   | Purchase Revenue | ROAS   | CVR
+---------+-------------+--------+-----+-----+-----------+-----------+-------+------------------+--------+----
+January  | --          | --     | --  | --  | £2,774.47 | 8,055     | £0.34 | £700,297.56      | 252.41 | -- 
+February | --          | --     | --  | --  | £2,712.20 | 7,731     | £0.35 | £682,664.14      | 251.70 | -- 
+March    | --          | --     | --  | --  | £3,531.06 | 6,391     | £0.55 | £601,186.41      | 170.26 | -- 
+Total    | --          | --     | --  | --  | £9,017.73 | 22,177    | £0.41 | £1,984,148.11    | 220.03 | -- 
+Bullets:
+- January was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 220.03 on £9,018 spend.
+- Quarter CPA was 65% lower than the same quarter last year.
+
+[Generics Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- CPA vs CVR
+- Cost vs Purchases
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 26.42 on £23,567 spend.
+- Quarter CPA was 18% lower than the same quarter last year.
+
+[Generics Summary]
+Title: Generics Performance Summary
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Month    | Impressions | Clicks | CTR | CPC | Cost       | Purchases | CPA   | Purchase Revenue | ROAS  | CVR
+---------+-------------+--------+-----+-----+------------+-----------+-------+------------------+-------+----
+January  | --          | --     | --  | --  | £6,866.11  | 1,861     | £3.69 | £201,575.37      | 29.36 | -- 
+February | --          | --     | --  | --  | £6,806.00  | 1,671     | £4.07 | £180,929.17      | 26.58 | -- 
+March    | --          | --     | --  | --  | £9,894.71  | 2,037     | £4.86 | £240,207.82      | 24.28 | -- 
+Total    | --          | --     | --  | --  | £23,566.81 | 5,570     | £4.23 | £622,712.36      | 26.42 | -- 
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 26.42 on £23,567 spend.
+- Quarter CPA was 18% lower than the same quarter last year.
+
+[Tests]
+
+[PMax Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Month    | Impressions | Clicks | CTR | CPC | Cost      | Purchases | CPA   | Purchase Revenue | ROAS  | CVR
+---------+-------------+--------+-----+-----+-----------+-----------+-------+------------------+-------+----
+January  | --          | --     | --  | --  | £1,671.00 | 409       | £4.08 | £31,769.23       | 19.01 | -- 
+February | --          | --     | --  | --  | £1,523.82 | 331       | £4.60 | £24,628.29       | 16.16 | -- 
+March    | --          | --     | --  | --  | £1,845.35 | 328       | £5.62 | £29,499.14       | 15.99 | -- 
+Total    | --          | --     | --  | --  | £5,040.16 | 1,069     | £4.72 | £85,896.66       | 17.04 | -- 
+Bullets:
+- January was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 17.04 on £5,040 spend.
+- Performance Max should be read alongside generic activity because the source CSV is aggregated at campaign type level.
+
+[Audience Insights - Generics Location Targeting]
+Title: Audience Insights - Generics Location Targeting (Q3 2025 Google only)
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+County (Matched) | Impr.   | Clicks | CTR    | CPC   | Cost       | Conversions | CPA   | CVR   
+-----------------+---------+--------+--------+-------+------------+-------------+-------+-------
+Hampshire        | 183,102 | 42,382 | 23.15% | £0.28 | £11,815.56 | 6,109       | £1.93 | 14.41%
+Greater London   | 197,766 | 34,271 | 17.33% | £0.31 | £10,716.38 | 4,806       | £2.23 | 14.02%
+Isle of Wight    | 79,349  | 16,790 | 21.16% | £0.45 | £7,512.68  | 3,082       | £2.44 | 18.35%
+West Sussex      | 38,257  | 10,519 | 27.50% | £0.27 | £2,868.07  | 1,462       | £1.96 | 13.90%
+Surrey           | 32,705  | 7,543  | 23.06% | £0.31 | £2,306.64  | 1,105       | £2.09 | 14.64%
+Bullets:
+- As you would expect the majority of our traffic comes from the South of England, and our investment mirrors that.
+- The Isle of Wight has the highest CVR, which is consistent with the reference deck.
+
+[Audience Insights - Generics Device Performance]
+Title: Audience Insights - Generics Device Performance (Q3 2025 Google only)
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Device        | Impr.   | Clicks  | CTR    | Avg. CPC | Cost       | Conversions | CPA   | CVR    | Search impr. share
+--------------+---------+---------+--------+----------+------------+-------------+-------+--------+-------------------
+Mobile phones | 731,128 | 150,483 | 20.58% | £0.25    | £38,142.36 | 18,404      | £2.07 | 12.23% | 58.55%            
+Computers     | 182,096 | 31,697  | 17.41% | £0.50    | £15,828.35 | 7,720       | £2.05 | 24.36% | 56.23%            
+Tablets       | 26,557  | 5,437   | 20.47% | £0.28    | £1,518.94  | 641         | £2.37 | 11.79% | 51.92%            
+Bullets:
+- The majority of impressions and clicks are from mobile, and investment continues to follow that demand.
+- Desktop had the strongest CVR and a similar CPA to the other devices, so it remained an efficient source of conversion volume.
+
+[Audience Insights - Brand Location Targeting]
+Title: Audience Insights - Brand Location Targeting (Q3 2025 Google only)
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+County (Matched) | Impr.  | Clicks | CTR    | CPC   | Cost      | Conversions | CPA   | CVR   
+-----------------+--------+--------+--------+-------+-----------+-------------+-------+-------
+Isle of Wight    | 98,611 | 53,797 | 54.55% | £0.12 | £6,367.53 | 13,790      | £0.46 | 25.63%
+Hampshire        | 59,499 | 31,968 | 53.73% | £0.11 | £3,385.37 | 5,906       | £0.57 | 18.47%
+Greater London   | 55,381 | 28,361 | 51.21% | £0.11 | £3,012.38 | 5,743       | £0.52 | 20.25%
+West Sussex      | 12,537 | 7,144  | 56.98% | £0.10 | £728.09   | 1,311       | £0.56 | 18.34%
+Surrey           | 10,609 | 6,015  | 56.70% | £0.11 | £661.48   | 1,259       | £0.53 | 20.93%
+Bullets:
+- Brand location splits broadly mirror the generics footprint.
+- The Isle of Wight remained the strongest conversion area within the reference deck.
+
+[Audience Insights - Brand Device Performance]
+Title: Audience Insights - Brand Device Performance (Q3 2025 Google only)
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Device        | Impr.   | Clicks  | CTR    | Avg. CPC | Cost       | Conversions | CPA   | CVR    | Search impr. share
+--------------+---------+---------+--------+----------+------------+-------------+-------+--------+-------------------
+Mobile phones | 255,202 | 136,063 | 53.32% | £0.11    | £15,067.60 | 21,464      | £0.70 | 15.78% | 80.02%            
+Computers     | 79,642  | 42,721  | 53.64% | £0.12    | £5,148.75  | 16,466      | £0.31 | 38.54% | 81.58%            
+Tablets       | 10,856  | 5,424   | 49.96% | £0.13    | £716.63    | 1,126       | £0.64 | 20.75% | 72.06%            
+Bullets:
+- Mobile still drove most brand impressions and clicks.
+- Desktop conversion strength was materially higher and accounted for a large share of brand conversions in the reference deck.
+
+[Brand tCPA Test]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Arm            | Impr   | Clicks | CTR    | CPC   | Cost      | Conversions | Cost/Conversion | Conversion Value | Conversion Value/Cost | CVR   
+---------------+--------+--------+--------+-------+-----------+-------------+-----------------+------------------+-----------------------+-------
+Control        | 34,522 | 15,926 | 46.13% | £0.17 | £2,644.09 | 2,244       | £1.18           | £208,138.19      | 78.72                 | 14.09%
+Treatment      | 29,996 | 14,074 | 46.92% | £0.25 | £3,473.78 | 2,333       | £1.49           | £226,417.79      | 65.18                 | 16.58%
+Difference (%) | -13%   | -12%   | 2%     | 49%   | 31%       | 4%          | 26%             | 9%               | -17%                  | 18%   
+Bullets:
+- Control was the stronger arm on overall efficiency in the supplied test summary.
+- From an efficiency standpoint, this test was not successful.
+- The treatment arm improved conversion rate but at a materially higher CPC and cost per conversion.
+- Several of the efficiency movements were statistically significant in the reference analysis.
+
+[Target ROAS Test]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Arm            | Impr  | Clicks | CTR    | CPC   | Cost    | Conversions | Cost/Conversion | Conversion Value | Conversion Value/Cost | CVR   
+---------------+-------+--------+--------+-------+---------+-------------+-----------------+------------------+-----------------------+-------
+Control        | 6,482 | 1,589  | 24.51% | £0.32 | £502.79 | 205         | £2.45           | £20,367.47       | 40.51                 | 12.91%
+Treatment      | 5,119 | 1,307  | 25.53% | £0.39 | £509.29 | 130         | £3.91           | £12,118.54       | 23.79                 | 9.96% 
+Difference (%) | -21%  | -18%   | 4%     | 22%   | 1%      | -37%        | 60%             | -41%             | -41%                  | -23%  
+Bullets:
+- Control was the stronger arm on overall efficiency in the supplied test summary.
+- The control arm performed significantly better, so the test was ended.
+- Treatment drove fewer conversions and lower conversion value at a higher CPC.
+- Cost per conversion was significantly higher in the treatment arm.
+
+[SEO]
+
+[SEO Overview]
+Title: Organic Keywords (Non Brand)
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- From the 25,933 keywords, 20,262 are non-branded terms.
+- The reference deck notes a slight reduction in non-brand keyword count, largely in secondary terms.
+
+[SEO Summary]
+Title: YOY Clicks reduced, but impact small
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- From the 25,933 keywords, 20,262 are non-branded terms.
+- The reference deck notes a slight reduction in non-brand keyword count, largely in secondary terms.
+- Impressions were up 31%, suggesting broader visibility across more non-brand terms.
+- Clicks were down 20% YoY in the reference deck, with weaker CTR consistent with visibility at lower positions.
+- AI and LLM behaviour should only be referenced when it is explicitly provided in the manual content, which it is here.
+
+[Opportunities]
+Title: Opportunities/Tests
+
+[Opportunities]
+Title: Live and upcoming tests/builds
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- Search Term Analyser - Running successfully on the account
+- Ad copy testing using AI - Currently running (not significant yet)
+- AI Max - Currently testing
+- Ad customisers - price insertion (on hold)
+- Predictive budget allocation
+- Competitor Ad Analysis
+
+[Competitors]
+
+[Competitor Analysis]
+Title: Competitor Analysis - Red Funnel
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- Mix of formats can be seen across Search, Video and Images.
+- Creative examples are heavily price-led, including single, return and percentage-off messaging.
+- The reference deck suggests Performance Max activity promoting Isle of Wight activities.
+- DSA appears to have been stopped.
+- Ad extension usage appears limited, mainly image extensions.
+- Ad Transparency Tool HERE
+
+[Closing]
+Title: Any Questions?
