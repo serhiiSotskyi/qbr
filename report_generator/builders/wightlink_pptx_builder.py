@@ -105,6 +105,51 @@ class WightlinkPptxBuilder:
         plt.close(fig)
         return output
 
+    def build_plan_comparison_chart(
+        self,
+        monthly_rows: list[dict[str, Any]],
+        filename: str,
+        planned_metric: str,
+        actual_metric: str,
+        title: str,
+    ) -> Path:
+        output = self.charts_dir / filename
+        if not monthly_rows:
+            return self._plot_empty(output, "No plan comparison data")
+
+        df = pd.DataFrame(monthly_rows)
+        if df.empty:
+            return self._plot_empty(output, "No plan comparison data")
+
+        labels = df["month_label"].tolist()
+        x_positions = range(len(labels))
+        width = 0.36
+
+        fig, ax = plt.subplots(figsize=(7.8, 3.9))
+        ax.bar(
+            [position - width / 2 for position in x_positions],
+            df[planned_metric].fillna(0),
+            width=width,
+            color="#94A3B8",
+            label="Plan",
+        )
+        ax.bar(
+            [position + width / 2 for position in x_positions],
+            df[actual_metric].fillna(0),
+            width=width,
+            color="#0C5460",
+            label="Actual",
+        )
+        ax.set_title(title, fontsize=14)
+        ax.set_xticks(list(x_positions), labels)
+        ax.tick_params(axis="both", labelsize=9)
+        ax.grid(axis="y", alpha=0.2)
+        ax.legend(fontsize=9, loc="upper left")
+        plt.tight_layout()
+        fig.savefig(output, dpi=180)
+        plt.close(fig)
+        return output
+
     def _render_slide(self, slide_spec: dict[str, Any]) -> None:
         slide = self.prs.slides.add_slide(self.prs.slide_layouts[6])
         fill = slide.background.fill
@@ -147,6 +192,13 @@ class WightlinkPptxBuilder:
         elif slide_type == "table_bullets":
             self._render_table(slide, table_rows, Inches(0.4), Inches(1.35), Inches(12.45), Inches(3.35))
             self._add_bullets(slide, bullets, Inches(0.8), Inches(4.95), Inches(11.8), Inches(1.45))
+        elif slide_type == "dual_chart_table_bullets":
+            if len(charts) >= 1:
+                slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.45), Inches(1.3), width=Inches(6.0), height=Inches(2.7))
+            if len(charts) >= 2:
+                slide.shapes.add_picture(str(charts[1]["path"]), Inches(6.85), Inches(1.3), width=Inches(6.0), height=Inches(2.7))
+            self._render_table(slide, table_rows, Inches(0.45), Inches(4.2), Inches(8.0), Inches(2.15))
+            self._add_bullets(slide, bullets, Inches(8.7), Inches(4.25), Inches(4.1), Inches(2.05), font_size=14)
         elif slide_type == "table_only":
             self._render_table(slide, table_rows, Inches(0.4), Inches(1.35), Inches(12.45), Inches(4.8))
             self._add_bullets(slide, bullets, Inches(0.8), Inches(6.15), Inches(11.8), Inches(0.7), font_size=13)

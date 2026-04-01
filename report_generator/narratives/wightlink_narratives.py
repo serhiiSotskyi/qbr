@@ -63,6 +63,66 @@ def build_all_performance_yoy_narrative(current_scope: dict[str, Any], prior_sco
     return bullets
 
 
+def build_plan_comparison_overview_narrative(plan_section: dict[str, Any]) -> list[str]:
+    summary = plan_section.get("summary", {})
+    bullets: list[str] = []
+
+    spend_pct = summary.get("spend_variance_pct")
+    if spend_pct is not None:
+        direction = "above" if spend_pct > 0 else "below"
+        bullets.append(
+            f"Quarter spend closed {_format_delta_pct(spend_pct)} {direction} plan at £{summary.get('actual_spend', 0):,.0f} versus £{summary.get('planned_spend', 0):,.0f}."
+        )
+
+    revenue_pct = summary.get("revenue_variance_pct")
+    if revenue_pct is not None:
+        direction = "above" if revenue_pct > 0 else "below"
+        bullets.append(
+            f"Quarter revenue finished {_format_delta_pct(revenue_pct)} {direction} plan at £{summary.get('actual_revenue', 0):,.0f} versus £{summary.get('planned_revenue', 0):,.0f}."
+        )
+
+    strongest = _best_month(plan_section.get("monthly", []), "revenue_variance")
+    if strongest and _sortable(strongest.get("revenue_variance"), none_default=0.0) > 0:
+        bullets.append(f"{strongest['month_label']} delivered the strongest revenue overdelivery versus plan.")
+
+    return bullets or ["Plan-comparison data was available, but there was not enough populated data to summarize quarter delivery."]
+
+
+def build_plan_comparison_detail_narrative(plan_section: dict[str, Any]) -> list[str]:
+    monthly = plan_section.get("monthly", [])
+    bullets: list[str] = []
+
+    strongest_spend = _best_month(monthly, "spend_variance")
+    if strongest_spend is not None:
+        variance = strongest_spend.get("spend_variance")
+        direction = "under plan" if _sortable(variance, none_default=0.0) < 0 else "over plan"
+        bullets.append(f"{strongest_spend['month_label']} showed the largest spend movement versus plan, finishing {direction}.")
+
+    weakest_revenue = _worst_month(monthly, "revenue_variance")
+    if weakest_revenue is not None and _sortable(weakest_revenue.get("revenue_variance"), none_default=0.0) < 0:
+        bullets.append(f"{weakest_revenue['month_label']} recorded the largest revenue shortfall versus plan.")
+
+    strongest_revenue = _best_month(monthly, "revenue_variance")
+    if strongest_revenue is not None and _sortable(strongest_revenue.get("revenue_variance"), none_default=0.0) > 0:
+        bullets.append(f"{strongest_revenue['month_label']} was the strongest month for revenue delivery against plan.")
+
+    return bullets or ["Monthly plan-versus-actual coverage was available, but there were no material variances to call out."]
+
+
+def build_plan_delivery_bullets(plan_section: dict[str, Any]) -> list[str]:
+    summary = plan_section.get("summary", {})
+    bullets: list[str] = []
+    spend_pct = summary.get("spend_variance_pct")
+    revenue_pct = summary.get("revenue_variance_pct")
+    if spend_pct is not None:
+        direction = "above" if spend_pct > 0 else "below"
+        bullets.append(f"Quarter spend landed {_format_delta_pct(spend_pct)} {direction} plan.")
+    if revenue_pct is not None:
+        direction = "above" if revenue_pct > 0 else "below"
+        bullets.append(f"Quarter revenue finished {_format_delta_pct(revenue_pct)} {direction} plan.")
+    return bullets
+
+
 def build_brand_narrative(scope: dict[str, Any], prior_scope: dict[str, Any] | None = None) -> list[str]:
     bullets = _build_performance_narrative(scope, "brand")
     bullets.extend(_append_yoy_efficiency(scope, prior_scope))
@@ -194,6 +254,20 @@ def _append_yoy_efficiency(scope: dict[str, Any], prior_scope: dict[str, Any] | 
     return [f"Quarter CPA was {abs(delta) * 100:.0f}% {direction} than the same quarter last year."]
 
 
+def _best_month(rows: list[dict[str, Any]], key: str) -> dict[str, Any] | None:
+    candidates = [row for row in rows if not _missing(row.get(key))]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda row: _sortable(row.get(key)))
+
+
+def _worst_month(rows: list[dict[str, Any]], key: str) -> dict[str, Any] | None:
+    candidates = [row for row in rows if not _missing(row.get(key))]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda row: _sortable(row.get(key), none_default=float("inf")))
+
+
 def _mean(values: list[Any]) -> float | None:
     clean = [float(value) for value in values if not _missing(value)]
     if not clean:
@@ -236,3 +310,10 @@ def _num(value: Any) -> float:
 
 def _missing(value: Any) -> bool:
     return value is None or (isinstance(value, float) and pd.isna(value)) or pd.isna(value)
+
+
+def _format_delta_pct(value: float) -> str:
+    percentage = abs(float(value) * 100)
+    if percentage < 1:
+        return f"{percentage:.1f}%"
+    return f"{percentage:.0f}%"

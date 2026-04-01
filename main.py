@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--client-id", help="Client ID from config/clients_config.json.")
     parser.add_argument("--auction-csv", help="Path to Auction Insights CSV export.")
     parser.add_argument("--trends-dir", help="Directory containing Google Trends CSV exports.")
+    parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
     parser.add_argument(
         "--output",
         default="output/QBR_Report.pptx",
@@ -33,6 +34,7 @@ def run_report(
     client_id: str,
     trends_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
+    plan_workbook: Optional[str] = None,
     output_path: Optional[str] = None,
     manual_inputs: Optional[dict[str, Any]] = None,
 ) -> str:
@@ -63,6 +65,7 @@ def run_report(
             manual_inputs=manual_inputs,
             trends_dir=trends_dir,
             auction_csv=auction_csv,
+            plan_workbook=plan_workbook,
         )
         return str(result["pptx_path"])
 
@@ -84,6 +87,7 @@ def run_text_report(
     client_id: str,
     trends_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
+    plan_workbook: Optional[str] = None,
     output_path: Optional[str] = None,
     manual_inputs: Optional[dict[str, Any]] = None,
 ) -> str:
@@ -114,6 +118,7 @@ def run_text_report(
             manual_inputs=manual_inputs,
             trends_dir=trends_dir,
             auction_csv=auction_csv,
+            plan_workbook=plan_workbook,
         )
         return str(result["text_path"])
 
@@ -142,6 +147,7 @@ def main() -> None:
         client_id=args.client_id,
         trends_dir=args.trends_dir,
         auction_csv=args.auction_csv,
+        plan_workbook=args.plan_workbook,
         output_path=args.output,
     )
 

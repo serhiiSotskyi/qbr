@@ -14,11 +14,15 @@ from report_generator.narratives.wightlink_narratives import (
     build_brand_narrative,
     build_generic_auction_narrative,
     build_generics_narrative,
+    build_plan_comparison_detail_narrative,
+    build_plan_comparison_overview_narrative,
+    build_plan_delivery_bullets,
     build_pmax_narrative,
     build_trends_narrative,
 )
 from report_generator.parsers.generic_trends_parser import parse_trends_inputs
 from report_generator.parsers.wightlink_auction_parser import parse_wightlink_auction_csv
+from report_generator.parsers.wightlink_plan_parser import parse_wightlink_plan_workbook
 from report_generator.parsers.wightlink_performance_parser import build_yoy_table, parse_wightlink_performance_csv
 from report_generator.reference.wightlink_reference_content import DEFAULT_WIGHTLINK_MANUAL_INPUTS
 
@@ -29,6 +33,7 @@ def generate_wightlink_report(
     manual_inputs: dict[str, Any] | None = None,
     trends_dir: str | Path | None = None,
     auction_csv: str | Path | None = None,
+    plan_workbook: str | Path | None = None,
 ) -> dict[str, Any]:
     performance = parse_wightlink_performance_csv(performance_csv)
     merged_manual = _merge_manual_inputs(DEFAULT_WIGHTLINK_MANUAL_INPUTS, manual_inputs or {})
@@ -40,6 +45,13 @@ def generate_wightlink_report(
     brand_auction = None
     if manual_inputs and manual_inputs.get("auction", {}).get("brand_csv"):
         brand_auction = parse_wightlink_auction_csv(manual_inputs["auction"]["brand_csv"], subtype="brand")
+
+    plan_section = None
+    if plan_workbook:
+        try:
+            plan_section = parse_wightlink_plan_workbook(plan_workbook, performance["quarter"], performance["current"])
+        except Exception:
+            plan_section = None
 
     requested_output = Path(output_path)
     if requested_output.suffix.lower() == ".txt":
@@ -55,7 +67,7 @@ def generate_wightlink_report(
 
     charts_dir = pptx_path.parent / f"{pptx_path.stem}_charts"
     ppt_builder = WightlinkPptxBuilder(pptx_path, charts_dir)
-    slides = _build_slides(performance, merged_manual, ppt_builder, trends_section, generic_auction, brand_auction)
+    slides = _build_slides(performance, merged_manual, ppt_builder, trends_section, generic_auction, brand_auction, plan_section)
 
     payload = build_wightlink_json_payload(
         client_id="wightlink",
@@ -89,6 +101,7 @@ def _build_slides(
     trends_section: dict[str, Any] | None,
     generic_auction: dict[str, Any] | None,
     brand_auction: dict[str, Any] | None,
+    plan_section: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     quarter = performance["quarter"]
     subtitle = f"{quarter.label} ({quarter.start.strftime('%b')} - {quarter.end.strftime('%b %Y')})"
@@ -104,6 +117,8 @@ def _build_slides(
         "Auction Insights",
         "Performance",
     ]
+    if plan_section:
+        agenda_items.append("Plan vs Actual")
 
     trend_chart = ppt_builder.build_trend_chart(trends_section, "trends.png") if trends_section else None
     overall_charts = {
@@ -118,6 +133,16 @@ def _build_slides(
         "cpa_cvr": ppt_builder.build_performance_chart(generic, "generic_cpa_cvr.png", "cpa", "cvr", "CPA vs CVR"),
         "cost_purchases": ppt_builder.build_performance_chart(generic, "generic_cost_purchases.png", "cost", "purchases", "Cost vs Purchases"),
     }
+    plan_charts = {}
+    if plan_section:
+        plan_charts = {
+            "spend": ppt_builder.build_plan_comparison_chart(
+                plan_section["monthly"], "plan_vs_actual_spend.png", "planned_spend", "actual_spend", "Plan vs Actual Spend"
+            ),
+            "revenue": ppt_builder.build_plan_comparison_chart(
+                plan_section["monthly"], "plan_vs_actual_revenue.png", "planned_revenue", "actual_revenue", "Plan vs Actual Revenue"
+            ),
+        }
 
     slides: list[dict[str, Any]] = []
     slides.append({
@@ -161,7 +186,7 @@ def _build_slides(
             {"title": "CPA vs CVR", "path": str(overall_charts["cpa_cvr"])},
             {"title": "Cost vs Purchases", "path": str(overall_charts["cost_purchases"])},
         ],
-        "bullets": build_all_performance_narrative(current),
+        "bullets": build_all_performance_narrative(current) + (build_plan_delivery_bullets(plan_section) if plan_section else []),
         "source_note": "Source: Uploaded performance CSV",
     })
     slides.append({
@@ -171,8 +196,50 @@ def _build_slides(
         "title": "All Performance YoY",
         "subtitle": subtitle,
         "table": {"rows": build_yoy_table(current, prior)},
-        "bullets": build_all_performance_yoy_narrative(current, prior),
+        "bullets": build_all_performance_yoy_narrative(current, prior) + (build_plan_delivery_bullets(plan_section)[:1] if plan_section else []),
     })
+    if plan_section:
+        slides.append({
+            "type": "table_bullets",
+            "section": "plan_vs_actual",
+            "section_title": "Plan vs Actual Overview",
+            "title": "Plan vs Actual Overview",
+            "subtitle": subtitle,
+            "table": {
+                "rows": [
+                    {
+                        "Metric": "Spend",
+                        "Planned": _format_plan_currency(plan_section["summary"].get("planned_spend")),
+                        "Actual": _format_plan_currency(plan_section["summary"].get("actual_spend")),
+                        "Variance": _format_plan_currency(plan_section["summary"].get("spend_variance")),
+                        "Variance %": _format_plan_delta(plan_section["summary"].get("spend_variance_pct")),
+                    },
+                    {
+                        "Metric": "Revenue",
+                        "Planned": _format_plan_currency(plan_section["summary"].get("planned_revenue")),
+                        "Actual": _format_plan_currency(plan_section["summary"].get("actual_revenue")),
+                        "Variance": _format_plan_currency(plan_section["summary"].get("revenue_variance")),
+                        "Variance %": _format_plan_delta(plan_section["summary"].get("revenue_variance_pct")),
+                    },
+                ]
+            },
+            "bullets": build_plan_comparison_overview_narrative(plan_section),
+            "source_note": "Source: Wightlink planning workbook and uploaded performance CSV",
+        })
+        slides.append({
+            "type": "dual_chart_table_bullets",
+            "section": "plan_vs_actual",
+            "section_title": "Plan vs Actual Monthly Trend",
+            "title": "Plan vs Actual Monthly Trend",
+            "subtitle": subtitle,
+            "charts": [
+                {"title": "Plan vs Actual Spend", "path": str(plan_charts["spend"])},
+                {"title": "Plan vs Actual Revenue", "path": str(plan_charts["revenue"])},
+            ],
+            "table": {"rows": plan_section.get("table_rows", [])},
+            "bullets": build_plan_comparison_detail_narrative(plan_section),
+            "source_note": "Source: Wightlink planning workbook and uploaded performance CSV",
+        })
     slides.append({
         "type": "dual_chart_bullets",
         "section": "performance",
@@ -256,3 +323,16 @@ def _merge_manual_inputs(base: dict[str, Any], overrides: dict[str, Any]) -> dic
             continue
         merged[key] = _merge_manual_inputs(merged[key], value)
     return merged
+
+
+def _format_plan_currency(value: Any) -> str:
+    if value is None:
+        return "--"
+    return f"£{float(value):,.2f}"
+
+
+def _format_plan_delta(value: Any) -> str:
+    if value is None:
+        return "--"
+    sign = "+" if float(value) > 0 else ""
+    return f"{sign}{float(value) * 100:.1f}%"

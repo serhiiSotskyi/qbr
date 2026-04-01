@@ -46,7 +46,7 @@ def save_uploaded_file(uploaded_file, destination: Path) -> str:
     return str(destination)
 
 
-def build_request_inputs(performance_file, auction_file, trends_files) -> tuple[Path, str, str | None, str | None]:
+def build_request_inputs(performance_file, auction_file, trends_files, plan_workbook_file=None) -> tuple[Path, str, str | None, str | None, str | None]:
     request_id = uuid4().hex
     request_dir = TEMP_DIR / request_id
     request_dir.mkdir(parents=True, exist_ok=True)
@@ -65,7 +65,11 @@ def build_request_inputs(performance_file, auction_file, trends_files) -> tuple[
             save_uploaded_file(trend_file, trends_path / trend_file.name)
         trends_dir = str(trends_path)
 
-    return request_dir, perf_path, auction_path, trends_dir
+    plan_workbook_path = None
+    if plan_workbook_file is not None:
+        plan_workbook_path = save_uploaded_file(plan_workbook_file, request_dir / "plan" / plan_workbook_file.name)
+
+    return request_dir, perf_path, auction_path, trends_dir, plan_workbook_path
 
 
 def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path, prompt_txt_path: Path, request_dir: Path) -> Path:
@@ -88,6 +92,9 @@ def main() -> None:
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
     auction_file = st.file_uploader("Auction CSV", type=["csv"])
     trends_files = st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
+    plan_workbook_file = None
+    if client_id == "wightlink":
+        plan_workbook_file = st.file_uploader("Wightlink Plan Workbook", type=["xlsx"])
 
     if "generated_bundle" not in st.session_state:
         st.session_state.generated_bundle = None
@@ -97,7 +104,12 @@ def main() -> None:
             st.error("Please upload a performance CSV")
             return
 
-        request_dir, perf_path, auction_path, trends_dir = build_request_inputs(performance_file, auction_file, trends_files)
+        request_dir, perf_path, auction_path, trends_dir, plan_workbook_path = build_request_inputs(
+            performance_file,
+            auction_file,
+            trends_files,
+            plan_workbook_file,
+        )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -113,6 +125,7 @@ def main() -> None:
                     client_id=client_id,
                     trends_dir=trends_dir,
                     auction_csv=auction_path,
+                    plan_workbook=plan_workbook_path,
                     output_path=str(pptx_path),
                 )
             )
@@ -122,6 +135,7 @@ def main() -> None:
                     client_id=client_id,
                     trends_dir=trends_dir,
                     auction_csv=auction_path,
+                    plan_workbook=plan_workbook_path,
                     output_path=str(report_txt_path),
                 )
             )
