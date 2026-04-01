@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import streamlit as st
 
 from main import run_report, run_text_report
+from presentation_prompt_builder import build_presentation_prompt
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -45,6 +46,37 @@ def save_uploaded_file(uploaded_file, destination: Path) -> str:
     return str(destination)
 
 
+def build_request_inputs(performance_file, auction_file, trends_files) -> tuple[Path, str, str | None, str | None]:
+    request_id = uuid4().hex
+    request_dir = TEMP_DIR / request_id
+    request_dir.mkdir(parents=True, exist_ok=True)
+
+    perf_path = save_uploaded_file(performance_file, request_dir / "performance" / performance_file.name)
+
+    auction_path = None
+    if auction_file is not None:
+        auction_path = save_uploaded_file(auction_file, request_dir / "auction" / auction_file.name)
+
+    trends_dir = None
+    if trends_files:
+        trends_path = request_dir / "trends"
+        trends_path.mkdir(parents=True, exist_ok=True)
+        for trend_file in trends_files:
+            save_uploaded_file(trend_file, trends_path / trend_file.name)
+        trends_dir = str(trends_path)
+
+    return request_dir, perf_path, auction_path, trends_dir
+
+
+def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path, prompt_txt_path: Path, request_dir: Path) -> Path:
+    package_path = request_dir / f"{client_id}_package.zip"
+    with ZipFile(package_path, "w", compression=ZIP_DEFLATED) as archive:
+        archive.write(pptx_path, arcname=f"{client_id}_report.pptx")
+        archive.write(report_txt_path, arcname="report.txt")
+        archive.write(prompt_txt_path, arcname="prompt.txt")
+    return package_path
+
+
 def main() -> None:
     st.title("PPC Report Generator")
 
@@ -57,101 +89,77 @@ def main() -> None:
     auction_file = st.file_uploader("Auction CSV", type=["csv"])
     trends_files = st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
 
-    if st.button("Generate Report"):
+    if "generated_bundle" not in st.session_state:
+        st.session_state.generated_bundle = None
+
+    if st.button("Generate Files"):
         if performance_file is None:
             st.error("Please upload a performance CSV")
             return
 
-        request_id = uuid4().hex
-        request_dir = TEMP_DIR / request_id
-        request_dir.mkdir(parents=True, exist_ok=True)
+        request_dir, perf_path, auction_path, trends_dir = build_request_inputs(performance_file, auction_file, trends_files)
+        outputs_dir = request_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
 
-        perf_path = save_uploaded_file(performance_file, request_dir / "performance" / performance_file.name)
-        auction_path = None
-        if auction_file is not None:
-            auction_path = save_uploaded_file(auction_file, request_dir / "auction" / auction_file.name)
+        pptx_path = outputs_dir / f"{client_id}_report.pptx"
+        report_txt_path = outputs_dir / "report.txt"
+        prompt_txt_path = outputs_dir / "prompt.txt"
 
-        trends_dir = None
-        if trends_files:
-            trends_path = request_dir / "trends"
-            trends_path.mkdir(parents=True, exist_ok=True)
-            for trend_file in trends_files:
-                save_uploaded_file(trend_file, trends_path / trend_file.name)
-            trends_dir = str(trends_path)
+        try:
+            st.info("Generating PPTX, TXT, and prompt...")
+            generated_pptx = Path(
+                run_report(
+                    performance_csv=perf_path,
+                    client_id=client_id,
+                    trends_dir=trends_dir,
+                    auction_csv=auction_path,
+                    output_path=str(pptx_path),
+                )
+            )
+            generated_txt = Path(
+                run_text_report(
+                    performance_csv=perf_path,
+                    client_id=client_id,
+                    trends_dir=trends_dir,
+                    auction_csv=auction_path,
+                    output_path=str(report_txt_path),
+                )
+            )
+            prompt_txt_path.write_text(build_presentation_prompt(client_id), encoding="utf-8")
+            package_path = create_package_bundle(client_id, generated_pptx, generated_txt, prompt_txt_path, request_dir)
 
-        output_path = f"output/{client_id}_report.pptx"
+            st.session_state.generated_bundle = {
+                "client_id": client_id,
+                "pptx_path": str(generated_pptx),
+                "report_txt_path": str(generated_txt),
+                "prompt_txt_path": str(prompt_txt_path),
+                "package_path": str(package_path),
+            }
+            st.success("Files generated successfully.")
+        except Exception as exc:
+            st.session_state.generated_bundle = None
+            st.error(str(exc))
 
+    bundle = st.session_state.generated_bundle
+    if bundle:
+        st.subheader("Generated Files")
         st.write(
             {
-                "client": client_id,
-                "performance_file": perf_path,
-                "auction_file": auction_path,
-                "trends_files": [uploaded.name for uploaded in trends_files] if trends_files else [],
+                "client": bundle["client_id"],
+                "pptx": bundle["pptx_path"],
+                "report_txt": bundle["report_txt_path"],
+                "prompt_txt": bundle["prompt_txt_path"],
+                "package_zip": bundle["package_path"],
             }
         )
 
-        try:
-            st.info("Generating report...")
-            generated_output = run_report(
-                performance_csv=perf_path,
-                client_id=client_id,
-                trends_dir=trends_dir if trends_files else None,
-                auction_csv=auction_path,
-                output_path=output_path,
-            )
-            st.success("Report generated successfully!")
-
-            with open(generated_output, "rb") as handle:
-                st.download_button(
-                    label="Download Report",
-                    data=handle,
-                    file_name=f"{client_id}_report.pptx",
-                )
-        except Exception as exc:
-            st.error(str(exc))
-
-    if st.button("Generate Text Report"):
-        if performance_file is None:
-            st.error("Please upload a performance CSV")
-            return
-
-        request_id = uuid4().hex
-        request_dir = TEMP_DIR / request_id
-        request_dir.mkdir(parents=True, exist_ok=True)
-
-        perf_path = save_uploaded_file(performance_file, request_dir / "performance" / performance_file.name)
-        auction_path = None
-        if auction_file is not None:
-            auction_path = save_uploaded_file(auction_file, request_dir / "auction" / auction_file.name)
-
-        trends_dir = None
-        if trends_files:
-            trends_path = request_dir / "trends"
-            trends_path.mkdir(parents=True, exist_ok=True)
-            for trend_file in trends_files:
-                save_uploaded_file(trend_file, trends_path / trend_file.name)
-            trends_dir = str(trends_path)
-
-        output_path = f"reports/{client_id}_report.txt"
-
-        try:
-            st.info("Generating text report...")
-            generated_output = run_text_report(
-                performance_csv=perf_path,
-                client_id=client_id,
-                trends_dir=trends_dir if trends_files else None,
-                auction_csv=auction_path,
-                output_path=output_path,
-            )
-            report_text = Path(generated_output).read_text(encoding="utf-8")
-            st.success("Text report generated")
+        with open(bundle["package_path"], "rb") as handle:
             st.download_button(
-                "Download TXT",
-                data=report_text,
-                file_name="report.txt",
+                label="Download All Files",
+                data=handle,
+                file_name=f"{bundle['client_id']}_package.zip",
+                mime="application/zip",
             )
-        except Exception as exc:
-            st.error(str(exc))
 
 
 if __name__ == "__main__":
