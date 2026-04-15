@@ -1,0 +1,160 @@
+[Cover]
+Title: Wightlink QBR
+Subtitle: Q1 2026 (Jan - Mar 2026)
+
+[Agenda]
+Title: What We'll Cover Today
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Bullets:
+- Trends
+- Auction Insights
+- Performance
+
+[Trends]
+
+[Trends]
+Title: Google Trends - Isle Of Wight Ferry
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- Google Trends - Isle Of Wight Ferry
+Bullets:
+- Peak search interest landed in 17 Feb 2026.
+
+[Auction Insights - Generic]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Display URL domain    | Impression share | Overlap rate | Position above rate | Top of page rate | Abs. Top of page rate | Outranking share
+----------------------+------------------+--------------+---------------------+------------------+-----------------------+-----------------
+ferrysavers.co.uk     | 12.96%           | 24.15%       | 29.04%              | 88.89%           | 11.95%                | 34.58%          
+parkdeanresorts.co.uk | 10.00%           | 3.50%        | 56.09%              | 87.96%           | 41.83%                | 36.46%          
+You                   | 37.19%           | --           | --                  | 94.72%           | 40.20%                | --              
+directferries.co.uk   | 24.78%           | 40.59%       | 45.57%              | 94.94%           | 28.67%                | 30.31%          
+redfunnel.co.uk       | 24.48%           | 45.32%       | 66.46%              | 95.62%           | 43.09%                | 25.99%          
+booking.com           | 10.00%           | 1.72%        | 62.20%              | 85.06%           | 35.00%                | 36.80%          
+Bullets:
+- We saw 5 competitors in the supplied auction data.
+- redfunnel.co.uk was one of the strongest overlapping competitors at 45%, with abs. top-of-page pressure at 43%.
+- directferries.co.uk was one of the strongest overlapping competitors at 41%, with abs. top-of-page pressure at 29%.
+- Average top-of-page pressure across competitors was 90% in the supplied file.
+
+[Auction Insights - Brand]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Display URL domain  | Impression share | Overlap rate | Position above rate | Top of page rate | Abs. Top of page rate | Outranking share
+--------------------+------------------+--------------+---------------------+------------------+-----------------------+-----------------
+You                 | 80.06%           | --           | --                  | 91.08%           | 74.04%                | --              
+redfunnel.co.uk     | 35.74%           | 42.52%       | 26.97%              | 84.11%           | 25.42%                | 70.88%          
+awayresorts.co.uk   | 12.68%           | 15.36%       | 13.38%              | 62.10%           | 12.60%                | 78.41%          
+adamvacations.com   | < 10%            | 11.67%       | 11.55%              | 42.10%           | 9.31%                 | 78.98%          
+directferries.co.uk | < 10%            | 11.56%       | 15.59%              | 72.42%           | 13.05%                | 78.61%          
+Bullets:
+- Throughout the quarter we saw 4 main competitors in the market.
+- Red Funnel were overlapping us 43% of the time, claiming the top spot 25% of the time.
+- Comparing YoY, Red Funnel had an increased presence versus the reference period.
+
+[Performance]
+
+[All Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- CPA vs CVR
+- Cost vs Purchases
+Bullets:
+- March was the strongest month for purchase volume.
+- February was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 58.44 on £55,265 spend.
+
+[All Performance YoY]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Metric    | Current       | Prior year    | YoY change
+----------+---------------+---------------+-----------
+Purchases | 34,929        | 25,506        | +36.9%    
+Revenue   | £3,229,632.90 | £2,207,172.42 | +46.3%    
+Cost      | £55,265.24    | £42,141.92    | +31.1%    
+CPA       | £1.58         | £1.65         | -4.2%     
+ROAS      | 58.44         | 52.37         | +11.6%    
+CVR       | --            | --            | --        
+Bullets:
+- Purchases were up 37% versus the same quarter last year.
+- Revenue was up 46% versus the same quarter last year.
+- Cost was up 31% versus the same quarter last year.
+- CPA was down 4% versus the same quarter last year.
+
+[Brand Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- CPA vs CVR
+- Cost vs Purchases
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 197.77 on £11,144 spend.
+- Quarter CPA was 61% lower than the same quarter last year.
+
+[Brand Summary]
+Title: Brand Performance Summary
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Month    | Impressions | Clicks | CTR | CPC | Cost       | Purchases | CPA   | Purchase Revenue | ROAS   | CVR
+---------+-------------+--------+-----+-----+------------+-----------+-------+------------------+--------+----
+January  | --          | --     | --  | --  | £2,774.47  | 8,055     | £0.34 | £700,297.56      | 252.41 | -- 
+February | --          | --     | --  | --  | £2,712.20  | 7,731     | £0.35 | £682,664.14      | 251.70 | -- 
+March    | --          | --     | --  | --  | £5,657.55  | 8,670     | £0.65 | £821,032.32      | 145.12 | -- 
+Total    | --          | --     | --  | --  | £11,144.22 | 24,457    | £0.46 | £2,203,994.03    | 197.77 | -- 
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 197.77 on £11,144 spend.
+- Quarter CPA was 61% lower than the same quarter last year.
+
+[Generics Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Charts:
+- CPA vs CVR
+- Cost vs Purchases
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 26.18 on £27,700 spend.
+- Quarter CPA was 16% lower than the same quarter last year.
+
+[Generics Summary]
+Title: Generics Performance Summary
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Month    | Impressions | Clicks | CTR | CPC | Cost       | Purchases | CPA   | Purchase Revenue | ROAS  | CVR
+---------+-------------+--------+-----+-----+------------+-----------+-------+------------------+-------+----
+January  | --          | --     | --  | --  | £6,866.11  | 1,861     | £3.69 | £201,575.37      | 29.36 | -- 
+February | --          | --     | --  | --  | £6,806.00  | 1,671     | £4.07 | £180,929.17      | 26.58 | -- 
+March    | --          | --     | --  | --  | £14,027.71 | 2,871     | £4.89 | £342,810.28      | 24.44 | -- 
+Total    | --          | --     | --  | --  | £27,699.82 | 6,403     | £4.33 | £725,314.83      | 26.18 | -- 
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 26.18 on £27,700 spend.
+- Quarter CPA was 16% lower than the same quarter last year.
+
+[PMax Performance]
+Subtitle: Q1 2026 (Jan - Mar 2026)
+Table:
+Month    | Impressions | Clicks | CTR | CPC | Cost      | Purchases | CPA   | Purchase Revenue | ROAS  | CVR
+---------+-------------+--------+-----+-----+-----------+-----------+-------+------------------+-------+----
+January  | --          | --     | --  | --  | £1,671.00 | 409       | £4.08 | £31,769.23       | 19.01 | -- 
+February | --          | --     | --  | --  | £1,523.82 | 331       | £4.60 | £24,628.29       | 16.16 | -- 
+March    | --          | --     | --  | --  | £2,258.27 | 441       | £5.13 | £39,601.87       | 17.54 | -- 
+Total    | --          | --     | --  | --  | £5,453.08 | 1,181     | £4.62 | £95,999.39       | 17.60 | -- 
+Bullets:
+- March was the strongest month for purchase volume.
+- January was the most efficient month on CPA.
+- CVR could not be calculated from the uploaded CSV because click data was not supplied.
+- Quarter ROAS closed at 17.60 on £5,453 spend.
+- Performance Max should be read alongside generic activity because the source CSV is aggregated at campaign type level.
+
+[Closing]
+Title: Any Questions?
