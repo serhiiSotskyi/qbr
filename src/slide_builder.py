@@ -7,6 +7,7 @@ from typing import Iterable, Sequence
 import pandas as pd
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
@@ -22,6 +23,11 @@ class SlideBuilder:
         self.text_primary = _hex_to_rgb(colors.get("text_primary", "#142A4D"))
         self.text_secondary = _hex_to_rgb(colors.get("text_secondary", "#5A5A5A"))
         self.text_body = _hex_to_rgb(colors.get("text_body", "#2D2D2D"))
+        self.surface = _hex_to_rgb(colors.get("surface", "#FFFFFF"))
+        self.border = _hex_to_rgb(colors.get("border", "#D9D9D9"))
+        self.accent = _hex_to_rgb(colors.get("accent", "#C32026"))
+        self.positive = _hex_to_rgb(colors.get("positive", "#111111"))
+        self.negative = _hex_to_rgb(colors.get("negative", "#C32026"))
         self.table_header = _hex_to_rgb(colors.get("table_header", "#DBE6F4"))
         self.table_total = _hex_to_rgb(colors.get("table_total", "#EBF1FA"))
         self.title_size = int(fonts.get("title_size", 16))
@@ -55,23 +61,25 @@ class SlideBuilder:
         subtitle: str,
         cpl_cvr_chart_path: str | Path,
         cost_leads_chart_path: str | Path,
-        bullets: Iterable[str],
+        bullets: Iterable[str] | None = None,
+        use_template: bool = True,
     ) -> None:
-        slide = self._get_template_slide("TREND")
+        slide = self._get_template_slide("TREND") if use_template else None
         if slide is None:
             slide = self._new_slide()
             self._add_title(slide, title)
             self._add_subtitle(slide, subtitle)
-            slide.shapes.add_picture(str(cpl_cvr_chart_path), Inches(0.55), Inches(1.35), width=Inches(6.25))
-            slide.shapes.add_picture(str(cost_leads_chart_path), Inches(6.95), Inches(1.35), width=Inches(5.85))
-            self._add_bullets(slide, bullets, left=0.8, top=5.15, width=12.0, height=1.8)
+            slide.shapes.add_picture(str(cost_leads_chart_path), Inches(0.7), Inches(1.55), width=Inches(5.45))
+            slide.shapes.add_picture(str(cpl_cvr_chart_path), Inches(6.7), Inches(1.55), width=Inches(5.2))
+            if bullets:
+                self._add_bullets(slide, bullets, left=0.8, top=4.85, width=12.0, height=1.55)
             return
 
         self._replace_text_placeholder(slide, "{{TITLE}}", title)
         self._replace_text_placeholder(slide, "{{SUBTITLE}}", subtitle)
-        self._replace_picture_placeholder(slide, "{{CHART_LEFT}}", cpl_cvr_chart_path)
-        self._replace_picture_placeholder(slide, "{{CHART_RIGHT}}", cost_leads_chart_path)
-        self._replace_bullets_placeholder(slide, "{{BULLETS}}", bullets)
+        self._replace_picture_placeholder(slide, "{{CHART_LEFT}}", cost_leads_chart_path)
+        self._replace_picture_placeholder(slide, "{{CHART_RIGHT}}", cpl_cvr_chart_path)
+        self._replace_bullets_placeholder(slide, "{{BULLETS}}", bullets or [])
         self._clear_text_placeholder(slide, "{{SLIDE_TYPE:TREND}}")
 
     def add_mix_slide(
@@ -120,6 +128,20 @@ class SlideBuilder:
         self._replace_table_placeholder(slide, "{{TABLE_DATA}}", table_df)
         self._replace_bullets_placeholder(slide, "{{BULLETS}}", bullets)
         self._clear_text_placeholder(slide, "{{SLIDE_TYPE:TABLE}}")
+
+    def add_summary_cards_slide(
+        self,
+        title: str,
+        subtitle: str,
+        kpis: Sequence[dict],
+        bullets: Iterable[str] | None = None,
+    ) -> None:
+        slide = self._new_slide()
+        self._add_title(slide, title)
+        self._add_subtitle(slide, subtitle)
+        self._render_kpi_cards(slide, kpis, left=0.65, top=1.45, width=12.0, height=3.4)
+        if bullets:
+            self._add_bullets(slide, bullets, left=0.8, top=5.2, width=11.8, height=1.35)
 
     def add_single_chart_slide(
         self,
@@ -250,6 +272,86 @@ class SlideBuilder:
             paragraph.level = 0
             paragraph.space_after = Pt(12)
 
+    def _render_kpi_cards(self, slide, kpis: Sequence[dict], left: float, top: float, width: float, height: float) -> None:
+        cards = list(kpis)
+        if not cards:
+            return
+
+        columns = 4
+        rows = 2
+        horizontal_gap = 0.18
+        vertical_gap = 0.18
+        card_width = (width - horizontal_gap * (columns - 1)) / columns
+        card_height = (height - vertical_gap * (rows - 1)) / rows
+
+        for index, kpi in enumerate(cards[: columns * rows]):
+            row = index // columns
+            column = index % columns
+            card_left = left + column * (card_width + horizontal_gap)
+            card_top = top + row * (card_height + vertical_gap)
+
+            card = slide.shapes.add_shape(
+                MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE,
+                Inches(card_left),
+                Inches(card_top),
+                Inches(card_width),
+                Inches(card_height),
+            )
+            card.fill.solid()
+            card.fill.fore_color.rgb = self.surface
+            card.line.color.rgb = self.border
+            card.line.width = Pt(1)
+
+            accent = slide.shapes.add_shape(
+                MSO_AUTO_SHAPE_TYPE.RECTANGLE,
+                Inches(card_left),
+                Inches(card_top),
+                Inches(card_width),
+                Inches(0.06),
+            )
+            accent.fill.solid()
+            accent.fill.fore_color.rgb = self.accent
+            accent.line.color.rgb = self.accent
+
+            label_box = slide.shapes.add_textbox(
+                Inches(card_left + 0.14),
+                Inches(card_top + 0.16),
+                Inches(card_width - 0.28),
+                Inches(0.28),
+            ).text_frame
+            label_para = label_box.paragraphs[0]
+            label_run = label_para.add_run()
+            label_run.text = str(kpi.get("label", "Metric"))
+            label_run.font.size = Pt(10)
+            label_run.font.bold = True
+            label_run.font.color.rgb = self.text_secondary
+
+            value_box = slide.shapes.add_textbox(
+                Inches(card_left + 0.14),
+                Inches(card_top + 0.48),
+                Inches(card_width - 0.28),
+                Inches(0.42),
+            ).text_frame
+            value_para = value_box.paragraphs[0]
+            value_run = value_para.add_run()
+            value_run.text = str(kpi.get("value", "n/a"))
+            value_run.font.size = Pt(20)
+            value_run.font.bold = True
+            value_run.font.color.rgb = self.text_primary
+
+            yoy_box = slide.shapes.add_textbox(
+                Inches(card_left + 0.14),
+                Inches(card_top + card_height - 0.44),
+                Inches(card_width - 0.28),
+                Inches(0.24),
+            ).text_frame
+            yoy_para = yoy_box.paragraphs[0]
+            yoy_run = yoy_para.add_run()
+            yoy_run.text = f"YoY: {kpi.get('yoy_label', 'n/a')}"
+            yoy_run.font.size = Pt(10)
+            yoy_run.font.bold = True
+            yoy_run.font.color.rgb = self._resolve_yoy_color(str(kpi.get("key", "")), kpi.get("yoy"))
+
     def _replace_text_placeholder(self, slide, placeholder: str, value: str) -> bool:
         for shape in slide.shapes:
             if not hasattr(shape, "text_frame"):
@@ -325,10 +427,12 @@ class SlideBuilder:
 
     def _populate_bullets(self, text_frame, bullets: Iterable[str]) -> None:
         text_frame.clear()
-        bullets_list = list(bullets) or ["Narrative placeholder"]
+        bullets_list = [str(bullet) for bullet in bullets if str(bullet).strip()]
+        if not bullets_list:
+            return
         for idx, bullet in enumerate(bullets_list):
             paragraph = text_frame.paragraphs[0] if idx == 0 else text_frame.add_paragraph()
-            paragraph.text = str(bullet)
+            paragraph.text = bullet
             paragraph.level = 0
             paragraph.font.size = Pt(14)
             paragraph.font.color.rgb = self.text_body
@@ -365,6 +469,15 @@ class SlideBuilder:
         para.runs[0].font.bold = bold
         para.runs[0].font.size = Pt(size)
         para.alignment = PP_ALIGN.CENTER
+
+    def _resolve_yoy_color(self, metric_key: str, yoy_value) -> RGBColor:
+        if yoy_value is None or pd.isna(yoy_value):
+            return self.text_secondary
+
+        lower_is_better = {"Cost", "CPC", "CPL"}
+        is_positive = yoy_value >= 0
+        is_favorable = (not is_positive) if metric_key in lower_is_better else is_positive
+        return self.positive if is_favorable else self.negative
 
 
 def _hex_to_rgb(hex_value: str) -> RGBColor:

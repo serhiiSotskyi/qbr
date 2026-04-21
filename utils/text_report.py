@@ -74,6 +74,22 @@ class TextReportBuilder:
         body_parts.extend(self._render_bullets(bullets))
         self._sections.append(self._render_section(title, body_parts))
 
+    def add_summary_slide(
+        self,
+        title: str,
+        subtitle: str,
+        kpis: Sequence[dict],
+        table_df: pd.DataFrame,
+        bullets: Iterable[str],
+    ) -> None:
+        body_parts = [subtitle]
+        if kpis:
+            body_parts.extend(["", "Key Metrics + YoY", self._render_kpis(kpis)])
+        if not table_df.empty:
+            body_parts.extend(["", self._render_table(table_df)])
+        body_parts.extend(self._render_bullets(bullets))
+        self._sections.append(self._render_section(title, body_parts))
+
     def add_single_chart_slide(
         self,
         title: str,
@@ -136,7 +152,7 @@ class TextReportBuilder:
 
     @staticmethod
     def _render_bullets(bullets: Iterable[str]) -> list[str]:
-        return [f"- {bullet}" for bullet in list(bullets)]
+        return [f"- {bullet}" for bullet in list(bullets) if str(bullet).strip()]
 
     @staticmethod
     def _render_table(table_df: pd.DataFrame) -> str:
@@ -144,6 +160,19 @@ class TextReportBuilder:
         if safe_df.empty:
             safe_df = pd.DataFrame([{"Status": "No data available"}])
         return safe_df.to_string(index=False)
+
+    @staticmethod
+    def _render_kpis(kpis: Sequence[dict]) -> str:
+        rows = []
+        for kpi in kpis:
+            rows.append(
+                {
+                    "Metric": str(kpi.get("label", "")),
+                    "Value": str(kpi.get("value", "n/a")),
+                    "YoY": str(kpi.get("yoy_label", "n/a")),
+                }
+            )
+        return pd.DataFrame(rows).to_string(index=False)
 
 
 def generate_text_report(
@@ -229,6 +258,7 @@ class TextReportPipeline:
             quarter,
             campaign_order=self.config_loader.get_campaign_types(client_config),
             destination_order=self.config_loader.get_destinations(client_config),
+            destination_other_config=client_config.get("destination_other"),
         )
         validate_report_data(report)
 
@@ -270,21 +300,31 @@ def _build_performance_section(
     campaigns,
 ) -> None:
     builder.add_divider_slide("Performance")
+    use_kpi_cards = _use_kpi_summary_cards(client_config)
 
     if config_loader.is_slide_enabled("overview", client_config):
         overall_scope = report["overall"]
+        if use_kpi_cards:
+            builder.add_summary_slide(
+                title="Overall Quarter Summary",
+                subtitle=subtitle,
+                kpis=overall_scope["kpis"],
+                table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
+                bullets=generate_overall_bullets(overall_scope, report["mix_overall"]),
+            )
+        else:
+            builder.add_table_slide(
+                title="Overall Quarter Summary",
+                subtitle=subtitle,
+                table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
+                bullets=generate_scope_bullets("Overall", overall_scope),
+            )
+
         builder.add_trend_slide(
             title="Overall Performance Trend",
             subtitle=subtitle,
             table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
-            bullets=generate_overall_bullets(overall_scope, report["mix_overall"]),
-        )
-
-        builder.add_table_slide(
-            title="Overall Quarter Summary",
-            subtitle=subtitle,
-            table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
-            bullets=generate_scope_bullets("Overall", overall_scope),
+            bullets=[] if use_kpi_cards else generate_overall_bullets(overall_scope, report["mix_overall"]),
         )
 
     if config_loader.is_slide_enabled("campaign_mix", client_config):
@@ -299,35 +339,55 @@ def _build_performance_section(
         campaign_names = list(campaigns or report["available_campaigns"])
         for campaign in campaign_names:
             scope = report["campaigns"][campaign]
-            builder.add_table_slide(
-                title=f"{campaign} Summary",
-                subtitle=subtitle,
-                table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
-                bullets=generate_scope_bullets(campaign, scope),
-            )
+            summary_bullets = generate_scope_bullets(campaign, scope)
+            if use_kpi_cards:
+                builder.add_summary_slide(
+                    title=f"{campaign} Summary",
+                    subtitle=subtitle,
+                    kpis=scope["kpis"],
+                    table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
+                    bullets=summary_bullets,
+                )
+            else:
+                builder.add_table_slide(
+                    title=f"{campaign} Summary",
+                    subtitle=subtitle,
+                    table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
+                    bullets=summary_bullets,
+                )
 
             builder.add_trend_slide(
                 title=f"{campaign} Monthly Trend",
                 subtitle=subtitle,
                 table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
-                bullets=generate_scope_bullets(campaign, scope),
+                bullets=[] if use_kpi_cards else summary_bullets,
             )
 
     if config_loader.is_slide_enabled("destination_summary", client_config):
         for destination in report["available_destinations"]:
             scope = report["destinations"][destination]
-            builder.add_table_slide(
-                title=f"{destination} Summary + YoY",
-                subtitle=subtitle,
-                table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
-                bullets=generate_scope_bullets(destination, scope),
-            )
+            summary_bullets = generate_scope_bullets(destination, scope)
+            if use_kpi_cards:
+                builder.add_summary_slide(
+                    title=f"{destination} Summary + YoY",
+                    subtitle=subtitle,
+                    kpis=scope["kpis"],
+                    table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
+                    bullets=summary_bullets,
+                )
+            else:
+                builder.add_table_slide(
+                    title=f"{destination} Summary + YoY",
+                    subtitle=subtitle,
+                    table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
+                    bullets=summary_bullets,
+                )
 
             builder.add_trend_slide(
                 title=f"{destination} Monthly Trend",
                 subtitle=subtitle,
                 table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
-                bullets=generate_scope_bullets(destination, scope),
+                bullets=[] if use_kpi_cards else summary_bullets,
             )
 
             builder.add_mix_slide(
@@ -470,3 +530,7 @@ def _fmt_percent(value: float | None) -> str:
     if value is None or pd.isna(value):
         return "n/a"
     return f"{value * 100:.2f}%"
+
+
+def _use_kpi_summary_cards(client_config: dict) -> bool:
+    return client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}

@@ -36,10 +36,19 @@ DEFAULT_CLIENT_CONFIG: Dict[str, Any] = {
         "enabled": False,
         "destinations": [],
     },
+    "destination_other": {
+        "enabled": False,
+        "label": "Other",
+        "mode": "remainder",
+        "exclude_campaign_types": [],
+    },
     "auction_insights": {
         "enabled": False,
         "client_domain": "",
         "known_competitors": [],
+    },
+    "branding": {
+        "chart_palette": {},
     },
     "slides": {
         "include_performance": True,
@@ -63,6 +72,10 @@ DEFAULT_CHART_STYLES: Dict[str, Any] = {
         "cvr": "#1D4ED8",
         "cost": "#14B8A6",
         "leads": "#0F172A",
+        "surface": "#FFFFFF",
+        "border": "#D9D9D9",
+        "accent": "#B01217",
+        "success": "#0F172A",
         "table_header": "#DBE6F4",
         "table_total": "#EBF1FA",
         "text_primary": "#142A4D",
@@ -132,8 +145,12 @@ class ConfigLoader:
     def get_report_config(self) -> Dict[str, Any]:
         return self._report_config
 
-    def get_chart_styles(self) -> Dict[str, Any]:
-        return self._chart_styles
+    def get_chart_styles(self, client_config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        config = client_config or {}
+        chart_palette = config.get("branding", {}).get("chart_palette", {})
+        if not chart_palette:
+            return self._chart_styles
+        return _deep_merge(self._chart_styles, {"colors": chart_palette})
 
     def get_clients(self) -> List[Dict[str, Any]]:
         return list(self._clients)
@@ -255,9 +272,13 @@ class ConfigLoader:
         normalized["destination_trends"]["destinations"] = list(
             normalized.get("destination_trends", {}).get("destinations", [])
         )
+        normalized["destination_other"]["exclude_campaign_types"] = list(
+            normalized.get("destination_other", {}).get("exclude_campaign_types", [])
+        )
         normalized["auction_insights"]["known_competitors"] = list(
             normalized.get("auction_insights", {}).get("known_competitors", [])
         )
+        normalized["branding"]["chart_palette"] = dict(normalized.get("branding", {}).get("chart_palette", {}))
         return normalized
 
 

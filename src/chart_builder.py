@@ -67,6 +67,7 @@ class ChartBuilder:
             )
 
         ax.set_title(title, fontsize=self.title_size)
+        ax.set_xlabel("Month", fontsize=self.body_size)
         ax.set_ylabel("Interest", fontsize=self.body_size)
         ax.tick_params(axis="both", labelsize=self.body_size)
         ax.grid(axis="y", alpha=0.2)
@@ -78,28 +79,8 @@ class ChartBuilder:
         return out_path
 
     def _plot_cpl_cvr(self, scope_key: str, monthly_table: pd.DataFrame) -> Path:
-        df = monthly_table[monthly_table["Month"] != "Total"].copy()
         out_path = self.charts_dir / f"{scope_key}_cpl_cvr.png"
-
-        months = df["Month"].tolist()
-        cpl = df["CPL"].tolist()
-        cvr = [x * 100 if x is not None else None for x in df["CVR"].tolist()]
-
-        fig, ax1 = plt.subplots(figsize=self.figure_size)
-        ax2 = ax1.twinx()
-
-        ax1.plot(months, cpl, marker="o", color=self.colors.get("cpl", "#0E7490"), linewidth=2, label="CPL (£)")
-        ax2.plot(months, cvr, marker="o", color=self.colors.get("cvr", "#1D4ED8"), linewidth=2, label="CVR (%)")
-
-        ax1.set_title("CPL vs CVR", fontsize=self.title_size)
-        ax1.set_ylabel("CPL (£)", fontsize=self.body_size)
-        ax2.set_ylabel("CVR (%)", fontsize=self.body_size)
-        ax1.tick_params(axis="both", labelsize=self.body_size)
-        ax2.tick_params(axis="both", labelsize=self.body_size)
-
-        lines_1, labels_1 = ax1.get_legend_handles_labels()
-        lines_2, labels_2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left", fontsize=self.body_size)
+        fig, ax1, ax2 = self.build_cpl_cvr_figure(monthly_table)
 
         plt.tight_layout()
         fig.savefig(out_path, dpi=180)
@@ -107,9 +88,83 @@ class ChartBuilder:
         return out_path
 
     def _plot_cost_leads(self, scope_key: str, monthly_table: pd.DataFrame) -> Path:
-        df = monthly_table[monthly_table["Month"] != "Total"].copy()
         out_path = self.charts_dir / f"{scope_key}_cost_leads.png"
+        fig, ax1, ax2 = self.build_cost_leads_figure(monthly_table)
 
+        plt.tight_layout()
+        fig.savefig(out_path, dpi=180)
+        plt.close(fig)
+        return out_path
+
+    def build_cpl_cvr_figure(self, monthly_table: pd.DataFrame):
+        df = monthly_table[monthly_table["Month"] != "Total"].copy()
+        months = df["Month"].tolist()
+        cpl = df["CPL"].tolist()
+        cvr = [x * 100 if x is not None else None for x in df["CVR"].tolist()]
+
+        fig, ax1 = plt.subplots(figsize=self.figure_size)
+        ax2 = ax1.twinx()
+
+        cpl_line = ax1.plot(
+            months,
+            cpl,
+            marker="o",
+            markersize=7,
+            color=self.colors.get("cpl", "#C32026"),
+            linewidth=2.5,
+            label="CPL (£)",
+            zorder=3,
+        )[0]
+        cvr_line = ax2.plot(
+            months,
+            cvr,
+            marker="o",
+            markersize=7,
+            color=self.colors.get("cvr", "#111111"),
+            linewidth=3,
+            label="CVR (%)",
+            zorder=4,
+        )[0]
+
+        ax1.set_title("CPL vs CVR", fontsize=self.title_size)
+        ax1.set_xlabel("Month", fontsize=self.body_size)
+        ax1.set_ylabel("CPL (£)", fontsize=self.body_size)
+        ax2.set_ylabel("CVR (%)", fontsize=self.body_size)
+        ax1.tick_params(axis="both", labelsize=self.body_size)
+        ax2.tick_params(axis="both", labelsize=self.body_size)
+        ax1.grid(axis="y", alpha=0.2)
+
+        for index, value in enumerate(cpl):
+            if value is None or pd.isna(value):
+                continue
+            ax1.annotate(
+                self._format_currency_label(value),
+                xy=(index, value),
+                xytext=(0, 10),
+                textcoords="offset points",
+                ha="center",
+                fontsize=self.body_size - 1,
+                color=self.colors.get("cpl", "#C32026"),
+            )
+
+        for index, value in enumerate(cvr):
+            if value is None or pd.isna(value):
+                continue
+            ax2.annotate(
+                f"{value:.1f}%",
+                xy=(index, value),
+                xytext=(0, -16),
+                textcoords="offset points",
+                ha="center",
+                fontsize=self.body_size - 1,
+                color=self.colors.get("cvr", "#111111"),
+            )
+
+        ax1.legend([cpl_line, cvr_line], ["CPL (£)", "CVR (%)"], loc="upper left", fontsize=self.body_size)
+        return fig, ax1, ax2
+
+    def build_cost_leads_figure(self, monthly_table: pd.DataFrame):
+        df = monthly_table[monthly_table["Month"] != "Total"].copy()
         months = df["Month"].tolist()
         cost = df["Cost"].tolist()
         leads = df["Sales Leads"].tolist()
@@ -117,23 +172,62 @@ class ChartBuilder:
         fig, ax1 = plt.subplots(figsize=self.figure_size)
         ax2 = ax1.twinx()
 
-        ax1.bar(months, cost, color=self.colors.get("cost", "#14B8A6"), alpha=0.75, label="Cost (£)")
-        ax2.plot(months, leads, marker="o", color=self.colors.get("leads", "#0F172A"), linewidth=2, label="Sales Leads")
+        bars = ax1.bar(
+            months,
+            cost,
+            color=self.colors.get("cost", "#D83A40"),
+            alpha=0.9,
+            label="Cost (£)",
+            zorder=2,
+        )
+        leads_line = ax2.plot(
+            months,
+            leads,
+            marker="o",
+            markersize=7,
+            color=self.colors.get("leads", "#111111"),
+            linewidth=2.75,
+            label="Sales Leads",
+            zorder=4,
+        )[0]
 
         ax1.set_title("Cost vs Sales Leads", fontsize=self.title_size)
+        ax1.set_xlabel("Month", fontsize=self.body_size)
         ax1.set_ylabel("Cost (£)", fontsize=self.body_size)
         ax2.set_ylabel("Sales Leads", fontsize=self.body_size)
         ax1.tick_params(axis="both", labelsize=self.body_size)
         ax2.tick_params(axis="both", labelsize=self.body_size)
+        ax1.grid(axis="y", alpha=0.2)
 
-        lines_1, labels_1 = ax1.get_legend_handles_labels()
-        lines_2, labels_2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper right", fontsize=self.body_size)
+        for bar, value in zip(bars, cost):
+            if value is None or pd.isna(value):
+                continue
+            ax1.annotate(
+                self._format_currency_label(value, abbreviated=True),
+                xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                xytext=(0, 5),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=self.body_size - 1,
+                color=self.colors.get("cost", "#D83A40"),
+            )
 
-        plt.tight_layout()
-        fig.savefig(out_path, dpi=180)
-        plt.close(fig)
-        return out_path
+        for index, value in enumerate(leads):
+            if value is None or pd.isna(value):
+                continue
+            ax2.annotate(
+                f"{int(round(value)):,}",
+                xy=(index, value),
+                xytext=(0, -16),
+                textcoords="offset points",
+                ha="center",
+                fontsize=self.body_size - 1,
+                color=self.colors.get("leads", "#111111"),
+            )
+
+        ax1.legend([bars, leads_line], ["Cost (£)", "Sales Leads"], loc="upper left", fontsize=self.body_size)
+        return fig, ax1, ax2
 
     def _plot_mix_pie(self, scope_key: str, mix_df: pd.DataFrame, value_col: str, suffix: str) -> Path:
         out_path = self.charts_dir / f"{scope_key}_{suffix}.png"
@@ -164,3 +258,14 @@ class ChartBuilder:
         fig.savefig(out_path, dpi=180)
         plt.close(fig)
         return out_path
+
+    @staticmethod
+    def _format_currency_label(value: float, abbreviated: bool = False) -> str:
+        if abbreviated:
+            absolute = abs(value)
+            if absolute >= 1_000_000:
+                return f"£{value / 1_000_000:.1f}m"
+            if absolute >= 1_000:
+                return f"£{value / 1_000:.1f}k"
+            return f"£{value:,.0f}"
+        return f"£{value:,.2f}"

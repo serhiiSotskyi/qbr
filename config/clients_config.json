@@ -59,6 +59,14 @@
           }
         ]
       },
+      "destination_other": {
+        "enabled": true,
+        "label": "Other",
+        "mode": "remainder",
+        "exclude_campaign_types": [
+          "Brand"
+        ]
+      },
       "auction_insights": {
         "enabled": true,
         "client_domain": "wendywu.co.uk",
@@ -68,6 +76,26 @@
           "distantjourneys.co.uk",
           "intrepidtravel.com"
         ]
+      },
+      "branding": {
+        "chart_palette": {
+          "cpl": "#C32026",
+          "cvr": "#111111",
+          "cost": "#D83A40",
+          "leads": "#111111",
+          "accent": "#C32026",
+          "surface": "#FFFFFF",
+          "border": "#DADADA",
+          "table_header": "#F7E1E2",
+          "table_total": "#FCEEEE",
+          "text_primary": "#111111",
+          "text_secondary": "#595959",
+          "text_body": "#222222",
+          "trend_current": "#C32026",
+          "trend_prior": "#8E8E8E",
+          "positive": "#111111",
+          "negative": "#C32026"
+        }
       },
       "slides": {
         "include_performance": true,
@@ -143,6 +171,14 @@
           }
         ]
       },
+      "destination_other": {
+        "enabled": true,
+        "label": "Other",
+        "mode": "remainder",
+        "exclude_campaign_types": [
+          "Brand"
+        ]
+      },
       "trend_aliases": {
         "wendy wu tours australia": [
           "wendy wu tours"
@@ -157,6 +193,26 @@
           "distantjourneys.co.uk",
           "intrepidtravel.com"
         ]
+      },
+      "branding": {
+        "chart_palette": {
+          "cpl": "#C32026",
+          "cvr": "#111111",
+          "cost": "#D83A40",
+          "leads": "#111111",
+          "accent": "#C32026",
+          "surface": "#FFFFFF",
+          "border": "#DADADA",
+          "table_header": "#F7E1E2",
+          "table_total": "#FCEEEE",
+          "text_primary": "#111111",
+          "text_secondary": "#595959",
+          "text_body": "#222222",
+          "trend_current": "#C32026",
+          "trend_prior": "#8E8E8E",
+          "positive": "#111111",
+          "negative": "#C32026"
+        }
       },
       "slides": {
         "include_performance": true,

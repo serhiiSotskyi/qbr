@@ -50,6 +50,7 @@ class ReportPipeline:
             quarter,
             campaign_order=self.config_loader.get_campaign_types(client_config),
             destination_order=self.config_loader.get_destinations(client_config),
+            destination_other_config=client_config.get("destination_other"),
         )
         validate_report_data(report)
 
@@ -58,7 +59,7 @@ class ReportPipeline:
         client_name = self.config_loader.get_client_name(client_config)
         report_title = self.config_loader.get_report_title(client_config)
         agency_name = self.config_loader.get_agency_name(client_config)
-        chart_styles = self.config_loader.get_chart_styles()
+        chart_styles = self.config_loader.get_chart_styles(client_config)
 
         chart_builder = ChartBuilder(self.charts_root / f"{client_config['id']}/{quarter.year}_Q{quarter.quarter}", chart_styles=chart_styles)
         builder = SlideBuilder(template_path, chart_styles=chart_styles)
@@ -92,23 +93,33 @@ class ReportPipeline:
 
     def _build_performance_section(self, builder: SlideBuilder, chart_builder: ChartBuilder, report: dict, subtitle: str, client_config: dict) -> None:
         builder.add_divider_slide("Performance")
+        use_kpi_cards = _use_kpi_summary_cards(client_config)
 
         if self.config_loader.is_slide_enabled("overview", client_config):
             overall_charts = chart_builder.build_scope_trend_charts("overall", report["overall"]["monthly"])
+            if use_kpi_cards:
+                builder.add_summary_cards_slide(
+                    title="Overall Quarter Summary",
+                    subtitle=subtitle,
+                    kpis=report["overall"]["kpis"],
+                    bullets=generate_overall_bullets(report["overall"], report["mix_overall"]),
+                )
+            else:
+                overall_table = format_summary_table(report["overall"]["monthly"], report["include_revenue"])
+                builder.add_table_slide(
+                    title="Overall Quarter Summary",
+                    subtitle=subtitle,
+                    table_df=overall_table,
+                    bullets=generate_scope_bullets("Overall", report["overall"]),
+                )
+
             builder.add_trend_slide(
                 title="Overall Performance Trend",
                 subtitle=subtitle,
                 cpl_cvr_chart_path=overall_charts["cpl_cvr"],
                 cost_leads_chart_path=overall_charts["cost_leads"],
-                bullets=generate_overall_bullets(report["overall"], report["mix_overall"]),
-            )
-
-            overall_table = format_summary_table(report["overall"]["monthly"], report["include_revenue"])
-            builder.add_table_slide(
-                title="Overall Quarter Summary",
-                subtitle=subtitle,
-                table_df=overall_table,
-                bullets=generate_scope_bullets("Overall", report["overall"]),
+                bullets=[] if use_kpi_cards else generate_overall_bullets(report["overall"], report["mix_overall"]),
+                use_template=not use_kpi_cards,
             )
 
         if self.config_loader.is_slide_enabled("campaign_mix", client_config):
@@ -124,13 +135,22 @@ class ReportPipeline:
         if self.config_loader.is_slide_enabled("campaign_summary", client_config):
             for campaign in report["available_campaigns"]:
                 scope = report["campaigns"][campaign]
-                table_df = format_summary_table(scope["monthly"], report["include_revenue"])
-                builder.add_table_slide(
-                    title=f"{campaign} Summary",
-                    subtitle=subtitle,
-                    table_df=table_df,
-                    bullets=generate_scope_bullets(campaign, scope),
-                )
+                summary_bullets = generate_scope_bullets(campaign, scope)
+                if use_kpi_cards:
+                    builder.add_summary_cards_slide(
+                        title=f"{campaign} Summary",
+                        subtitle=subtitle,
+                        kpis=scope["kpis"],
+                        bullets=summary_bullets,
+                    )
+                else:
+                    table_df = format_summary_table(scope["monthly"], report["include_revenue"])
+                    builder.add_table_slide(
+                        title=f"{campaign} Summary",
+                        subtitle=subtitle,
+                        table_df=table_df,
+                        bullets=summary_bullets,
+                    )
 
                 scope_charts = chart_builder.build_scope_trend_charts(
                     f"campaign_{_slug(campaign)}", scope["monthly"]
@@ -140,19 +160,29 @@ class ReportPipeline:
                     subtitle=subtitle,
                     cpl_cvr_chart_path=scope_charts["cpl_cvr"],
                     cost_leads_chart_path=scope_charts["cost_leads"],
-                    bullets=generate_scope_bullets(campaign, scope),
+                    bullets=[] if use_kpi_cards else summary_bullets,
+                    use_template=not use_kpi_cards,
                 )
 
         if self.config_loader.is_slide_enabled("destination_summary", client_config):
             for destination in report["available_destinations"]:
                 scope = report["destinations"][destination]
-                table_df = format_summary_table(scope["monthly"], report["include_revenue"])
-                builder.add_table_slide(
-                    title=f"{destination} Summary + YoY",
-                    subtitle=subtitle,
-                    table_df=table_df,
-                    bullets=generate_scope_bullets(destination, scope),
-                )
+                summary_bullets = generate_scope_bullets(destination, scope)
+                if use_kpi_cards:
+                    builder.add_summary_cards_slide(
+                        title=f"{destination} Summary + YoY",
+                        subtitle=subtitle,
+                        kpis=scope["kpis"],
+                        bullets=summary_bullets,
+                    )
+                else:
+                    table_df = format_summary_table(scope["monthly"], report["include_revenue"])
+                    builder.add_table_slide(
+                        title=f"{destination} Summary + YoY",
+                        subtitle=subtitle,
+                        table_df=table_df,
+                        bullets=summary_bullets,
+                    )
 
                 scope_charts = chart_builder.build_scope_trend_charts(
                     f"destination_{_slug(destination)}", scope["monthly"]
@@ -162,7 +192,8 @@ class ReportPipeline:
                     subtitle=subtitle,
                     cpl_cvr_chart_path=scope_charts["cpl_cvr"],
                     cost_leads_chart_path=scope_charts["cost_leads"],
-                    bullets=generate_scope_bullets(destination, scope),
+                    bullets=[] if use_kpi_cards else summary_bullets,
+                    use_template=not use_kpi_cards,
                 )
 
                 mix_df = report["dest_mix"][destination]
@@ -275,3 +306,7 @@ def _slug(value: str) -> str:
         .replace("/", "_")
         .replace("-", "_")
     )
+
+
+def _use_kpi_summary_cards(client_config: dict) -> bool:
+    return client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}

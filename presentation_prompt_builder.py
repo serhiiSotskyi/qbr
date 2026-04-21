@@ -535,7 +535,7 @@ PROMPTS = {
         - `Overall Quarter Summary`
 
         Create:
-        - 1 KPI overview slide
+        - 1 KPI overview slide with cards
         - 1 performance trend slide
 
         Show:
@@ -547,6 +547,12 @@ PROMPTS = {
         - Impressions
         - Clicks
         - CVR if present
+        - YoY directly under every KPI card metric
+
+        OVERALL SUMMARY RULES
+        - use KPI cards instead of a large table for the summary slide
+        - treat the `Key Metrics + YoY` block in `report.txt` as the source of truth for the card content
+        - keep commentary on the summary slide, not the trend slide
 
         TYPE 2 — CAMPAIGN TYPE MIX
         Section:
@@ -571,12 +577,16 @@ PROMPTS = {
         For EACH channel present in the report create 2 slides:
 
         Slide A: `[Channel] Summary`
-        - preserve KPI table exactly
+        - use KPI cards
+        - preserve KPI values exactly
+        - show YoY under every metric
         - preserve bullets exactly
 
         Slide B: `[Channel] Monthly Trend`
-        - create charts from the monthly table
-        - preserve bullets exactly
+        - create smaller charts from the monthly table
+        - use a combined Cost vs Leads chart as the primary chart
+        - use a dual-axis CPL vs CVR chart with the CVR line in black on the right axis
+        - do not repeat commentary already shown on the summary slide
 
         TYPE 4 — DESTINATION / GEO BLOCKS
         Possible blocks include:
@@ -589,12 +599,16 @@ PROMPTS = {
         For EACH destination block present in the report create 3 slides:
 
         Slide A: `[Geo] Summary + YoY`
-        - preserve KPI table exactly
+        - use KPI cards
+        - preserve KPI values exactly
+        - show YoY under every metric
         - preserve bullets exactly
 
         Slide B: `[Geo] Monthly Trend`
-        - create charts from the monthly trend table
-        - preserve bullets exactly
+        - create smaller charts from the monthly trend table
+        - use a combined Cost vs Leads chart as the primary chart
+        - use a dual-axis CPL vs CVR chart with the CVR line in black on the right axis
+        - do not repeat commentary already shown on the summary slide
 
         Slide C: `[Geo] Campaign Mix`
         - preserve the campaign mix table exactly
@@ -624,6 +638,9 @@ PROMPTS = {
         - every category comparison -> bar chart
         - no missing charts for data sections
         - no replacing tables with only text
+        - all month labels must be `Jan`, `Feb`, `Mar` style labels, never `1`, `2`, `3`
+        - include `£` on cost and CPL values where applicable
+        - trend charts should be visually smaller and should not fill the full slide height
 
         CLIENT-SPECIFIC RULES
 
@@ -676,7 +693,7 @@ PROMPTS = {
         - `Overall Quarter Summary`
 
         Create:
-        - 1 KPI overview slide
+        - 1 KPI overview slide with cards
         - 1 performance trend slide
 
         Show:
@@ -688,6 +705,12 @@ PROMPTS = {
         - Impressions
         - Clicks
         - CVR if present
+        - YoY directly under every KPI card metric
+
+        OVERALL SUMMARY RULES
+        - use KPI cards instead of a large table for the summary slide
+        - treat the `Key Metrics + YoY` block in `report.txt` as the source of truth for the card content
+        - keep commentary on the summary slide, not the trend slide
 
         TYPE 2 — CAMPAIGN TYPE MIX
         Section:
@@ -712,12 +735,16 @@ PROMPTS = {
         For EACH channel present in the report create 2 slides:
 
         Slide A: `[Channel] Summary`
-        - preserve KPI table exactly
+        - use KPI cards
+        - preserve KPI values exactly
+        - show YoY under every metric
         - preserve bullets exactly
 
         Slide B: `[Channel] Monthly Trend`
-        - create charts from the monthly table
-        - preserve bullets exactly
+        - create smaller charts from the monthly table
+        - use a combined Cost vs Leads chart as the primary chart
+        - use a dual-axis CPL vs CVR chart with the CVR line in black on the right axis
+        - do not repeat commentary already shown on the summary slide
 
         TYPE 4 — DESTINATION / GEO BLOCKS
         Possible blocks include:
@@ -730,12 +757,16 @@ PROMPTS = {
         For EACH destination block present in the report create 3 slides:
 
         Slide A: `[Geo] Summary + YoY`
-        - preserve KPI table exactly
+        - use KPI cards
+        - preserve KPI values exactly
+        - show YoY under every metric
         - preserve bullets exactly
 
         Slide B: `[Geo] Monthly Trend`
-        - create charts from the monthly trend table
-        - preserve bullets exactly
+        - create smaller charts from the monthly trend table
+        - use a combined Cost vs Leads chart as the primary chart
+        - use a dual-axis CPL vs CVR chart with the CVR line in black on the right axis
+        - do not repeat commentary already shown on the summary slide
 
         Slide C: `[Geo] Campaign Mix`
         - preserve the campaign mix table exactly
@@ -765,6 +796,9 @@ PROMPTS = {
         - every category comparison -> bar chart
         - no missing charts for data sections
         - no replacing tables with only text
+        - all month labels must be `Jan`, `Feb`, `Mar` style labels, never `1`, `2`, `3`
+        - include `£` on cost and CPL values where applicable
+        - trend charts should be visually smaller and should not fill the full slide height
 
         CLIENT-SPECIFIC RULES
 
