@@ -57,6 +57,9 @@ def parse_wightlink_auction_csv(csv_path: str | Path | None, subtype: str = "gen
 
     df["display_url_domain"] = df["display_url_domain"].fillna("").astype(str).str.strip()
     df = df[df["display_url_domain"] != ""].copy()
+    df["_sort_order"] = range(len(df))
+    df["_is_you"] = df["display_url_domain"].str.lower().eq("you")
+    df = df.sort_values(["_is_you", "_sort_order"], ascending=[False, True]).drop(columns=["_sort_order", "_is_you"]).reset_index(drop=True)
 
     return {
         "subtype": subtype,

@@ -7,6 +7,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from report_generator.pipelines.olympic_pipeline import generate_olympic_report
+from report_generator.pipelines.wightlink_annual_pipeline import generate_wightlink_annual_report
 from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
 from src.config_loader import ConfigLoader
 from src.report_pipeline import ReportPipeline
@@ -21,6 +22,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--auction-csv", help="Path to Auction Insights CSV export.")
     parser.add_argument("--trends-dir", help="Directory containing Google Trends CSV exports.")
     parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
+    parser.add_argument(
+        "--report-mode",
+        choices=["quarterly", "annual"],
+        default="quarterly",
+        help="Wightlink-only mode selector. Defaults to quarterly.",
+    )
     parser.add_argument(
         "--output",
         default="output/QBR_Report.pptx",
@@ -37,6 +44,7 @@ def run_report(
     plan_workbook: Optional[str] = None,
     output_path: Optional[str] = None,
     manual_inputs: Optional[dict[str, Any]] = None,
+    report_mode: str = "quarterly",
 ) -> str:
     project_root = Path(__file__).resolve().parent
     if client_id == "olympic_holidays":
@@ -58,15 +66,25 @@ def run_report(
         return str(result["pptx_path"])
 
     if client_id == "wightlink":
-        resolved_output = project_root / output_path if output_path else project_root / "output" / "wightlink_qbr.pptx"
-        result = generate_wightlink_report(
-            performance_csv=performance_csv,
-            output_path=resolved_output,
-            manual_inputs=manual_inputs,
-            trends_dir=trends_dir,
-            auction_csv=auction_csv,
-            plan_workbook=plan_workbook,
-        )
+        default_name = "wightlink_annual.pptx" if report_mode == "annual" else "wightlink_qbr.pptx"
+        resolved_output = project_root / output_path if output_path else project_root / "output" / default_name
+        if report_mode == "annual":
+            result = generate_wightlink_annual_report(
+                performance_csv=performance_csv,
+                output_path=resolved_output,
+                manual_inputs=manual_inputs,
+                trends_dir=trends_dir,
+                auction_csv=auction_csv,
+            )
+        else:
+            result = generate_wightlink_report(
+                performance_csv=performance_csv,
+                output_path=resolved_output,
+                manual_inputs=manual_inputs,
+                trends_dir=trends_dir,
+                auction_csv=auction_csv,
+                plan_workbook=plan_workbook,
+            )
         return str(result["pptx_path"])
 
     pipeline = ReportPipeline(project_root=project_root)
@@ -90,6 +108,7 @@ def run_text_report(
     plan_workbook: Optional[str] = None,
     output_path: Optional[str] = None,
     manual_inputs: Optional[dict[str, Any]] = None,
+    report_mode: str = "quarterly",
 ) -> str:
     project_root = Path(__file__).resolve().parent
     if client_id == "olympic_holidays":
@@ -111,15 +130,25 @@ def run_text_report(
         return str(result["text_path"])
 
     if client_id == "wightlink":
-        resolved_output = project_root / output_path if output_path else project_root / "reports" / "wightlink_qbr.txt"
-        result = generate_wightlink_report(
-            performance_csv=performance_csv,
-            output_path=resolved_output,
-            manual_inputs=manual_inputs,
-            trends_dir=trends_dir,
-            auction_csv=auction_csv,
-            plan_workbook=plan_workbook,
-        )
+        default_name = "wightlink_annual.txt" if report_mode == "annual" else "wightlink_qbr.txt"
+        resolved_output = project_root / output_path if output_path else project_root / "reports" / default_name
+        if report_mode == "annual":
+            result = generate_wightlink_annual_report(
+                performance_csv=performance_csv,
+                output_path=resolved_output,
+                manual_inputs=manual_inputs,
+                trends_dir=trends_dir,
+                auction_csv=auction_csv,
+            )
+        else:
+            result = generate_wightlink_report(
+                performance_csv=performance_csv,
+                output_path=resolved_output,
+                manual_inputs=manual_inputs,
+                trends_dir=trends_dir,
+                auction_csv=auction_csv,
+                plan_workbook=plan_workbook,
+            )
         return str(result["text_path"])
 
     pipeline = TextReportPipeline(project_root=project_root)
@@ -149,6 +178,7 @@ def main() -> None:
         auction_csv=args.auction_csv,
         plan_workbook=args.plan_workbook,
         output_path=args.output,
+        report_mode=args.report_mode,
     )
 
     print(f"Report generated: {output_path}")

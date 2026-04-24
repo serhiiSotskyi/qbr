@@ -63,6 +63,35 @@ def build_all_performance_yoy_narrative(current_scope: dict[str, Any], prior_sco
     return bullets
 
 
+def build_all_performance_annual_narrative(scope: dict[str, Any]) -> list[str]:
+    bullets = _build_performance_narrative(scope, "overall", period_label="year")
+    return [bullet.replace("in the quarter.", "in the year.") for bullet in bullets]
+
+
+def build_all_performance_annual_yoy_narrative(
+    current_scope: dict[str, Any],
+    prior_scope: dict[str, Any] | None,
+    current_year: Any,
+    prior_year: Any,
+) -> list[str]:
+    if not prior_scope or not prior_scope.get("has_data"):
+        return [f"No prior-year data was available in the uploaded performance CSV for a {current_year} versus {prior_year} comparison."]
+
+    current_totals = current_scope.get("totals", {})
+    prior_totals = prior_scope.get("totals", {})
+    bullets = []
+    for label, key in [("Purchases", "purchases"), ("Revenue", "purchase_revenue"), ("Cost", "cost"), ("CPA", "cpa"), ("ROAS", "roas")]:
+        delta = _pct_change(current_totals.get(key), prior_totals.get(key))
+        if delta is None:
+            continue
+        direction = "up" if delta > 0 else "down"
+        verb = "were" if label == "Purchases" else "was"
+        bullets.append(f"{label} {verb} {direction} {abs(delta) * 100:.0f}% in {current_year} versus {prior_year}.")
+    if not bullets:
+        bullets.append(f"The uploaded CSV did not contain enough comparable full-year data for a {current_year} versus {prior_year} summary.")
+    return bullets
+
+
 def build_plan_comparison_overview_narrative(plan_section: dict[str, Any]) -> list[str]:
     summary = plan_section.get("summary", {})
     bullets: list[str] = []
@@ -142,6 +171,45 @@ def build_pmax_narrative(scope: dict[str, Any]) -> list[str]:
     return bullets
 
 
+def build_brand_annual_narrative(scope: dict[str, Any], prior_scope: dict[str, Any] | None = None, current_year: Any | None = None, prior_year: Any | None = None) -> list[str]:
+    bullets = _build_performance_narrative(scope, "brand", period_label="year")
+    bullets.extend(_append_yoy_efficiency(scope, prior_scope, period_label="year", current_year=current_year, prior_year=prior_year))
+    return bullets
+
+
+def build_generics_annual_narrative(scope: dict[str, Any], prior_scope: dict[str, Any] | None = None, current_year: Any | None = None, prior_year: Any | None = None) -> list[str]:
+    bullets = _build_performance_narrative(scope, "generic", period_label="year")
+    bullets.extend(_append_yoy_efficiency(scope, prior_scope, period_label="year", current_year=current_year, prior_year=prior_year))
+    return bullets
+
+
+def build_pmax_annual_narrative(scope: dict[str, Any], prior_scope: dict[str, Any] | None = None, current_year: Any | None = None, prior_year: Any | None = None) -> list[str]:
+    bullets = _build_performance_narrative(scope, "performance max", period_label="year")
+    bullets.extend(_append_yoy_efficiency(scope, prior_scope, period_label="year", current_year=current_year, prior_year=prior_year))
+    if scope.get("has_data"):
+        bullets.append("Performance Max should be read alongside generic activity because the source CSV is aggregated at campaign type level.")
+    return bullets
+
+
+def build_trends_annual_narrative(
+    trend_section: dict[str, Any] | None,
+    current_year_window: Any,
+    prior_year_window: Any,
+    fallback: list[str] | None = None,
+) -> list[str]:
+    bullets = build_trends_narrative(trend_section, fallback=fallback)
+    if not bullets:
+        return bullets
+    updated = []
+    for bullet in bullets:
+        current_label = getattr(current_year_window, "short_label", str(current_year_window))
+        prior_label = getattr(prior_year_window, "short_label", str(prior_year_window))
+        bullet = bullet.replace("YoY", f"{current_label} versus {prior_label}")
+        bullet = bullet.replace("prior comparison series", f"{prior_label} comparison series")
+        updated.append(bullet)
+    return updated
+
+
 def build_generic_location_narrative(manual_section: dict[str, Any]) -> list[str]:
     return list(manual_section.get("bullets", []))
 
@@ -219,9 +287,9 @@ def _build_auction_narrative(
     return bullets
 
 
-def _build_performance_narrative(scope: dict[str, Any], scope_label: str) -> list[str]:
+def _build_performance_narrative(scope: dict[str, Any], scope_label: str, period_label: str = "quarter") -> list[str]:
     if not scope.get("has_data"):
-        return [f"No {scope_label} performance rows were present in the uploaded CSV for the selected quarter."]
+        return [f"No {scope_label} performance rows were present in the uploaded CSV for the selected {period_label}."]
 
     monthly = scope.get("monthly", [])
     if not monthly:
@@ -233,25 +301,42 @@ def _build_performance_narrative(scope: dict[str, Any], scope_label: str) -> lis
         f"{best_volume['month_label']} was the strongest month for purchase volume.",
         f"{best_efficiency['month_label']} was the most efficient month on CPA.",
     ]
-    if all(_missing(row.get("cvr")) for row in monthly):
-        bullets.append("CVR could not be calculated from the uploaded CSV because click data was not supplied.")
-    else:
+    if not all(_missing(row.get("cvr")) for row in monthly):
         best_cvr = max(monthly, key=lambda row: _sortable(row.get("cvr")))
-        bullets.append(f"{best_cvr['month_label']} recorded the strongest conversion rate in the quarter.")
+        bullets.append(f"{best_cvr['month_label']} recorded the strongest conversion rate in the {period_label}.")
     totals = scope.get("totals", {})
     if totals.get("purchase_revenue") is not None and totals.get("cost") is not None:
-        bullets.append(f"Quarter ROAS closed at {float(totals['roas']):.2f} on £{float(totals['cost']):,.0f} spend.")
+        period_prefix = "Quarter" if period_label == "quarter" else "Full-year"
+        bullets.append(f"{period_prefix} ROAS closed at {float(totals['roas']):.2f} on £{float(totals['cost']):,.0f} spend.")
     return bullets
 
 
-def _append_yoy_efficiency(scope: dict[str, Any], prior_scope: dict[str, Any] | None) -> list[str]:
+def _append_yoy_efficiency(
+    scope: dict[str, Any],
+    prior_scope: dict[str, Any] | None,
+    period_label: str = "quarter",
+    current_year: Any | None = None,
+    prior_year: Any | None = None,
+) -> list[str]:
     if not prior_scope or not prior_scope.get("has_data"):
         return []
-    delta = _pct_change(scope.get("totals", {}).get("cpa"), prior_scope.get("totals", {}).get("cpa"))
-    if delta is None:
-        return []
-    direction = "higher" if delta > 0 else "lower"
-    return [f"Quarter CPA was {abs(delta) * 100:.0f}% {direction} than the same quarter last year."]
+    bullets: list[str] = []
+    cpa_delta = _pct_change(scope.get("totals", {}).get("cpa"), prior_scope.get("totals", {}).get("cpa"))
+    if cpa_delta is not None:
+        direction = "higher" if cpa_delta > 0 else "lower"
+        if period_label == "year" and current_year is not None and prior_year is not None:
+            bullets.append(f"Full-year CPA was {abs(cpa_delta) * 100:.0f}% {direction} in {current_year} than in {prior_year}.")
+        else:
+            bullets.append(f"Quarter CPA was {abs(cpa_delta) * 100:.0f}% {direction} than the same quarter last year.")
+
+    roas_delta = _pct_change(scope.get("totals", {}).get("roas"), prior_scope.get("totals", {}).get("roas"))
+    if roas_delta is not None:
+        direction = "higher" if roas_delta > 0 else "lower"
+        if period_label == "year" and current_year is not None and prior_year is not None:
+            bullets.append(f"Full-year ROAS was {abs(roas_delta) * 100:.0f}% {direction} in {current_year} than in {prior_year}.")
+        else:
+            bullets.append(f"Quarter ROAS was {abs(roas_delta) * 100:.0f}% {direction} than the same quarter last year.")
+    return bullets
 
 
 def _best_month(rows: list[dict[str, Any]], key: str) -> dict[str, Any] | None:

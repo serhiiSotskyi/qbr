@@ -87,6 +87,9 @@ def main() -> None:
     client_options = load_client_options()
     selected_client = st.selectbox("Client", client_options, format_func=lambda client: client["name"])
     client_id = selected_client["id"]
+    report_mode = "quarterly"
+    if client_id == "wightlink":
+        report_mode = st.selectbox("Wightlink report mode", ["quarterly", "annual"], index=0)
 
     st.subheader("File Uploads")
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
@@ -127,6 +130,7 @@ def main() -> None:
                     auction_csv=auction_path,
                     plan_workbook=plan_workbook_path,
                     output_path=str(pptx_path),
+                    report_mode=report_mode,
                 )
             )
             generated_txt = Path(
@@ -137,6 +141,7 @@ def main() -> None:
                     auction_csv=auction_path,
                     plan_workbook=plan_workbook_path,
                     output_path=str(report_txt_path),
+                    report_mode=report_mode,
                 )
             )
             prompt_txt_path.write_text(build_presentation_prompt(client_id), encoding="utf-8")

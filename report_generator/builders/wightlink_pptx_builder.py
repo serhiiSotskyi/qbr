@@ -105,6 +105,80 @@ class WightlinkPptxBuilder:
         plt.close(fig)
         return output
 
+    def build_yoy_performance_chart(
+        self,
+        current_scope: dict[str, Any],
+        prior_scope: dict[str, Any] | None,
+        filename: str,
+        left_metric: str,
+        right_metric: str | None,
+        title: str,
+        current_label: str,
+        prior_label: str,
+    ) -> Path:
+        output = self.charts_dir / filename
+        current_monthly = current_scope.get("monthly", [])
+        if not current_monthly:
+            return self._plot_empty(output, "No performance data")
+
+        current_df = pd.DataFrame(current_monthly)
+        labels = current_df["month_label"].tolist()
+        fig, ax1 = plt.subplots(figsize=(7.8, 4.0))
+
+        ax1.plot(labels, current_df[left_metric], color="#0C5460", linewidth=2.3, marker="o", label=f"{current_label} {left_metric.upper()}")
+
+        if prior_scope and prior_scope.get("monthly"):
+            prior_df = pd.DataFrame(prior_scope["monthly"])
+            prior_df = prior_df.set_index("month_label").reindex(labels).reset_index()
+            ax1.plot(
+                labels,
+                prior_df[left_metric],
+                color="#94A3B8",
+                linewidth=2.1,
+                linestyle="--",
+                marker="o",
+                label=f"{prior_label} {left_metric.upper()}",
+            )
+
+        ax1.set_title(title, fontsize=14)
+        ax1.tick_params(axis="both", labelsize=9)
+        ax1.grid(axis="y", alpha=0.2)
+        lines, labels_accum = ax1.get_legend_handles_labels()
+
+        if right_metric and right_metric in current_df.columns and current_df[right_metric].notna().any():
+            ax2 = ax1.twinx()
+            ax2.plot(
+                labels,
+                current_df[right_metric],
+                color="#1D4ED8",
+                linewidth=2.0,
+                marker="o",
+                label=f"{current_label} {right_metric.upper()}",
+            )
+            if prior_scope and prior_scope.get("monthly"):
+                prior_df = pd.DataFrame(prior_scope["monthly"])
+                prior_df = prior_df.set_index("month_label").reindex(labels).reset_index()
+                if right_metric in prior_df.columns and prior_df[right_metric].notna().any():
+                    ax2.plot(
+                        labels,
+                        prior_df[right_metric],
+                        color="#60A5FA",
+                        linewidth=1.9,
+                        linestyle="--",
+                        marker="o",
+                        label=f"{prior_label} {right_metric.upper()}",
+                    )
+            ax2.tick_params(axis="y", labelsize=9)
+            right_lines, right_labels = ax2.get_legend_handles_labels()
+            lines += right_lines
+            labels_accum += right_labels
+
+        ax1.legend(lines, labels_accum, fontsize=8, loc="upper left")
+        plt.tight_layout()
+        fig.savefig(output, dpi=180)
+        plt.close(fig)
+        return output
+
     def build_plan_comparison_chart(
         self,
         monthly_rows: list[dict[str, Any]],
@@ -113,32 +187,56 @@ class WightlinkPptxBuilder:
         actual_metric: str,
         title: str,
     ) -> Path:
+        return self.build_bar_comparison_chart(
+            monthly_rows,
+            filename,
+            planned_metric,
+            actual_metric,
+            title,
+            "Plan",
+            "Actual",
+            empty_message="No plan comparison data",
+        )
+
+    def build_bar_comparison_chart(
+        self,
+        monthly_rows: list[dict[str, Any]],
+        filename: str,
+        left_metric: str,
+        right_metric: str,
+        title: str,
+        left_label: str,
+        right_label: str,
+        empty_message: str = "No comparison data",
+    ) -> Path:
         output = self.charts_dir / filename
         if not monthly_rows:
-            return self._plot_empty(output, "No plan comparison data")
+            return self._plot_empty(output, empty_message)
 
         df = pd.DataFrame(monthly_rows)
-        if df.empty:
-            return self._plot_empty(output, "No plan comparison data")
+        if df.empty or "month_label" not in df.columns:
+            return self._plot_empty(output, empty_message)
 
         labels = df["month_label"].tolist()
         x_positions = range(len(labels))
         width = 0.36
+        left_values = df[left_metric].fillna(0) if left_metric in df.columns else [0] * len(labels)
+        right_values = df[right_metric].fillna(0) if right_metric in df.columns else [0] * len(labels)
 
         fig, ax = plt.subplots(figsize=(7.8, 3.9))
         ax.bar(
             [position - width / 2 for position in x_positions],
-            df[planned_metric].fillna(0),
+            left_values,
             width=width,
             color="#94A3B8",
-            label="Plan",
+            label=left_label,
         )
         ax.bar(
             [position + width / 2 for position in x_positions],
-            df[actual_metric].fillna(0),
+            right_values,
             width=width,
             color="#0C5460",
-            label="Actual",
+            label=right_label,
         )
         ax.set_title(title, fontsize=14)
         ax.set_xticks(list(x_positions), labels)
@@ -185,6 +283,9 @@ class WightlinkPptxBuilder:
             if len(charts) >= 2:
                 slide.shapes.add_picture(str(charts[1]["path"]), Inches(6.85), Inches(1.35), width=Inches(6.0), height=Inches(3.15))
             self._add_bullets(slide, bullets, Inches(0.8), Inches(4.85), Inches(11.8), Inches(1.65))
+        elif slide_type == "kpi_cards_bullets":
+            self._render_kpi_cards(slide, slide_spec.get("kpis", []), Inches(0.65), Inches(1.35), Inches(12.05), Inches(3.45))
+            self._add_bullets(slide, bullets, Inches(0.8), Inches(5.15), Inches(11.8), Inches(1.25), font_size=14)
         elif slide_type == "single_chart_bullets":
             if charts:
                 slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.6), Inches(1.5), width=Inches(6.7), height=Inches(3.8))
@@ -280,6 +381,69 @@ class WightlinkPptxBuilder:
                 p = cell.text_frame.paragraphs[0]
                 p.font.size = Pt(8.5)
                 p.font.color.rgb = self.text_body
+
+    def _render_kpi_cards(self, slide, kpis: list[dict[str, Any]], left, top, width, height) -> None:
+        cards = list(kpis)
+        if not cards:
+            self._add_image_placeholder(slide, left, top, width, height, "No KPI data")
+            return
+
+        columns = 3
+        rows = 2
+        gap_x = Inches(0.2)
+        gap_y = Inches(0.2)
+        card_width = int((width - gap_x * (columns - 1)) / columns)
+        card_height = int((height - gap_y * (rows - 1)) / rows)
+
+        for index, kpi in enumerate(cards[: columns * rows]):
+            row = index // columns
+            column = index % columns
+            card_left = left + column * (card_width + gap_x)
+            card_top = top + row * (card_height + gap_y)
+
+            card = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE, card_left, card_top, card_width, card_height)
+            card.fill.solid()
+            card.fill.fore_color.rgb = RGBColor(255, 255, 255)
+            card.line.color.rgb = self.light_fill
+            card.line.width = Pt(1)
+
+            accent = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, card_left, card_top, card_width, Inches(0.05))
+            accent.fill.solid()
+            accent.fill.fore_color.rgb = self.accent
+            accent.line.color.rgb = self.accent
+
+            label_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + Inches(0.14), card_width - Inches(0.32), Inches(0.28)).text_frame
+            label_run = label_frame.paragraphs[0].add_run()
+            label_run.text = str(kpi.get("label", "Metric"))
+            label_run.font.size = Pt(10)
+            label_run.font.bold = True
+            label_run.font.color.rgb = self.text_secondary
+
+            value_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + Inches(0.46), card_width - Inches(0.32), Inches(0.44)).text_frame
+            value_run = value_frame.paragraphs[0].add_run()
+            value_run.text = str(kpi.get("value", "--"))
+            value_run.font.size = Pt(20)
+            value_run.font.bold = True
+            value_run.font.color.rgb = self.text_primary
+
+            lines = list(kpi.get("context", [])) or [f"YoY: {kpi.get('yoy_label', '--')}"]
+            context_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + card_height - Inches(0.55), card_width - Inches(0.32), Inches(0.36)).text_frame
+            context_frame.clear()
+            for line_index, line in enumerate(lines[:2]):
+                para = context_frame.paragraphs[0] if line_index == 0 else context_frame.add_paragraph()
+                para.text = str(line)
+                para.font.size = Pt(9)
+                para.font.bold = True
+                para.font.color.rgb = self._resolve_delta_color(str(kpi.get("key", "")), kpi.get("yoy"))
+
+    def _resolve_delta_color(self, key: str, value: Any) -> RGBColor:
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return self.text_secondary
+        lower_is_better = key in {"cost", "cpa"}
+        positive = float(value) >= 0
+        if positive != lower_is_better:
+            return RGBColor(22, 101, 52)
+        return RGBColor(185, 28, 28)
 
     def _add_image_placeholder(self, slide, left, top, width, height, text: str) -> None:
         shape = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, left, top, width, height)

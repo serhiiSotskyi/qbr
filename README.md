@@ -2,6 +2,8 @@
 
 Reusable Python project to generate quarterly PPC PowerPoint reports from CSV exports. The existing PPC performance workflow is preserved, and the pipeline now also supports Google Trends slides, Auction Insights slides, and a recommendations slide.
 
+For a non-technical step-by-step workflow, see [docs/USER_GUIDE.md](/Users/sergeysotskiy/Documents/GitHub/qbr/docs/USER_GUIDE.md).
+
 ## Updated file tree
 
 ```text
