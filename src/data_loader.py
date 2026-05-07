@@ -72,7 +72,7 @@ def load_csv(csv_path: str | Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
 
-    df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
+    df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce", format="mixed")
     df = df.dropna(subset=["date"]).copy()
     if df.empty:
         raise ValueError("No valid dates found in CSV after parsing.")

@@ -128,6 +128,24 @@ class WendyWuQbrTests(unittest.TestCase):
             self.assertIsNone(kpi["yoy"])
             self.assertEqual(kpi["yoy_label"], "n/a")
 
+    def test_text_month_dates_are_parsed_across_quarter_months(self) -> None:
+        rows = [
+            {"Date": "1 Jan 2026", "Campaign Type": "Brand", "Destination": "China", "Impressions": 100, "Clicks": 10, "Cost": 20, "Sales Leads": 5},
+            {"Date": "1 Feb 2026", "Campaign Type": "Brand", "Destination": "China", "Impressions": 120, "Clicks": 12, "Cost": 24, "Sales Leads": 6},
+            {"Date": "1 Mar 2026", "Campaign Type": "Brand", "Destination": "China", "Impressions": 140, "Clicks": 14, "Cost": 28, "Sales Leads": 7},
+            {"Date": "1 May 2026", "Campaign Type": "Brand", "Destination": "China", "Impressions": 160, "Clicks": 16, "Cost": 32, "Sales Leads": 8},
+        ]
+        frame = pd.DataFrame(rows)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            frame.to_csv(tmp.name, index=False)
+            csv_path = Path(tmp.name)
+
+        df = load_csv(csv_path)
+        quarter = detect_latest_complete_quarter(df)
+
+        self.assertEqual(len(df), 4)
+        self.assertEqual((quarter.year, quarter.quarter), (2026, 1))
+
     def test_text_report_includes_kpi_block_and_other_mix_excludes_brand(self) -> None:
         client_id = "wendy_wu"
         client_config, quarter, report, _ = _prepare_report(client_id, FIXTURES[client_id])

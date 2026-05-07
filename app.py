@@ -8,6 +8,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import streamlit as st
 
 from main import run_report, run_text_report
+from notion_memory import NotionMemoryError, notion_save_key, save_report_to_notion
 from presentation_prompt_builder import build_presentation_prompt
 
 
@@ -81,6 +82,38 @@ def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path
     return package_path
 
 
+def save_generated_bundle_to_notion(bundle: dict) -> None:
+    saved_keys = st.session_state.setdefault("notion_saved_keys", set())
+    save_key = str(bundle.get("notion_save_key") or notion_save_key(bundle))
+    if save_key in saved_keys:
+        st.session_state.notion_save_status = {
+            "type": "info",
+            "message": "This generated package has already been saved to Notion.",
+        }
+        return
+
+    try:
+        result = save_report_to_notion(bundle, base_dir=BASE_DIR)
+    except NotionMemoryError as exc:
+        st.session_state.notion_save_status = {
+            "type": "warning",
+            "message": f"Download started, but Notion save failed: {exc}",
+        }
+    except Exception:
+        st.session_state.notion_save_status = {
+            "type": "warning",
+            "message": "Download started, but Notion save failed unexpectedly.",
+        }
+    else:
+        saved_keys.add(save_key)
+        message = "Saved this generated package to Notion."
+        if result.url:
+            message = f"{message} {result.url}"
+        if result.skipped_count:
+            message = f"{message} {result.skipped_count} file(s) were too large or unavailable to attach."
+        st.session_state.notion_save_status = {"type": "success", "message": message}
+
+
 def main() -> None:
     st.title("PPC Report Generator")
 
@@ -149,11 +182,15 @@ def main() -> None:
 
             st.session_state.generated_bundle = {
                 "client_id": client_id,
+                "client_name": selected_client["name"],
+                "report_mode": report_mode,
                 "pptx_path": str(generated_pptx),
                 "report_txt_path": str(generated_txt),
                 "prompt_txt_path": str(prompt_txt_path),
                 "package_path": str(package_path),
             }
+            st.session_state.generated_bundle["notion_save_key"] = notion_save_key(st.session_state.generated_bundle)
+            st.session_state.notion_save_status = None
             st.success("Files generated successfully.")
         except Exception as exc:
             st.session_state.generated_bundle = None
@@ -178,7 +215,20 @@ def main() -> None:
                 data=handle,
                 file_name=f"{bundle['client_id']}_package.zip",
                 mime="application/zip",
+                on_click=save_generated_bundle_to_notion,
+                args=(bundle,),
             )
+
+        notion_status = st.session_state.get("notion_save_status")
+        if notion_status:
+            status_type = notion_status.get("type")
+            status_message = notion_status.get("message", "")
+            if status_type == "success":
+                st.success(status_message)
+            elif status_type == "info":
+                st.info(status_message)
+            else:
+                st.warning(status_message)
 
 
 if __name__ == "__main__":
