@@ -182,7 +182,7 @@ def compute_yoy(current: Dict, prior: Dict) -> Dict[str, float | None]:
     yoy: Dict[str, float | None] = {}
     for key, cur_val in current.items():
         prior_val = prior.get(key)
-        if prior_val in (None, 0):
+        if cur_val is None or pd.isna(cur_val) or prior_val in (None, 0) or pd.isna(prior_val):
             yoy[key] = None
         else:
             yoy[key] = (cur_val - prior_val) / prior_val

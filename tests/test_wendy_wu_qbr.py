@@ -128,6 +128,38 @@ class WendyWuQbrTests(unittest.TestCase):
             self.assertIsNone(kpi["yoy"])
             self.assertEqual(kpi["yoy_label"], "n/a")
 
+    def test_yoy_falls_back_to_na_when_current_derived_kpi_is_undefined(self) -> None:
+        rows = [
+            {"Date": "01/04/2025", "Campaign Type": "Other", "Destination": "Other", "Impressions": 100, "Clicks": 10, "Cost": 20, "Sales Leads": 2},
+            {"Date": "01/05/2025", "Campaign Type": "Other", "Destination": "Other", "Impressions": 100, "Clicks": 10, "Cost": 20, "Sales Leads": 2},
+            {"Date": "01/06/2025", "Campaign Type": "Other", "Destination": "Other", "Impressions": 100, "Clicks": 10, "Cost": 20, "Sales Leads": 2},
+            {"Date": "01/04/2026", "Campaign Type": "Other", "Destination": "Other", "Impressions": 0, "Clicks": 0, "Cost": 0, "Sales Leads": 1},
+            {"Date": "01/05/2026", "Campaign Type": "Other", "Destination": "Other", "Impressions": 0, "Clicks": 0, "Cost": 0, "Sales Leads": 1},
+            {"Date": "01/06/2026", "Campaign Type": "Other", "Destination": "Other", "Impressions": 0, "Clicks": 0, "Cost": 0, "Sales Leads": 1},
+        ]
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            pd.DataFrame(rows).to_csv(tmp.name, index=False)
+            csv_path = Path(tmp.name)
+
+        df = load_csv(csv_path)
+        quarter = detect_latest_complete_quarter(df)
+        report = prepare_report_data(
+            df,
+            quarter,
+            campaign_order=["Brand", "Generic"],
+            destination_order=["China"],
+            destination_other_config={"enabled": True, "label": "Other", "mode": "remainder", "exclude_campaign_types": ["Brand"]},
+        )
+        validate_report_data(report)
+
+        other_kpis = {kpi["key"]: kpi for kpi in report["campaigns"]["Other"]["kpis"]}
+        self.assertIsNone(report["campaigns"]["Other"]["yoy"]["CTR"])
+        self.assertIsNone(report["campaigns"]["Other"]["yoy"]["CPC"])
+        self.assertIsNone(report["campaigns"]["Other"]["yoy"]["CVR"])
+        self.assertEqual(other_kpis["CTR"]["yoy_label"], "n/a")
+        self.assertEqual(other_kpis["CPC"]["yoy_label"], "n/a")
+        self.assertEqual(other_kpis["CVR"]["yoy_label"], "n/a")
+
     def test_text_month_dates_are_parsed_across_quarter_months(self) -> None:
         rows = [
             {"Date": "1 Jan 2026", "Campaign Type": "Brand", "Destination": "China", "Impressions": 100, "Clicks": 10, "Cost": 20, "Sales Leads": 5},
