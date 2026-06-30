@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import re
+from csv import DictReader, DictWriter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
+from io import StringIO
 from pathlib import Path
 from typing import Mapping
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -80,6 +82,11 @@ EXPECTED_SOURCE_SECTIONS = (
     "RECOMMENDATIONS",
     "Recommendations / Next Steps",
 )
+CENTRAL_ASIA_SECTION_TITLES = (
+    "Central Asia & Mongolia Summary + YoY",
+    "Central Asia & Mongolia Monthly Trend",
+    "Central Asia & Mongolia Campaign Mix",
+)
 
 PERIOD_RE = re.compile(r"\bQ[1-4]\s+\d{4}\s*\([^)]+\)")
 QUARTER_SHORT_RE = re.compile(r"\bQ[1-4]\s+\d{4}\b")
@@ -128,8 +135,10 @@ def build_claude_handoff_package(
     resolved_period = period_label or extract_period_label(report_text)
     quarter_short = extract_quarter_short(resolved_period)
     headline_kpis = extract_headline_kpis(report_text)
-    missing_sections = find_missing_expected_sections(source_sections)
-    extra_sections = find_extra_source_sections(source_sections)
+    include_central_asia_slide = should_include_central_asia_slide(client_slug, source_sections)
+    expected_sections = expected_source_sections(include_central_asia_slide)
+    missing_sections = find_missing_expected_sections(source_sections, expected_sections)
+    extra_sections = find_extra_source_sections(source_sections, expected_sections)
 
     streamlit_pptx_filename = f"{client_slug}_streamlit_output.pptx"
     generated_pptx_bytes = _read_payload(generated_pptx)
@@ -162,8 +171,12 @@ def build_claude_handoff_package(
 
     readme_text = render_asset_template("README_FOR_CLAUDE_TEMPLATE.txt", variables)
     claude_prompt_text = render_asset_template("CLAUDE_PROMPT_TEMPLATE.txt", variables)
-    slide_mapping_text = render_asset_template("SLIDE_MAPPING_WWT_QBR_TEMPLATE.csv", variables)
+    slide_mapping_text = build_slide_mapping_text(variables, include_central_asia_slide)
     qa_checklist_text = render_asset_template("QA_CHECKLIST_TEMPLATE.txt", variables)
+    if include_central_asia_slide:
+        readme_text = apply_central_asia_slide_instructions(readme_text)
+        claude_prompt_text = apply_central_asia_slide_instructions(claude_prompt_text)
+        qa_checklist_text = apply_central_asia_slide_instructions(qa_checklist_text)
     chart_qa_text = read_asset_text("CHART_QA_ADDENDUM_FOR_CLAUDE.txt")
     source_index_text = build_source_section_index(
         report_text=report_text,
@@ -195,7 +208,11 @@ def build_claude_handoff_package(
         },
         {"name": "README_FOR_CLAUDE.txt", "role": "operator README", "required": True},
         {"name": "CLAUDE_PROMPT.txt", "role": "Claude execution prompt", "required": True},
-        {"name": "SLIDE_MAPPING.csv", "role": "38-slide reference deck mapping", "required": True},
+        {
+            "name": "SLIDE_MAPPING.csv",
+            "role": "39-slide UK reference deck mapping" if include_central_asia_slide else "38-slide reference deck mapping",
+            "required": True,
+        },
         {"name": "SOURCE_SECTION_INDEX.txt", "role": "report section line index", "required": True},
         {"name": "QA_CHECKLIST.txt", "role": "required final deck QA checklist", "required": True},
         {"name": "CHART_QA_ADDENDUM_FOR_CLAUDE.txt", "role": "required chart rendering and screenshot QA rules", "required": True},
@@ -216,6 +233,8 @@ def build_claude_handoff_package(
         "generated_at": generated_at_value,
         "reference_deck_url": reference_deck_url,
         "has_reference_pptx": has_reference_pptx,
+        "target_slide_count": 39 if include_central_asia_slide else 38,
+        "uk_central_asia_mongolia_slide": include_central_asia_slide,
         "files": files_manifest,
         "headline_kpis": headline_kpis,
         "source_sections": [
@@ -313,18 +332,18 @@ def extract_section_text(report_text: str, section_title: str) -> str:
     return "\n".join(lines[start_index:end_index])
 
 
-def find_missing_expected_sections(source_sections: list[SourceSection]) -> list[str]:
+def find_missing_expected_sections(source_sections: list[SourceSection], expected_sections: tuple[str, ...] = EXPECTED_SOURCE_SECTIONS) -> list[str]:
     missing: list[str] = []
-    for expected in EXPECTED_SOURCE_SECTIONS:
+    for expected in expected_sections:
         if not any(_section_matches_expected(expected, section) for section in source_sections):
             missing.append(expected)
     return missing
 
 
-def find_extra_source_sections(source_sections: list[SourceSection]) -> list[str]:
+def find_extra_source_sections(source_sections: list[SourceSection], expected_sections: tuple[str, ...] = EXPECTED_SOURCE_SECTIONS) -> list[str]:
     extras: list[str] = []
     for section in source_sections:
-        if not any(_section_matches_expected(expected, section) for expected in EXPECTED_SOURCE_SECTIONS):
+        if not any(_section_matches_expected(expected, section) for expected in expected_sections):
             extras.append(_display_section_title(section, source_sections))
     return extras
 
@@ -383,6 +402,86 @@ def build_source_section_index(
 
 def render_asset_template(filename: str, variables: Mapping[str, str]) -> str:
     return render_template(read_asset_text(filename), variables)
+
+
+def build_slide_mapping_text(variables: Mapping[str, str], include_central_asia_slide: bool) -> str:
+    rendered = render_asset_template("SLIDE_MAPPING_WWT_QBR_TEMPLATE.csv", variables)
+    if not include_central_asia_slide:
+        return rendered
+
+    input_buffer = StringIO(rendered)
+    reader = DictReader(input_buffer)
+    fieldnames = reader.fieldnames or []
+    rows = list(reader)
+    adjusted_rows: list[dict[str, str]] = []
+    central_row = {
+        "target_slide": "26",
+        "reference_title": "Central Asia & Mongolia Summary + YoY",
+        "source_section_or_action": (
+            "Central Asia & Mongolia Summary + YoY + Central Asia & Mongolia Monthly Trend + "
+            "Central Asia & Mongolia Campaign Mix"
+        ),
+        "required_action": (
+            "UK-only inserted destination slide. Update KPI blocks, YoY values, commentary bullets, monthly trend visual, "
+            "and campaign mix table using Central Asia & Mongolia data from report.txt. Preserve the destination slide style."
+        ),
+    }
+
+    for row in rows:
+        slide_number = int(row["target_slide"])
+        if slide_number == 26:
+            adjusted_rows.append(central_row)
+        if slide_number >= 26:
+            row = {**row, "target_slide": str(slide_number + 1)}
+        adjusted_rows.append(row)
+
+    output_buffer = StringIO()
+    writer = DictWriter(output_buffer, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(adjusted_rows)
+    return output_buffer.getvalue()
+
+
+def apply_central_asia_slide_instructions(text: str) -> str:
+    replacements = {
+        "38-slide reference deck": "39-slide UK deck",
+        "38 target slides": "39 target slides",
+        "38 slides": "39 slides",
+        "38-slide structure": "39-slide UK structure",
+        "38-slide": "39-slide",
+        "Do not add extra slides just because report.txt has extra sections.": (
+            "Do not add extra slides just because report.txt has extra sections, except the explicit UK-only "
+            "Central Asia & Mongolia destination slide in SLIDE_MAPPING.csv."
+        ),
+    }
+    updated = text
+    for old, new in replacements.items():
+        updated = updated.replace(old, new)
+    note = (
+        "\n\nUK-only Central Asia & Mongolia slide\n"
+        "- Insert one Central Asia & Mongolia destination slide after India Monthly Trend and before destination Other.\n"
+        "- Use Central Asia & Mongolia Summary + YoY, Central Asia & Mongolia Monthly Trend, and Central Asia & Mongolia Campaign Mix from report.txt.\n"
+        "- Shift subsequent reference slides down by one so the finished UK deck has 39 slides.\n"
+        "- This is the only approved extra slide; do not add slides for any other extra source section.\n"
+    )
+    return updated + note
+
+
+def should_include_central_asia_slide(client_slug: str, source_sections: list[SourceSection]) -> bool:
+    if client_slug != "wendy_wu_uk":
+        return False
+    return any(section.title == "Central Asia & Mongolia Summary + YoY" for section in source_sections)
+
+
+def expected_source_sections(include_central_asia_slide: bool) -> tuple[str, ...]:
+    if not include_central_asia_slide:
+        return EXPECTED_SOURCE_SECTIONS
+
+    sections = list(EXPECTED_SOURCE_SECTIONS)
+    insert_at = sections.index("Other Summary + YoY")
+    for title in reversed(CENTRAL_ASIA_SECTION_TITLES):
+        sections.insert(insert_at, title)
+    return tuple(sections)
 
 
 def render_template(template: str, variables: Mapping[str, str]) -> str:

@@ -6,11 +6,13 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from pptx import Presentation
 
 from src.chart_builder import ChartBuilder
 from src.config_loader import ConfigLoader
 from src.data_loader import detect_latest_complete_quarter, load_csv
 from src.metrics import prepare_report_data, validate_report_data
+from src.report_pipeline import ReportPipeline
 from utils.text_report import generate_text_report
 
 
@@ -103,8 +105,11 @@ class WendyWuQbrTests(unittest.TestCase):
                 self.assertAlmostEqual(campaign_cost, overall_raw_cost)
 
                 for destination in client_config["destinations"]:
-                    destination_scope = report["destinations"][destination]
                     raw_subset = current_df[current_df["destination"] == destination].copy()
+                    if raw_subset.empty:
+                        self.assertNotIn(destination, report["destinations"])
+                        continue
+                    destination_scope = report["destinations"][destination]
                     self.assertAlmostEqual(destination_scope["total"]["Cost"], float(raw_subset["cost"].sum()))
                     self.assertAlmostEqual(destination_scope["total"]["Sales Leads"], float(raw_subset["sales_leads"].sum()))
 
@@ -232,6 +237,42 @@ class WendyWuQbrTests(unittest.TestCase):
                     self.assertGreaterEqual(len(cost_ax1.containers), 1)
                     plt.close(fig)
 
+    def test_central_asia_mongolia_is_uk_only_named_destination(self) -> None:
+        csv_path = _write_central_asia_fixture()
+        uk_config = CONFIG_LOADER.get_client_config("wendy_wu")
+        australia_config = CONFIG_LOADER.get_client_config("wendy_wu_australia")
+
+        self.assertIn("Central Asia & Mongolia", uk_config["destinations"])
+        self.assertNotIn("Central Asia & Mongolia", australia_config["destinations"])
+
+        _, _, uk_report, _ = _prepare_report("wendy_wu", csv_path)
+        _, _, australia_report, _ = _prepare_report("wendy_wu_australia", csv_path)
+
+        self.assertIn("Central Asia & Mongolia", uk_report["available_destinations"])
+        self.assertIn("Other", uk_report["available_destinations"])
+        self.assertAlmostEqual(uk_report["destinations"]["Central Asia & Mongolia"]["total"]["Cost"], 600.0)
+        self.assertAlmostEqual(uk_report["destinations"]["Other"]["total"]["Cost"], 300.0)
+
+        self.assertNotIn("Central Asia & Mongolia", australia_report["available_destinations"])
+        self.assertAlmostEqual(australia_report["destinations"]["Other"]["total"]["Cost"], 900.0)
+
+    def test_uk_pptx_adds_central_asia_mongolia_destination_slides(self) -> None:
+        csv_path = _write_central_asia_fixture()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "wendy_wu_uk.pptx"
+            pipeline = ReportPipeline(project_root=ROOT)
+            pipeline.charts_root = Path(tmpdir) / "charts"
+            generated_path = pipeline.run(
+                input_csv=csv_path,
+                output_pptx=output_path,
+                client_id="wendy_wu",
+            )
+
+            titles = _pptx_text(generated_path)
+            self.assertIn("Central Asia & Mongolia Summary + YoY", titles)
+            self.assertIn("Central Asia & Mongolia Monthly Trend", titles)
+            self.assertIn("Central Asia & Mongolia Campaign Mix", titles)
+
 
 def _prepare_report(client_id: str, csv_path: Path):
     client_config = CONFIG_LOADER.get_client_config(client_id)
@@ -265,7 +306,56 @@ def _write_single_quarter_fixture() -> Path:
     frame = pd.DataFrame(rows)
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
         frame.to_csv(tmp.name, index=False)
+    return Path(tmp.name)
+
+
+def _write_central_asia_fixture() -> Path:
+    rows = []
+    for month, central_cost, other_cost in [(1, 100, 50), (2, 200, 100), (3, 300, 150)]:
+        rows.extend(
+            [
+                {
+                    "Date": f"01/{month:02d}/2026",
+                    "Campaign Type": "Generic",
+                    "Destination": "China",
+                    "Impressions": 1000,
+                    "Clicks": 100,
+                    "Cost": 25,
+                    "Sales Leads": 5,
+                },
+                {
+                    "Date": f"01/{month:02d}/2026",
+                    "Campaign Type": "Generic",
+                    "Destination": "Central Asia & Mongolia",
+                    "Impressions": 2000,
+                    "Clicks": 200,
+                    "Cost": central_cost,
+                    "Sales Leads": 20,
+                },
+                {
+                    "Date": f"01/{month:02d}/2026",
+                    "Campaign Type": "Generic",
+                    "Destination": "Other",
+                    "Impressions": 1500,
+                    "Clicks": 150,
+                    "Cost": other_cost,
+                    "Sales Leads": 10,
+                },
+            ]
+        )
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+        pd.DataFrame(rows).to_csv(tmp.name, index=False)
         return Path(tmp.name)
+
+
+def _pptx_text(pptx_path: Path) -> str:
+    presentation = Presentation(str(pptx_path))
+    chunks: list[str] = []
+    for slide in presentation.slides:
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                chunks.append(shape.text)
+    return "\n".join(chunks)
 
 
 if __name__ == "__main__":

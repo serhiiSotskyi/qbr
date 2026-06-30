@@ -81,6 +81,38 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
         self.assertNotIn("Wendy Wu Tours UK", package.read("SOURCE_SECTION_INDEX.txt").decode("utf-8"))
         self.assert_package_references_chart_qa(package)
 
+    def test_uk_handoff_adds_central_asia_mongolia_slide_when_report_has_section(self) -> None:
+        fixture_path = FIXTURES / "wendy_wu_uk_streamlit_package.zip"
+        with ZipFile(fixture_path) as source:
+            report_text = _inject_central_asia_sections(source.read("report.txt").decode("utf-8"))
+            prompt_text = source.read("prompt.txt").decode("utf-8")
+            pptx_bytes = source.read("wendy_wu_report.pptx")
+
+        handoff_bytes, manifest = build_claude_handoff_package(
+            report_text=report_text,
+            prompt_text=prompt_text,
+            generated_pptx=pptx_bytes,
+            client_display_name="Wendy Wu Tours UK",
+            client_slug="wendy_wu_uk",
+            reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
+            generated_at=GENERATED_AT,
+        )
+        package = ZipFile(BytesIO(handoff_bytes))
+
+        self.assertEqual(manifest["target_slide_count"], 39)
+        self.assertTrue(manifest["uk_central_asia_mongolia_slide"])
+        self.assertFalse(any("Central Asia & Mongolia" in warning for warning in manifest["warnings"]))
+
+        slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
+        self.assertIn("26,Central Asia & Mongolia Summary + YoY", slide_mapping)
+        self.assertIn("27,Other (Destination) Summary + YoY", slide_mapping)
+        self.assertIn("39,Thank You", slide_mapping)
+
+        for filename in ("README_FOR_CLAUDE.txt", "CLAUDE_PROMPT.txt", "QA_CHECKLIST.txt"):
+            content = package.read(filename).decode("utf-8")
+            self.assertIn("Central Asia & Mongolia", content)
+            self.assertIn("39", content)
+
     def assert_package_references_chart_qa(self, package: ZipFile) -> None:
         self.assertIn("CHART_QA_ADDENDUM_FOR_CLAUDE.txt", package.namelist())
         addendum = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
@@ -131,3 +163,43 @@ def _expected_package_names(client_slug: str) -> set[str]:
         "CHART_QA_ADDENDUM_FOR_CLAUDE.txt",
         "PACKAGE_MANIFEST.json",
     }
+
+
+def _inject_central_asia_sections(report_text: str) -> str:
+    central_sections = """
+----------------------------------------
+
+Central Asia & Mongolia Summary + YoY
+Q2 2026 (Apr - Jun 2026)
+Key Metrics + YoY
+     Metric     Value    YoY
+       Cost £6,000.00    n/a
+Sales Leads       120    n/a
+        CPL    £50.00    n/a
+        CVR     3.00%    n/a
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
+  Apr      10,000  1,000 10.00% £2.00 £2,000.00          40 £50.00 4.00%
+  May      10,000  1,000 10.00% £2.00 £2,000.00          40 £50.00 4.00%
+  Jun      10,000  1,000 10.00% £2.00 £2,000.00          40 £50.00 4.00%
+Total      30,000  3,000 10.00% £2.00 £6,000.00         120 £50.00 4.00%
+- Central Asia & Mongolia generated 120 leads from £6,000.00 with a quarter CPL of £50.00.
+
+----------------------------------------
+
+Central Asia & Mongolia Monthly Trend
+Q2 2026 (Apr - Jun 2026)
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
+  Apr      10,000  1,000 10.00% £2.00 £2,000.00          40 £50.00 4.00%
+  May      10,000  1,000 10.00% £2.00 £2,000.00          40 £50.00 4.00%
+  Jun      10,000  1,000 10.00% £2.00 £2,000.00          40 £50.00 4.00%
+Total      30,000  3,000 10.00% £2.00 £6,000.00         120 £50.00 4.00%
+
+----------------------------------------
+
+Central Asia & Mongolia Campaign Mix
+Q2 2026 (Apr - Jun 2026)
+Campaign Type     Cost Sales Leads Cost Share Lead Share    CPL
+      Generic £6,000.00         120    100.00%    100.00% £50.00
+"""
+    marker = "\n----------------------------------------\n\nOther Summary + YoY"
+    return report_text.replace(marker, central_sections + marker, 1)
