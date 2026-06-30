@@ -1,0 +1,45 @@
+Required QA before delivery
+
+Deck identity
+- Final deck is a copy of the Google Slides reference deck or a PPTX built from reference_deck_exported_from_google_slides.pptx.
+- Final deck has 38 slides in the same order as the reference deck.
+- Final deck is editable content after Google Slides import, not one image per slide.
+- Client/market naming is {{client_display_name}}.
+
+Stale content
+- No old quarter date labels remain.
+- No old month labels remain unless part of a prior-year comparison explicitly required by report.txt.
+- No wrong market labels remain.
+- No old testing content remains on slides 31-32.
+- No old update content remains on slide 34 unless the user explicitly provided it again.
+- No old next-step copy remains on slides 36-37.
+
+Data integrity
+- All KPI values match report.txt Key Metrics and Total rows exactly.
+- All YoY values match report.txt exactly.
+- All tables match report.txt exactly, including n/a, currency symbols, percentages, and Total rows.
+- All chart month labels match the period months in report.txt.
+- Campaign Type Mix includes all campaign type rows from report.txt.
+- Destination summary slides include the campaign mix table for that destination when available.
+- Source "Other Summary" in the Performance section is not accidentally used for destination Other slides.
+
+Manual placeholders
+- Testing divider and slides 31-32 are clearly marked for human completion unless source data is provided.
+- Other Updates divider and slide 34 are clearly marked for human completion unless source data is provided.
+- Any unused Next Steps continuation slide is clearly marked for human completion or removed only if the user explicitly allows slide count changes.
+
+Visual fidelity
+- Typography, colors, red accents, dark footer, page structure, and KPI block styling match the reference deck.
+- Text does not overflow or wrap awkwardly in title/footer bands.
+- Tables fit within slide bounds and remain readable.
+- Chart/image slots are replaced with current-period visuals and no stale chart images remain.
+- Every chart slide has been checked against CHART_QA_ADDENDUM_FOR_CLAUDE.txt.
+- No chart labels, value annotations, legends, or axis labels are clipped or overlapping.
+- Chart images are placed with fit/contain behavior and are not stretched non-proportionally.
+- No objects overlap unintentionally.
+
+Final response
+- If the output is native Google Slides, return the new Google Slides URL only.
+- If the output is PPTX, return the finished PPTX and state it is ready to import into Google Slides.
+- Include a short note listing manual placeholders that remain.
+- Do not return the original reference deck URL as if it were the output.

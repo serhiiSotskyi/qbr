@@ -1,0 +1,65 @@
+Chart QA Addendum for Claude
+
+Problem to fix
+The deck content can be correct while chart images are too tightly rendered or incorrectly scaled inside the template slots. This causes labels, value annotations, legends, and axis text to look squashed, clipped, or overlapping.
+
+Do not rebuild the whole deck just to fix charts. Run a chart-only polish pass if needed.
+
+Reference standard
+Use the original Q1 reference deck as the visual standard for chart scale, spacing, margins, label size, border treatment, and composition. Generated charts should feel like the reference charts were updated with new data, not like newly designed charts.
+
+Slides to inspect
+- Google Trends chart slides: 3, 4, 5
+- Overall Performance Trend: 7
+- Campaign Type Mix: 8
+- Channel monthly trend slides: 10, 12, 14, 16
+- Destination monthly trend slides: 19, 21, 23, 25
+- Destination summary slides that include campaign mix chart/table: 18, 20, 22, 24, 26, 27
+- Auction Insights: 29
+
+Chart rendering rules
+- Preserve the chart slot size and position from the reference deck.
+- Do not stretch chart images non-proportionally.
+- Use fit/contain placement, not crop/fill placement.
+- Export chart images at high resolution, ideally 2x or 3x the displayed slide size.
+- Leave internal padding inside every exported chart image so labels cannot be cut off after insertion.
+- Add at least 10-15% internal padding around chart labels; use 20-25% right padding for horizontal bar charts with value labels.
+- Use font sizes that match the Q1 reference chart appearance after insertion. Do not use oversized labels.
+- Avoid chart titles inside the image when the slide already has a title, unless the reference chart image includes a title in that same position.
+- Keep legends readable but compact; legends should not push charts smaller than the reference.
+- For donut charts, avoid placing labels on tiny slices if they overlap. Use the legend for small categories and label only slices large enough to read cleanly.
+- For bar charts, make sure value labels are not clipped at the right edge. Increase the x-axis maximum or add right margin.
+- For long category names, use the same abbreviations as the reference where appropriate, for example "Perf. Max" instead of "Performance Max".
+- Keep the same color system as the reference: black/dark charcoal, red accent, mid grey, light grey.
+- Keep chart frames/borders consistent with the reference slide. If the reference chart is inside a bordered frame, the replacement should use the same frame.
+
+Required visual QA
+For every chart slide, create or inspect a full-slide screenshot/thumbnail after the chart replacement. The pass is not complete until each chart passes these checks:
+- No number is clipped.
+- No label overlaps another label, legend, bar, slice, or axis.
+- No chart appears squeezed vertically or horizontally.
+- The chart is centered in its intended slot.
+- The chart has comparable whitespace to the Q1 reference.
+- The chart does not collide with bullets, table text, headers, footers, or logos.
+- The slide still matches the reference deck layout.
+
+Special check for Campaign Type Mix
+The result should match the Q1 reference slide proportions:
+- Two donut charts on the left, sized similarly to the reference.
+- Horizontal CPL bar chart on the right, inside the same style of framed chart area as the reference.
+- Donut percentage labels must be readable and not overlap.
+- Legends should sit below the donuts with compact font size and enough spacing.
+- CPL bar chart value labels must be fully visible; no right-edge clipping.
+- The "Demand Gen" label may wrap only if it matches the reference quality and does not make the y-axis look crowded.
+
+Second-pass instruction
+If a chart cannot be made readable within the existing slot, prioritize legibility while preserving the template:
+1. reduce nonessential chart text,
+2. abbreviate category labels,
+3. move or simplify legends,
+4. hide labels for tiny slices,
+5. increase chart image padding,
+6. only then slightly resize the chart within the existing visual bounds.
+
+Final response
+List the slides whose charts were changed and confirm that screenshots/thumbnails were checked after the fix.

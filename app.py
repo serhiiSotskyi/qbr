@@ -7,6 +7,13 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import streamlit as st
 
+from claude_handoff import (
+    DEFAULT_REFERENCE_PPTX_PATH,
+    build_claude_handoff_package,
+    is_wendy_wu_qbr,
+    resolve_wendy_wu_client_display_name,
+    resolve_wendy_wu_handoff_slug,
+)
 from main import run_report, run_text_report
 from notion_memory import NotionMemoryError, notion_save_key, save_report_to_notion
 from presentation_prompt_builder import build_presentation_prompt
@@ -80,6 +87,29 @@ def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path
         archive.write(report_txt_path, arcname="report.txt")
         archive.write(prompt_txt_path, arcname="prompt.txt")
     return package_path
+
+
+def create_claude_handoff_bundle(
+    *,
+    client_id: str,
+    pptx_path: Path,
+    report_txt_path: Path,
+    prompt_txt_path: Path,
+    request_dir: Path,
+    client_name: str,
+) -> tuple[Path, dict]:
+    client_slug = resolve_wendy_wu_handoff_slug(client_id)
+    handoff_bytes, manifest = build_claude_handoff_package(
+        report_text=report_txt_path.read_text(encoding="utf-8"),
+        prompt_text=prompt_txt_path.read_text(encoding="utf-8"),
+        generated_pptx=pptx_path,
+        client_display_name=resolve_wendy_wu_client_display_name(client_id, fallback=client_name),
+        client_slug=client_slug,
+        reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
+    )
+    handoff_path = request_dir / f"{client_slug}_claude_handoff_package.zip"
+    handoff_path.write_bytes(handoff_bytes)
+    return handoff_path, manifest
 
 
 def save_generated_bundle_to_notion(bundle: dict) -> None:
@@ -179,6 +209,17 @@ def main() -> None:
             )
             prompt_txt_path.write_text(build_presentation_prompt(client_id), encoding="utf-8")
             package_path = create_package_bundle(client_id, generated_pptx, generated_txt, prompt_txt_path, request_dir)
+            claude_handoff_path = None
+            claude_handoff_manifest = None
+            if is_wendy_wu_qbr(client_id, report_mode):
+                claude_handoff_path, claude_handoff_manifest = create_claude_handoff_bundle(
+                    client_id=client_id,
+                    pptx_path=generated_pptx,
+                    report_txt_path=generated_txt,
+                    prompt_txt_path=prompt_txt_path,
+                    request_dir=request_dir,
+                    client_name=selected_client["name"],
+                )
 
             st.session_state.generated_bundle = {
                 "client_id": client_id,
@@ -189,6 +230,9 @@ def main() -> None:
                 "prompt_txt_path": str(prompt_txt_path),
                 "package_path": str(package_path),
             }
+            if claude_handoff_path is not None:
+                st.session_state.generated_bundle["claude_handoff_path"] = str(claude_handoff_path)
+                st.session_state.generated_bundle["claude_handoff_manifest"] = claude_handoff_manifest
             st.session_state.generated_bundle["notion_save_key"] = notion_save_key(st.session_state.generated_bundle)
             st.session_state.notion_save_status = None
             st.success("Files generated successfully.")
@@ -206,18 +250,29 @@ def main() -> None:
                 "report_txt": bundle["report_txt_path"],
                 "prompt_txt": bundle["prompt_txt_path"],
                 "package_zip": bundle["package_path"],
+                "claude_handoff_zip": bundle.get("claude_handoff_path"),
             }
         )
 
         with open(bundle["package_path"], "rb") as handle:
             st.download_button(
-                label="Download All Files",
+                label="Download Raw Streamlit Files",
                 data=handle,
                 file_name=f"{bundle['client_id']}_package.zip",
                 mime="application/zip",
                 on_click=save_generated_bundle_to_notion,
                 args=(bundle,),
             )
+
+        if bundle.get("claude_handoff_path"):
+            with open(bundle["claude_handoff_path"], "rb") as handle:
+                st.download_button(
+                    label="Download Claude Handoff Package",
+                    data=handle,
+                    file_name=Path(bundle["claude_handoff_path"]).name,
+                    mime="application/zip",
+                )
+            st.caption("Use the Claude handoff zip for the final Google Slides deck. The Streamlit PPTX inside it is an intermediate source, not the final client deck.")
 
         notion_status = st.session_state.get("notion_save_status")
         if notion_status:

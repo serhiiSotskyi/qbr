@@ -1,0 +1,45 @@
+You are preparing a {{client_display_name}} {{quarter_short}} PPC report deck.
+
+I am uploading:
+- report.txt
+- {{streamlit_pptx_filename}}
+- reference_deck_exported_from_google_slides.pptx, if included
+- original_streamlit_prompt.txt
+- SLIDE_MAPPING.csv
+- SOURCE_SECTION_INDEX.txt
+- QA_CHECKLIST.txt
+- CHART_QA_ADDENDUM_FOR_CLAUDE.txt
+- PACKAGE_MANIFEST.json
+
+Target reference deck:
+{{reference_deck_url}}
+
+Task
+Create a new report deck that is visually and structurally identical to the target reference deck, but populated with {{period_label}} {{client_display_name}} data from report.txt.
+
+Final deliverable requirement
+The final client deliverable must be suitable for Google Slides. If you have native Google Slides editing, copy the reference Google Slides deck first and edit the copy. If you do not have native Google Slides editing, use reference_deck_exported_from_google_slides.pptx as the intermediate editing file, return the finished PPTX, and make sure it can be imported back into Google Slides without changing the visual system.
+
+Source priority
+1. report.txt is the source of truth for all numbers, tables, bullets, dates, and recommendations.
+2. SLIDE_MAPPING.csv defines how source sections map to the 38 target slides.
+3. The Google Slides reference deck and reference_deck_exported_from_google_slides.pptx define the final visual style, slide order, and layout.
+4. {{streamlit_pptx_filename}} is only a secondary aid for understanding coverage. Do not use its styling or slide order as the target.
+5. original_streamlit_prompt.txt is background only. Do not follow it where it conflicts with this prompt or SLIDE_MAPPING.csv.
+
+Hard requirements
+- Do not edit the original reference deck. Copy it first if working in Google Slides.
+- Keep 38 slides and the same slide order as the reference deck.
+- Replace all old quarter labels/content with {{period_label}} content.
+- Use "{{client_display_name}}" where the market/client name appears.
+- Preserve the reference deck design exactly: dark backgrounds, red accent bars, KPI cards, tables, footers, typography, chart placement, and spacing.
+- Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
+- For source inconsistencies, KPI blocks/tables/charts must use the Key Metrics and Total rows as authoritative.
+- Do not add extra slides for extra source sections.
+- Fold destination Campaign Mix sections into the matching destination summary slides.
+- Keep Testing and Other Updates as explicit manual placeholders unless report.txt provides those sections.
+- Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping; inspect full-slide screenshots/thumbnails after chart replacement.
+- Run QA_CHECKLIST.txt before returning.
+
+Output
+Return the new copied Google Slides deck URL if you edited Google Slides directly. If you used the PPTX bridge, return the finished PPTX only and note that it should be imported into Google Slides. Also list any placeholders that remain for manual completion.

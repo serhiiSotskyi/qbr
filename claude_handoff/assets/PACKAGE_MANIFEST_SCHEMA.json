@@ -1,0 +1,34 @@
+{
+  "package_type": "claude_handoff",
+  "report_family": "Wendy Wu QBR",
+  "client_display_name": "string",
+  "client_slug": "string",
+  "period_label": "string",
+  "quarter_short": "string",
+  "generated_at": "ISO-8601 datetime string",
+  "reference_deck_url": "string",
+  "has_reference_pptx": "boolean",
+  "files": [
+    {
+      "name": "string",
+      "role": "string",
+      "required": "boolean"
+    }
+  ],
+  "headline_kpis": {
+    "sales_leads": "string",
+    "cost": "string",
+    "cpl": "string",
+    "cvr": "string"
+  },
+  "source_sections": [
+    {
+      "index": "number",
+      "title": "string",
+      "line": "number"
+    }
+  ],
+  "warnings": [
+    "string"
+  ]
+}
