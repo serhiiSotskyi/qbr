@@ -1,0 +1,43 @@
+You are preparing a Wightlink {{quarter_short}} PPC QBR deck.
+
+I am uploading:
+- report.txt
+- wightlink_streamlit_output.pptx
+- reference_deck_exported_from_google_slides.pptx, if included
+- original_streamlit_prompt.txt
+- SLIDE_MAPPING.csv
+- SOURCE_SECTION_INDEX.txt
+- RAW_INPUTS_MANIFEST.txt
+- QA_CHECKLIST.txt
+- CHART_QA_ADDENDUM_FOR_CLAUDE.txt
+- raw_inputs/
+- PACKAGE_MANIFEST.json
+
+Target reference deck:
+{{reference_deck_url}}
+
+Task
+Create a new Wightlink {{quarter_short}} QBR deck that is visually and structurally aligned with the Wightlink reference deck, but populated with {{period_label}} data from report.txt and raw_inputs.
+
+Source priority
+1. report.txt is the source of truth for current-quarter content, KPI values, tables, bullets, and dates.
+2. raw_inputs/*.csv are supporting source files for chart regeneration, trend titles, plan/forecast context, and audit.
+3. SLIDE_MAPPING.csv defines how the QBR source maps to the 27-slide reference deck.
+4. The Google Slides reference deck and reference_deck_exported_from_google_slides.pptx define the final visual style, slide order, and layout.
+5. wightlink_streamlit_output.pptx is only a secondary aid for understanding generated content. Do not use its styling as the visual target.
+6. original_streamlit_prompt.txt is background only. Ignore any generic design style where it conflicts with the Wightlink reference deck.
+
+Hard requirements
+- Do not edit the original reference deck. Copy it first if working in Google Slides.
+- Default to 27 slides and the same order as the reference deck.
+- Replace old period labels/content with {{period_label}}, except where a prior-period comparison is explicit.
+- Preserve the Wightlink reference design exactly.
+- Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
+- Use raw_inputs for chart generation and traceability. Do not let raw plan-book values override report.txt KPIs.
+- Replace file-name-based trend titles with clean Google Trends query names from the CSV headers.
+- Do not invent Testing, Next Steps, Other Updates, top-campaign, or competitor creative content if it is not provided. Use explicit manual placeholders instead.
+- Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping; inspect full-slide screenshots/thumbnails after chart replacement.
+- Run QA_CHECKLIST.txt before returning.
+
+Output
+Return the new copied Google Slides deck URL if you edited Google Slides directly. If you used the PPTX bridge, return the finished PPTX only and note that it should be imported into Google Slides. Also list any placeholders that remain for manual completion.

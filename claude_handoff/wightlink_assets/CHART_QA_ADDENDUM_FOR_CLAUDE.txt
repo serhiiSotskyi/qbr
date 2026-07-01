@@ -1,0 +1,39 @@
+Chart QA Addendum for Claude
+
+Problem to prevent
+The deck content can be correct while chart images are too tightly rendered or incorrectly scaled inside template slots. This causes labels, value annotations, legends, and axis text to look squashed, clipped, or overlapping.
+
+Reference standard
+Use the Wightlink reference deck as the visual standard for chart scale, spacing, margins, label size, border treatment, and composition. Current-period charts should feel like the reference charts were updated with new data.
+
+Slides to inspect
+- Google Trends slides: 4, 5, 6
+- All Performance chart slide/content area: 12
+- Brand trend slide: 14
+- Generics trend slide: 16
+- PMax trend slide: 18
+- Any chart added to auction insights or plan-vs-actual slides
+
+Chart rendering rules
+- Preserve the chart slot size and position from the reference deck.
+- Do not stretch chart images non-proportionally.
+- Use fit/contain placement, not crop/fill placement.
+- Export chart images at high resolution, ideally 2x or 3x the displayed slide size.
+- Leave internal padding inside every exported chart image so labels cannot be cut off after insertion.
+- For line charts, keep date labels sparse and readable; do not label every daily point if it makes the axis unreadable.
+- For dual-axis charts, make both axes readable and make legends explicit.
+- Use Wightlink reference colors and chart styling.
+- Keep legends readable but compact.
+
+Required visual QA
+For every chart slide, create or inspect a full-slide screenshot/thumbnail after the chart replacement. The pass is not complete until each chart passes these checks:
+- No number is clipped.
+- No label overlaps another label, legend, line, bar, or axis.
+- No chart appears squeezed vertically or horizontally.
+- The chart is centered in its intended slot.
+- The chart has comparable whitespace to the reference.
+- The chart does not collide with bullets, table text, headers, footers, or logos.
+- The slide still matches the reference deck layout.
+
+Final response
+List the slides whose charts were changed and confirm that screenshots/thumbnails were checked after the fix.

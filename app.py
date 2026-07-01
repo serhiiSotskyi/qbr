@@ -9,8 +9,11 @@ import streamlit as st
 
 from claude_handoff import (
     DEFAULT_REFERENCE_PPTX_PATH,
+    DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
     build_claude_handoff_package,
+    build_wightlink_claude_handoff_package,
     is_wendy_wu_qbr,
+    is_wightlink_qbr,
     resolve_wendy_wu_client_display_name,
     resolve_wendy_wu_handoff_slug,
 )
@@ -112,6 +115,33 @@ def create_claude_handoff_bundle(
     return handoff_path, manifest
 
 
+def create_wightlink_claude_handoff_bundle(
+    *,
+    pptx_path: Path,
+    report_txt_path: Path,
+    prompt_txt_path: Path,
+    request_dir: Path,
+    performance_csv_path: str | Path,
+    auction_csv_path: str | Path | None,
+    trends_dir: str | Path | None,
+    plan_book_path: str | Path | None,
+) -> tuple[Path, dict]:
+    trend_csv_files = sorted(Path(trends_dir).glob("*.csv")) if trends_dir else []
+    handoff_bytes, manifest = build_wightlink_claude_handoff_package(
+        report_text=report_txt_path.read_text(encoding="utf-8"),
+        prompt_text=prompt_txt_path.read_text(encoding="utf-8"),
+        generated_pptx=pptx_path,
+        performance_csv=performance_csv_path,
+        auction_csv=auction_csv_path,
+        trend_csv_files=trend_csv_files,
+        plan_book_csv=plan_book_path,
+        reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
+    )
+    handoff_path = request_dir / "wightlink_claude_handoff_package.zip"
+    handoff_path.write_bytes(handoff_bytes)
+    return handoff_path, manifest
+
+
 def save_generated_bundle_to_notion(bundle: dict) -> None:
     saved_keys = st.session_state.setdefault("notion_saved_keys", set())
     save_key = str(bundle.get("notion_save_key") or notion_save_key(bundle))
@@ -160,7 +190,7 @@ def main() -> None:
     trends_files = st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
     plan_workbook_file = None
     if client_id == "wightlink":
-        plan_workbook_file = st.file_uploader("Wightlink Plan Workbook", type=["xlsx"])
+        plan_workbook_file = st.file_uploader("Wightlink Plan Book CSV or Workbook", type=["csv", "xlsx"])
 
     if "generated_bundle" not in st.session_state:
         st.session_state.generated_bundle = None
@@ -219,6 +249,17 @@ def main() -> None:
                     prompt_txt_path=prompt_txt_path,
                     request_dir=request_dir,
                     client_name=selected_client["name"],
+                )
+            elif is_wightlink_qbr(client_id, report_mode):
+                claude_handoff_path, claude_handoff_manifest = create_wightlink_claude_handoff_bundle(
+                    pptx_path=generated_pptx,
+                    report_txt_path=generated_txt,
+                    prompt_txt_path=prompt_txt_path,
+                    request_dir=request_dir,
+                    performance_csv_path=perf_path,
+                    auction_csv_path=auction_path,
+                    trends_dir=trends_dir,
+                    plan_book_path=plan_workbook_path,
                 )
 
             st.session_state.generated_bundle = {

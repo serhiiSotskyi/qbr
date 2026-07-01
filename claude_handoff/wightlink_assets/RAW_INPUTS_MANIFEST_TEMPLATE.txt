@@ -1,0 +1,19 @@
+Raw input files included for traceability and chart regeneration
+
+raw_inputs/performance_export.csv
+- Role: Primary performance source. Daily rows by Campaign Type with Purchases, Purchase Revenue, Cost, CPA, ROAS, AOV, Impressions, Clicks, CTR, and CPC.
+- Use for: chart regeneration, audit, and monthly aggregation if needed.
+- Do not use to override report.txt values unless a clear mismatch must be investigated.
+
+raw_inputs/auction_insights_report.csv
+- Role: Auction insights source for {{period_label}}.
+- Use for: auction table/chart and competitor overlap summaries.
+
+raw_inputs/trends_*.csv
+- Role: Google Trends sources.
+- Use the second column header as the clean query name for slide titles.
+
+raw_inputs/plan_book_middle_scenario.csv
+- Role: Plan/forecast context.
+- Use for: plan-vs-actual fields where the Wightlink reference deck expects a Plan comparison and the calculation is clear.
+- Do not use to replace report.txt KPI values.

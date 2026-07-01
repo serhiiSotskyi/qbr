@@ -1,0 +1,41 @@
+{
+  "package_type": "claude_handoff",
+  "report_family": "Wightlink QBR",
+  "client_display_name": "Wightlink",
+  "period_label": "string",
+  "quarter_short": "string",
+  "generated_at": "ISO-8601 datetime string",
+  "reference_deck_url": "string",
+  "reference_slide_count": 27,
+  "streamlit_slide_count": "number",
+  "has_reference_pptx": "boolean",
+  "headline_kpis": {
+    "cost": "string",
+    "purchases": "string",
+    "purchase_revenue": "string",
+    "cpa": "string",
+    "roas": "string",
+    "aov": "string"
+  },
+  "trend_queries": [
+    "string"
+  ],
+  "source_sections": [
+    {
+      "index": "number",
+      "title": "string",
+      "line": "number",
+      "slide": "number"
+    }
+  ],
+  "files": [
+    {
+      "name": "string",
+      "role": "string",
+      "required": "boolean"
+    }
+  ],
+  "warnings": [
+    "string"
+  ]
+}

@@ -1,0 +1,39 @@
+Reference deck outline: Wightlink 2025/26 Year Report
+
+Reference URL
+https://docs.google.com/presentation/d/1QBixtNRD_N_qZ6J56RyfM1vvrTudrZUowZIMdBoGhso
+
+Reference slide count: 27
+
+01. Wightlink Financial Year Review / cover
+02. What We'll Cover Today / agenda
+03. Trends divider
+04. Google Trends - Wightlink / Isle of Wight Ferry visual layout
+05. Google Trends - Isle of Wight Ferry visual layout
+06. Google Trends - Isle of Wight Holidays visual layout
+07. Auction Insights divider
+08. Auction Insights - Generic
+09. Competitive Landscape - Red Funnel YoY
+10. Competitive Landscape - Red Funnel Ad Creatives
+11. Performance divider
+12. All Performance
+13. Brand Performance
+14. Brand Monthly Breakdown
+15. Generics Performance
+16. Generics Monthly Breakdown
+17. PMax Performance
+18. PMax Performance Summary
+19. Top Performing Campaigns excl. Brand
+20. Testing divider
+21. Homepage A/B Test Results
+22. Microsoft Ads - Performance Max Test
+23. Next Steps divider
+24. Next Steps
+25. Other Updates divider
+26. Ad Monitor Now Live
+27. Thank you
+
+Template guidance
+- Use the visual system, typography, footer style, tables, section dividers, and chart treatment from this deck.
+- Do not keep FY 2025/26 content unless it is intentionally being used as a prior-period comparison.
+- Some reference slides have no current Q2 source. Convert those to manual placeholders.
