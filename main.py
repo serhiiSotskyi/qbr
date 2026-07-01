@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--client-id", help="Client ID from config/clients_config.json.")
     parser.add_argument("--auction-csv", help="Path to Auction Insights CSV export.")
     parser.add_argument("--trends-dir", help="Directory containing Google Trends CSV exports.")
+    parser.add_argument("--other-campaigns-dir", help="Directory containing Wendy Wu UK Google/MS campaign CSV exports for Other top-campaign slides.")
     parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
     parser.add_argument(
         "--report-mode",
@@ -42,6 +43,7 @@ def run_report(
     trends_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
     plan_workbook: Optional[str] = None,
+    other_campaigns_dir: Optional[str] = None,
     output_path: Optional[str] = None,
     manual_inputs: Optional[dict[str, Any]] = None,
     report_mode: str = "quarterly",
@@ -96,6 +98,7 @@ def run_report(
         client_id=client_id,
         auction_csv=auction_csv,
         trends_dir=trends_dir,
+        other_campaigns_dir=other_campaigns_dir,
     )
     return str(report_path)
 
@@ -106,6 +109,7 @@ def run_text_report(
     trends_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
     plan_workbook: Optional[str] = None,
+    other_campaigns_dir: Optional[str] = None,
     output_path: Optional[str] = None,
     manual_inputs: Optional[dict[str, Any]] = None,
     report_mode: str = "quarterly",
@@ -160,6 +164,7 @@ def run_text_report(
         client_id=client_id,
         auction_csv=auction_csv,
         trends_dir=trends_dir,
+        other_campaigns_dir=other_campaigns_dir,
     )
     return str(report_path)
 
@@ -176,6 +181,7 @@ def main() -> None:
         client_id=args.client_id,
         trends_dir=args.trends_dir,
         auction_csv=args.auction_csv,
+        other_campaigns_dir=args.other_campaigns_dir,
         plan_workbook=args.plan_workbook,
         output_path=args.output,
         report_mode=args.report_mode,

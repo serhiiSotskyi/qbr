@@ -175,6 +175,68 @@ class SlideBuilder:
         if source_note:
             self._add_source_note(slide, source_note)
 
+    def add_other_top_campaigns_slide(
+        self,
+        title: str,
+        subtitle: str,
+        clicks_chart_path: str | Path,
+        conversions_chart_path: str | Path,
+    ) -> None:
+        slide = self._new_slide()
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = RGBColor(255, 255, 255)
+
+        slide_width = self.prs.slide_width
+        slide_height = self.prs.slide_height
+
+        header = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, 0, 0, slide_width, Inches(1.05))
+        header.fill.solid()
+        header.fill.fore_color.rgb = RGBColor(26, 26, 26)
+        header.line.color.rgb = RGBColor(26, 26, 26)
+
+        accent = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, 0, 0, Inches(0.1), Inches(1.05))
+        accent.fill.solid()
+        accent.fill.fore_color.rgb = self.accent
+        accent.line.color.rgb = self.accent
+
+        title_frame = slide.shapes.add_textbox(Inches(0.28), Inches(0.14), Inches(9.3), Inches(0.48)).text_frame
+        title_frame.clear()
+        title_run = title_frame.paragraphs[0].add_run()
+        title_run.text = title
+        title_run.font.size = Pt(25)
+        title_run.font.bold = True
+        title_run.font.color.rgb = RGBColor(255, 255, 255)
+
+        subtitle_frame = slide.shapes.add_textbox(Inches(0.28), Inches(0.72), Inches(5.8), Inches(0.28)).text_frame
+        subtitle_run = subtitle_frame.paragraphs[0].add_run()
+        subtitle_run.text = subtitle
+        subtitle_run.font.size = Pt(11)
+        subtitle_run.font.color.rgb = RGBColor(247, 204, 209)
+
+        logo_frame = slide.shapes.add_textbox(Inches(10.55), Inches(0.26), Inches(2.25), Inches(0.5)).text_frame
+        logo_para = logo_frame.paragraphs[0]
+        logo_para.alignment = PP_ALIGN.RIGHT
+        logo_run = logo_para.add_run()
+        logo_run.text = "summon"
+        logo_run.font.size = Pt(26)
+        logo_run.font.bold = True
+        logo_run.font.color.rgb = RGBColor(255, 255, 255)
+
+        slide.shapes.add_picture(str(clicks_chart_path), Inches(1.0), Inches(1.55), width=Inches(5.45), height=Inches(4.55))
+        slide.shapes.add_picture(str(conversions_chart_path), Inches(7.1), Inches(1.55), width=Inches(5.45), height=Inches(4.55))
+
+        footer = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, 0, slide_height - Inches(0.33), slide_width, Inches(0.33))
+        footer.fill.solid()
+        footer.fill.fore_color.rgb = RGBColor(26, 26, 26)
+        footer.line.color.rgb = RGBColor(26, 26, 26)
+
+        footer_text = subtitle.split(" (", 1)[0]
+        footer_frame = slide.shapes.add_textbox(Inches(0.28), slide_height - Inches(0.29), Inches(5.6), Inches(0.22)).text_frame
+        footer_run = footer_frame.paragraphs[0].add_run()
+        footer_run.text = f"{footer_text} | Summon Digital | Confidential"
+        footer_run.font.size = Pt(8)
+        footer_run.font.color.rgb = RGBColor(225, 225, 225)
+
     def add_recommendations_slide(
         self,
         title: str,

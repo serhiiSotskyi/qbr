@@ -68,6 +68,22 @@
           "Brand"
         ]
       },
+      "other_top_campaigns": {
+        "enabled": true,
+        "top_n": 10,
+        "exclude_terms": [
+          "brand",
+          "japan",
+          "china",
+          "india",
+          "se asia",
+          "vietnam",
+          "cambodia",
+          "thailand",
+          "malaysia",
+          "borneo"
+        ]
+      },
       "auction_insights": {
         "enabled": true,
         "client_domain": "wendywu.co.uk",

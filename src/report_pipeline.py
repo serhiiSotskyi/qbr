@@ -15,6 +15,7 @@ from .narrative_generator import (
     generate_scope_bullets,
     generate_trend_bullets,
 )
+from .other_campaigns import load_other_campaign_summary
 from .recommendation_generator import generate_recommendations
 from .slide_builder import SlideBuilder
 from .trends_loader import TrendsLoader
@@ -39,6 +40,7 @@ class ReportPipeline:
         client_id: str | None = None,
         auction_csv: str | Path | None = None,
         trends_dir: str | Path | None = None,
+        other_campaigns_dir: str | Path | None = None,
     ) -> Path:
         client_config = self.config_loader.get_client_config(client_id)
         template_path = self.config_loader.get_template_path(self.project_root, client_config)
@@ -63,13 +65,14 @@ class ReportPipeline:
 
         chart_builder = ChartBuilder(self.charts_root / f"{client_config['id']}/{quarter.year}_Q{quarter.quarter}", chart_styles=chart_styles)
         builder = SlideBuilder(template_path, chart_styles=chart_styles)
+        other_campaigns_summary = self._load_other_campaigns_summary(client_config, other_campaigns_dir)
 
         title_text = report_title if not agency_name else f"{client_name} | {report_title}"
         subtitle_text = subtitle if not agency_name else f"{subtitle} | {agency_name}"
         builder.add_title_slide(title_text, subtitle_text)
 
         if self.config_loader.is_slide_enabled("include_performance", client_config):
-            self._build_performance_section(builder, chart_builder, report, subtitle, client_config)
+            self._build_performance_section(builder, chart_builder, report, subtitle, client_config, other_campaigns_summary)
 
         trends_summary = self._load_trends_summary(client_config, quarter, trends_dir)
         if self.config_loader.is_slide_enabled("include_trends", client_config) and trends_summary:
@@ -91,7 +94,15 @@ class ReportPipeline:
         builder.save(output_path)
         return output_path
 
-    def _build_performance_section(self, builder: SlideBuilder, chart_builder: ChartBuilder, report: dict, subtitle: str, client_config: dict) -> None:
+    def _build_performance_section(
+        self,
+        builder: SlideBuilder,
+        chart_builder: ChartBuilder,
+        report: dict,
+        subtitle: str,
+        client_config: dict,
+        other_campaigns_summary: dict | None = None,
+    ) -> None:
         builder.add_divider_slide("Performance")
         use_kpi_cards = _use_kpi_summary_cards(client_config)
 
@@ -206,6 +217,19 @@ class ReportPipeline:
                     bullets=generate_mix_bullets(mix_df, destination),
                 )
 
+                if destination == "Other" and other_campaigns_summary:
+                    top_charts = chart_builder.build_other_top_campaign_charts(
+                        "destination_other",
+                        other_campaigns_summary["top_clicks"],
+                        other_campaigns_summary["top_conversions"],
+                    )
+                    builder.add_other_top_campaigns_slide(
+                        title="Other (Destination) Top 10 campaigns",
+                        subtitle=subtitle,
+                        clicks_chart_path=top_charts["top_clicks"],
+                        conversions_chart_path=top_charts["top_conversions"],
+                    )
+
     def _build_trends_section(
         self,
         builder: SlideBuilder,
@@ -295,6 +319,16 @@ class ReportPipeline:
             auction_df,
             client_domain=auction_config.get("client_domain"),
             known_competitors=auction_config.get("known_competitors", []),
+        )
+
+    def _load_other_campaigns_summary(self, client_config: dict, other_campaigns_dir: str | Path | None) -> dict | None:
+        config = client_config.get("other_top_campaigns", {})
+        if not config.get("enabled") or not other_campaigns_dir:
+            return None
+        return load_other_campaign_summary(
+            other_campaigns_dir,
+            exclude_terms=config.get("exclude_terms", []),
+            top_n=int(config.get("top_n", 10)),
         )
 
 

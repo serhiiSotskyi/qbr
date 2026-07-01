@@ -113,6 +113,33 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
             self.assertIn("Central Asia & Mongolia", content)
             self.assertIn("39", content)
 
+    def test_uk_handoff_maps_other_top_campaign_section_when_available(self) -> None:
+        fixture_path = FIXTURES / "wendy_wu_uk_streamlit_package.zip"
+        with ZipFile(fixture_path) as source:
+            report_text = _inject_other_top_campaigns_section(source.read("report.txt").decode("utf-8"))
+            prompt_text = source.read("prompt.txt").decode("utf-8")
+            pptx_bytes = source.read("wendy_wu_report.pptx")
+
+        handoff_bytes, manifest = build_claude_handoff_package(
+            report_text=report_text,
+            prompt_text=prompt_text,
+            generated_pptx=pptx_bytes,
+            client_display_name="Wendy Wu Tours UK",
+            client_slug="wendy_wu_uk",
+            reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
+            generated_at=GENERATED_AT,
+        )
+        package = ZipFile(BytesIO(handoff_bytes))
+
+        self.assertTrue(manifest["other_top_campaigns_slide"])
+        self.assertFalse(any("Other (Destination) Top 10 campaigns" in warning for warning in manifest["warnings"]))
+
+        slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
+        self.assertIn(
+            '27,Other (Destination) Top 10 campaigns,Other (Destination) Top 10 campaigns,"Update the two ranked campaign charts',
+            slide_mapping,
+        )
+
     def assert_package_references_chart_qa(self, package: ZipFile) -> None:
         self.assertIn("CHART_QA_ADDENDUM_FOR_CLAUDE.txt", package.namelist())
         addendum = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
@@ -203,3 +230,26 @@ Campaign Type     Cost Sales Leads Cost Share Lead Share    CPL
 """
     marker = "\n----------------------------------------\n\nOther Summary + YoY"
     return report_text.replace(marker, central_sections + marker, 1)
+
+
+def _inject_other_top_campaigns_section(report_text: str) -> str:
+    section = """
+----------------------------------------
+
+Other (Destination) Top 10 campaigns
+Q2 2026 (Apr - Jun 2026)
+Other campaign uploads exclude rows containing: brand, japan, china, india, se asia, vietnam, cambodia, thailand, malaysia, borneo.
+Source files: ms_campaigns.csv, google_campaigns.csv
+
+Top 10 by Clicks
+    Campaign      Sources Clicks Conversions Impressions    Cost   CPC   CPA   CVR
+    Mongolia Microsoft Ads  3,978       11.14      88,952 £1,179 £0.30 £105.89 0.28%
+Central Asia Microsoft Ads    485       26.15      12,000   £632 £1.30  £24.17 5.39%
+
+Top 10 by Conversions
+    Campaign      Sources Clicks Conversions Impressions    Cost   CPC   CPA   CVR
+Central Asia Microsoft Ads    485       26.15      12,000   £632 £1.30  £24.17 5.39%
+    Mongolia Microsoft Ads  3,978       11.14      88,952 £1,179 £0.30 £105.89 0.28%
+"""
+    marker = "\n----------------------------------------\n\nGOOGLE TRENDS"
+    return report_text.replace(marker, section + marker, 1)

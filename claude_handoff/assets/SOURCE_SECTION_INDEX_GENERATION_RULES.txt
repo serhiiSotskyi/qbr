@@ -19,6 +19,7 @@ Parsing rules
 Important disambiguation
 - "Other Summary" in the PERFORMANCE block is channel/campaign-type Other.
 - "Other Summary + YoY" in the destination block is destination Other.
+- "Other (Destination) Top 10 campaigns" is an optional destination Other supporting section generated when Google/MS campaign exports are uploaded.
 - The handoff must explicitly warn Claude not to use Performance Other data for destination Other slides.
 
 Expected common section order for Wendy Wu QBR
@@ -52,14 +53,15 @@ Expected common section order for Wendy Wu QBR
 28. Other Summary + YoY
 29. Other Monthly Trend
 30. Other Campaign Mix
-31. GOOGLE TRENDS divider
-32. Brand terms trend
-33. Japan Demand Trend
-34. China Demand Trend
-35. AUCTION INSIGHTS divider
-36. Brand coverage is very strong
-37. RECOMMENDATIONS divider
-38. Recommendations / Next Steps
+31. Other (Destination) Top 10 campaigns (optional)
+32. GOOGLE TRENDS divider
+33. Brand terms trend
+34. Japan Demand Trend
+35. China Demand Trend
+36. AUCTION INSIGHTS divider
+37. Brand coverage is very strong
+38. RECOMMENDATIONS divider
+39. Recommendations / Next Steps
 
 Validation checks
 - The generated index should not fail if a future report has an extra section.

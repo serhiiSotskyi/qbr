@@ -60,7 +60,13 @@ def save_uploaded_file(uploaded_file, destination: Path) -> str:
     return str(destination)
 
 
-def build_request_inputs(performance_file, auction_file, trends_files, plan_workbook_file=None) -> tuple[Path, str, str | None, str | None, str | None]:
+def build_request_inputs(
+    performance_file,
+    auction_file,
+    trends_files,
+    plan_workbook_file=None,
+    other_campaign_files=None,
+) -> tuple[Path, str, str | None, str | None, str | None, str | None]:
     request_id = uuid4().hex
     request_dir = TEMP_DIR / request_id
     request_dir.mkdir(parents=True, exist_ok=True)
@@ -83,7 +89,15 @@ def build_request_inputs(performance_file, auction_file, trends_files, plan_work
     if plan_workbook_file is not None:
         plan_workbook_path = save_uploaded_file(plan_workbook_file, request_dir / "plan" / plan_workbook_file.name)
 
-    return request_dir, perf_path, auction_path, trends_dir, plan_workbook_path
+    other_campaigns_dir = None
+    if other_campaign_files:
+        other_campaigns_path = request_dir / "other_campaigns"
+        other_campaigns_path.mkdir(parents=True, exist_ok=True)
+        for campaign_file in other_campaign_files:
+            save_uploaded_file(campaign_file, other_campaigns_path / campaign_file.name)
+        other_campaigns_dir = str(other_campaigns_path)
+
+    return request_dir, perf_path, auction_path, trends_dir, plan_workbook_path, other_campaigns_dir
 
 
 def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path, prompt_txt_path: Path, request_dir: Path) -> Path:
@@ -219,6 +233,14 @@ def main() -> None:
     plan_workbook_file = None
     if client_id == "wightlink":
         plan_workbook_file = st.file_uploader("Wightlink Plan Book CSV or Workbook", type=["csv", "xlsx"])
+    other_campaign_files = []
+    if client_id == "wendy_wu":
+        other_campaign_files = st.file_uploader(
+            "Wendy Wu UK Other campaign exports",
+            type=["csv"],
+            accept_multiple_files=True,
+            help="Optional Google Ads and Microsoft Ads campaign exports used to build the Other destination top-10 campaign slide.",
+        )
 
     if "generated_bundle" not in st.session_state:
         st.session_state.generated_bundle = None
@@ -228,11 +250,12 @@ def main() -> None:
             st.error("Please upload a performance CSV")
             return
 
-        request_dir, perf_path, auction_path, trends_dir, plan_workbook_path = build_request_inputs(
+        request_dir, perf_path, auction_path, trends_dir, plan_workbook_path, other_campaigns_dir = build_request_inputs(
             performance_file,
             auction_file,
             trends_files,
             plan_workbook_file,
+            other_campaign_files,
         )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -250,6 +273,7 @@ def main() -> None:
                     trends_dir=trends_dir,
                     auction_csv=auction_path,
                     plan_workbook=plan_workbook_path,
+                    other_campaigns_dir=other_campaigns_dir,
                     output_path=str(pptx_path),
                     report_mode=report_mode,
                 )
@@ -261,6 +285,7 @@ def main() -> None:
                     trends_dir=trends_dir,
                     auction_csv=auction_path,
                     plan_workbook=plan_workbook_path,
+                    other_campaigns_dir=other_campaigns_dir,
                     output_path=str(report_txt_path),
                     report_mode=report_mode,
                 )

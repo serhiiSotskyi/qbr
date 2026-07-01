@@ -73,6 +73,7 @@ EXPECTED_SOURCE_SECTIONS = (
     "Other Summary + YoY",
     "Other Monthly Trend",
     "Other Campaign Mix",
+    "Other (Destination) Top 10 campaigns",
     "GOOGLE TRENDS",
     "Brand terms trend",
     "Japan Demand Trend",
@@ -136,7 +137,8 @@ def build_claude_handoff_package(
     quarter_short = extract_quarter_short(resolved_period)
     headline_kpis = extract_headline_kpis(report_text)
     include_central_asia_slide = should_include_central_asia_slide(client_slug, source_sections)
-    expected_sections = expected_source_sections(include_central_asia_slide)
+    include_other_top_campaigns_slide = should_include_other_top_campaigns_slide(source_sections)
+    expected_sections = expected_source_sections(include_central_asia_slide, include_other_top_campaigns_slide)
     missing_sections = find_missing_expected_sections(source_sections, expected_sections)
     extra_sections = find_extra_source_sections(source_sections, expected_sections)
 
@@ -171,7 +173,7 @@ def build_claude_handoff_package(
 
     readme_text = render_asset_template("README_FOR_CLAUDE_TEMPLATE.txt", variables)
     claude_prompt_text = render_asset_template("CLAUDE_PROMPT_TEMPLATE.txt", variables)
-    slide_mapping_text = build_slide_mapping_text(variables, include_central_asia_slide)
+    slide_mapping_text = build_slide_mapping_text(variables, include_central_asia_slide, include_other_top_campaigns_slide)
     qa_checklist_text = render_asset_template("QA_CHECKLIST_TEMPLATE.txt", variables)
     if include_central_asia_slide:
         readme_text = apply_central_asia_slide_instructions(readme_text)
@@ -235,6 +237,7 @@ def build_claude_handoff_package(
         "has_reference_pptx": has_reference_pptx,
         "target_slide_count": 39 if include_central_asia_slide else 38,
         "uk_central_asia_mongolia_slide": include_central_asia_slide,
+        "other_top_campaigns_slide": include_other_top_campaigns_slide,
         "files": files_manifest,
         "headline_kpis": headline_kpis,
         "source_sections": [
@@ -404,9 +407,13 @@ def render_asset_template(filename: str, variables: Mapping[str, str]) -> str:
     return render_template(read_asset_text(filename), variables)
 
 
-def build_slide_mapping_text(variables: Mapping[str, str], include_central_asia_slide: bool) -> str:
+def build_slide_mapping_text(
+    variables: Mapping[str, str],
+    include_central_asia_slide: bool,
+    include_other_top_campaigns_slide: bool = False,
+) -> str:
     rendered = render_asset_template("SLIDE_MAPPING_WWT_QBR_TEMPLATE.csv", variables)
-    if not include_central_asia_slide:
+    if not include_central_asia_slide and not include_other_top_campaigns_slide:
         return rendered
 
     input_buffer = StringIO(rendered)
@@ -429,9 +436,18 @@ def build_slide_mapping_text(variables: Mapping[str, str], include_central_asia_
 
     for row in rows:
         slide_number = int(row["target_slide"])
-        if slide_number == 26:
+        if include_other_top_campaigns_slide and row["reference_title"] == "Other (Destination) Top 10 campaigns":
+            row = {
+                **row,
+                "source_section_or_action": "Other (Destination) Top 10 campaigns",
+                "required_action": (
+                    "Update the two ranked campaign charts from the Other top-campaign source section. "
+                    "Use the campaign-level Other definition from report.txt: exclude Brand, Japan, China, India, and SE Asia terms."
+                ),
+            }
+        if include_central_asia_slide and slide_number == 26:
             adjusted_rows.append(central_row)
-        if slide_number >= 26:
+        if include_central_asia_slide and slide_number >= 26:
             row = {**row, "target_slide": str(slide_number + 1)}
         adjusted_rows.append(row)
 
@@ -473,14 +489,21 @@ def should_include_central_asia_slide(client_slug: str, source_sections: list[So
     return any(section.title == "Central Asia & Mongolia Summary + YoY" for section in source_sections)
 
 
-def expected_source_sections(include_central_asia_slide: bool) -> tuple[str, ...]:
-    if not include_central_asia_slide:
-        return EXPECTED_SOURCE_SECTIONS
+def should_include_other_top_campaigns_slide(source_sections: list[SourceSection]) -> bool:
+    return any(section.title == "Other (Destination) Top 10 campaigns" for section in source_sections)
 
+
+def expected_source_sections(
+    include_central_asia_slide: bool,
+    include_other_top_campaigns_slide: bool = False,
+) -> tuple[str, ...]:
     sections = list(EXPECTED_SOURCE_SECTIONS)
-    insert_at = sections.index("Other Summary + YoY")
-    for title in reversed(CENTRAL_ASIA_SECTION_TITLES):
-        sections.insert(insert_at, title)
+    if not include_other_top_campaigns_slide and "Other (Destination) Top 10 campaigns" in sections:
+        sections.remove("Other (Destination) Top 10 campaigns")
+    if include_central_asia_slide:
+        insert_at = sections.index("Other Summary + YoY")
+        for title in reversed(CENTRAL_ASIA_SECTION_TITLES):
+            sections.insert(insert_at, title)
     return tuple(sections)
 
 

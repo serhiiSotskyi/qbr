@@ -78,6 +78,25 @@ class ChartBuilder:
         plt.close(fig)
         return out_path
 
+    def build_other_top_campaign_charts(self, scope_key: str, top_clicks: pd.DataFrame, top_conversions: pd.DataFrame) -> Dict[str, Path]:
+        clicks_path = self._plot_other_campaign_bar_chart(
+            self.charts_dir / f"{scope_key}_top_clicks.png",
+            top_clicks,
+            value_col="Clicks",
+            title="TOP 10 CAMPAIGNS BY CLICKS",
+            x_label="Clicks",
+            colors=[self.colors.get("cost", "#C32026"), "#DD726E"],
+        )
+        conversions_path = self._plot_other_campaign_bar_chart(
+            self.charts_dir / f"{scope_key}_top_conversions.png",
+            top_conversions,
+            value_col="Conversions",
+            title="TOP 10 CAMPAIGNS BY CONVERSIONS",
+            x_label="Conversions",
+            colors=[self.colors.get("leads", "#111111"), "#444444"],
+        )
+        return {"top_clicks": clicks_path, "top_conversions": conversions_path}
+
     def _plot_cpl_cvr(self, scope_key: str, monthly_table: pd.DataFrame) -> Path:
         out_path = self.charts_dir / f"{scope_key}_cpl_cvr.png"
         fig, ax1, ax2 = self.build_cpl_cvr_figure(monthly_table)
@@ -250,6 +269,55 @@ class ChartBuilder:
         plt.close(fig)
         return out_path
 
+    def _plot_other_campaign_bar_chart(
+        self,
+        out_path: Path,
+        table_df: pd.DataFrame,
+        *,
+        value_col: str,
+        title: str,
+        x_label: str,
+        colors: list[str],
+    ) -> Path:
+        if table_df.empty or value_col not in table_df.columns or float(table_df[value_col].fillna(0).sum()) <= 0:
+            return self._plot_empty_state(out_path, "No campaign data")
+
+        chart_df = table_df[["Campaign", value_col]].copy().head(10)
+        chart_df = chart_df.sort_values(value_col, ascending=True)
+        bar_colors = [colors[index % len(colors)] for index in range(len(chart_df))]
+
+        fig, ax = plt.subplots(figsize=(6.1, 4.7))
+        bars = ax.barh(chart_df["Campaign"], chart_df[value_col], color=bar_colors, height=0.62)
+        ax.set_title(title, fontsize=self.body_size + 1, color="#909090", fontweight="bold", pad=14)
+        ax.set_xlabel(x_label, fontsize=self.body_size, color="#B0B0B0")
+        ax.set_ylabel("Campaign", fontsize=self.body_size, color="#B0B0B0")
+        ax.tick_params(axis="both", labelsize=self.body_size - 1, colors="#606060")
+        ax.grid(axis="x", alpha=0.2)
+        ax.set_axisbelow(True)
+        for spine in ["top", "right", "left"]:
+            ax.spines[spine].set_visible(False)
+        ax.spines["bottom"].set_color("#E6E6E6")
+
+        max_value = float(chart_df[value_col].max())
+        ax.set_xlim(right=max_value * 1.18 if max_value > 0 else 1)
+        for bar, value in zip(bars, chart_df[value_col]):
+            label = self._format_plain_number(value)
+            ax.annotate(
+                label,
+                xy=(bar.get_width(), bar.get_y() + bar.get_height() / 2),
+                xytext=(6, 0),
+                textcoords="offset points",
+                va="center",
+                ha="left",
+                fontsize=self.body_size - 1,
+                color="#4B5563",
+            )
+
+        plt.tight_layout(pad=1.5)
+        fig.savefig(out_path, dpi=220, facecolor="white")
+        plt.close(fig)
+        return out_path
+
     def _plot_empty_state(self, out_path: Path, message: str) -> Path:
         fig, ax = plt.subplots(figsize=self.figure_size)
         ax.text(0.5, 0.5, message, ha="center", va="center", fontsize=self.title_size)
@@ -269,3 +337,10 @@ class ChartBuilder:
                 return f"£{value / 1_000:.1f}k"
             return f"£{value:,.0f}"
         return f"£{value:,.2f}"
+
+    @staticmethod
+    def _format_plain_number(value: float) -> str:
+        numeric = float(value)
+        if abs(numeric - round(numeric)) < 0.005:
+            return f"{int(round(numeric)):,}"
+        return f"{numeric:,.1f}"

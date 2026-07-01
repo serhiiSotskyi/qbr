@@ -42,6 +42,11 @@ DEFAULT_CLIENT_CONFIG: Dict[str, Any] = {
         "mode": "remainder",
         "exclude_campaign_types": [],
     },
+    "other_top_campaigns": {
+        "enabled": False,
+        "exclude_terms": [],
+        "top_n": 10,
+    },
     "auction_insights": {
         "enabled": False,
         "client_domain": "",
@@ -274,6 +279,9 @@ class ConfigLoader:
         )
         normalized["destination_other"]["exclude_campaign_types"] = list(
             normalized.get("destination_other", {}).get("exclude_campaign_types", [])
+        )
+        normalized["other_top_campaigns"]["exclude_terms"] = list(
+            normalized.get("other_top_campaigns", {}).get("exclude_terms", [])
         )
         normalized["auction_insights"]["known_competitors"] = list(
             normalized.get("auction_insights", {}).get("known_competitors", [])

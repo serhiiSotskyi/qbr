@@ -17,6 +17,11 @@ from src.narrative_generator import (
     generate_scope_bullets,
     generate_trend_bullets,
 )
+from src.other_campaigns import (
+    describe_other_campaign_filter,
+    format_other_top_campaigns_table,
+    load_other_campaign_summary,
+)
 from src.recommendation_generator import generate_recommendations
 from src.trends_loader import TrendsLoader
 from src.trends_metrics import summarize_trends
@@ -122,6 +127,26 @@ class TextReportBuilder:
             body_parts.extend(["", source_note])
         self._sections.append(self._render_section(title, body_parts))
 
+    def add_other_top_campaigns_slide(
+        self,
+        title: str,
+        subtitle: str,
+        top_clicks: pd.DataFrame,
+        top_conversions: pd.DataFrame,
+        source_files: Sequence[str],
+        excluded_terms: Sequence[str],
+    ) -> None:
+        body_parts = [
+            subtitle,
+            describe_other_campaign_filter(excluded_terms),
+            f"Source files: {', '.join(source_files) if source_files else 'not supplied'}",
+        ]
+        if not top_clicks.empty:
+            body_parts.extend(["", "Top 10 by Clicks", self._render_table(format_other_top_campaigns_table(top_clicks))])
+        if not top_conversions.empty:
+            body_parts.extend(["", "Top 10 by Conversions", self._render_table(format_other_top_campaigns_table(top_conversions))])
+        self._sections.append(self._render_section(title, body_parts))
+
     def add_recommendations_slide(
         self,
         title: str,
@@ -195,6 +220,7 @@ def generate_text_report(
     config_loader = context["config_loader"]
     trends_summary = context.get("trends_summary")
     auction_summary = context.get("auction_summary")
+    other_campaigns_summary = context.get("other_campaigns_summary")
     recommendations = context.get("recommendations", [])
 
     builder = TextReportBuilder()
@@ -204,7 +230,7 @@ def generate_text_report(
     builder.add_title_slide(title_text, subtitle_text)
 
     if config_loader.is_slide_enabled("include_performance", client_config):
-        _build_performance_section(builder, report, subtitle, client_config, config_loader, campaigns)
+        _build_performance_section(builder, report, subtitle, client_config, config_loader, campaigns, other_campaigns_summary)
 
     if config_loader.is_slide_enabled("include_trends", client_config) and trends_summary:
         _build_trends_section(builder, trends_summary, subtitle, client_config, config_loader)
@@ -249,6 +275,7 @@ class TextReportPipeline:
         client_id: str | None = None,
         auction_csv: str | Path | None = None,
         trends_dir: str | Path | None = None,
+        other_campaigns_dir: str | Path | None = None,
     ) -> Path:
         client_config = self.config_loader.get_client_config(client_id)
         df = load_csv(input_csv)
@@ -269,6 +296,7 @@ class TextReportPipeline:
 
         trends_summary = _load_trends_summary(self.project_root, self.config_loader, client_config, quarter, trends_dir)
         auction_summary = _load_auction_summary(self.config_loader, client_config, auction_csv)
+        other_campaigns_summary = _load_other_campaigns_summary(client_config, other_campaigns_dir)
         recommendations = generate_recommendations(report, trends_summary=trends_summary, auction_summary=auction_summary)
 
         output_path = Path(output_txt) if output_txt else self.project_root / "reports" / "report.txt"
@@ -284,6 +312,7 @@ class TextReportPipeline:
                 "config_loader": self.config_loader,
                 "trends_summary": trends_summary,
                 "auction_summary": auction_summary,
+                "other_campaigns_summary": other_campaigns_summary,
                 "recommendations": recommendations,
             },
             output_path=output_path,
@@ -298,6 +327,7 @@ def _build_performance_section(
     client_config: dict,
     config_loader: ConfigLoader,
     campaigns,
+    other_campaigns_summary: dict | None = None,
 ) -> None:
     builder.add_divider_slide("Performance")
     use_kpi_cards = _use_kpi_summary_cards(client_config)
@@ -397,6 +427,16 @@ def _build_performance_section(
                 bullets=generate_mix_bullets(report["dest_mix"][destination], destination),
             )
 
+            if destination == "Other" and other_campaigns_summary:
+                builder.add_other_top_campaigns_slide(
+                    title="Other (Destination) Top 10 campaigns",
+                    subtitle=subtitle,
+                    top_clicks=other_campaigns_summary["top_clicks"],
+                    top_conversions=other_campaigns_summary["top_conversions"],
+                    source_files=other_campaigns_summary.get("source_files", []),
+                    excluded_terms=other_campaigns_summary.get("excluded_terms", []),
+                )
+
 
 def _build_trends_section(
     builder: TextReportBuilder,
@@ -494,6 +534,17 @@ def _load_auction_summary(
         auction_df,
         client_domain=auction_config.get("client_domain"),
         known_competitors=auction_config.get("known_competitors", []),
+    )
+
+
+def _load_other_campaigns_summary(client_config: dict, other_campaigns_dir: str | Path | None) -> dict | None:
+    config = client_config.get("other_top_campaigns", {})
+    if not config.get("enabled") or not other_campaigns_dir:
+        return None
+    return load_other_campaign_summary(
+        other_campaigns_dir,
+        exclude_terms=config.get("exclude_terms", []),
+        top_n=int(config.get("top_n", 10)),
     )
 
 
