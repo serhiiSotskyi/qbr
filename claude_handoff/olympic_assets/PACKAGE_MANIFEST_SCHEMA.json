@@ -1,0 +1,50 @@
+{
+  "package_type": "claude_handoff",
+  "report_family": "Olympic Holidays PPC QBR",
+  "client_display_name": "Olympic Holidays",
+  "period_label": "string",
+  "quarter_short": "string",
+  "period_months_label": "string",
+  "generated_at": "ISO-8601 datetime string",
+  "reference_deck_url": "string",
+  "reference_slide_count": 11,
+  "streamlit_slide_count": "number",
+  "has_reference_pptx": "boolean",
+  "files": [
+    {
+      "name": "string",
+      "role": "string",
+      "required": "boolean"
+    }
+  ],
+  "headline_kpis": {
+    "revenue": "string",
+    "purchases": "string",
+    "cpa": "string",
+    "cost": "string",
+    "aov": "string",
+    "cost_per_atc": "string",
+    "total_atc": "string"
+  },
+  "trend_sources": [
+    {
+      "standard_name": "string",
+      "original_filename": "string",
+      "display_name": "string"
+    }
+  ],
+  "source_sections": [
+    {
+      "index": "number",
+      "title": "string",
+      "line": "number",
+      "slide": "number"
+    }
+  ],
+  "placeholder_sections": [
+    "string"
+  ],
+  "warnings": [
+    "string"
+  ]
+}

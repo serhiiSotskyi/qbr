@@ -1,0 +1,46 @@
+You are preparing an Olympic Holidays {{quarter_short}} PPC report deck.
+
+I am uploading:
+- report.txt
+- {{streamlit_pptx_filename}}
+- reference_deck_exported_from_google_slides.pptx, if included
+- original_streamlit_prompt.txt
+- SLIDE_MAPPING.csv
+- SOURCE_SECTION_INDEX.txt
+- REFERENCE_DECK_OUTLINE.txt
+- QA_CHECKLIST.txt
+- CHART_QA_ADDENDUM_FOR_CLAUDE.txt
+- INPUT_FILES_MANIFEST.txt
+- PACKAGE_MANIFEST.json
+- source_data/ raw CSV files
+
+Target reference deck:
+{{reference_deck_url}}
+
+Task
+Create a new Olympic Holidays {{quarter_short}} report deck that is visually and structurally aligned to the Olympic Holidays reference deck, but populated with {{period_label}} data from report.txt.
+
+Final deliverable requirement
+The final client deliverable must be suitable for Google Slides. If you have native Google Slides editing, copy the reference Google Slides deck first and edit the copy. If you do not have native Google Slides editing, use reference_deck_exported_from_google_slides.pptx as the intermediate editing file, return the finished PPTX, and make sure it can be imported back into Google Slides without changing the visual system.
+
+Source priority
+1. report.txt is the source of truth for all numbers, tables, bullets, KPI values, dates, and chart content.
+2. SLIDE_MAPPING.csv defines how source sections map to the target slides.
+3. The Google Slides reference deck and reference_deck_exported_from_google_slides.pptx define the final visual style, slide order, and layout language.
+4. source_data/ CSVs are audit/backup sources and can be used for chart regeneration if report.txt does not expose enough chart detail.
+5. {{streamlit_pptx_filename}} is only a secondary aid for understanding coverage. Do not use its styling as the target.
+6. original_streamlit_prompt.txt is background only.
+
+Hard requirements
+- Do not edit the original reference deck.
+- Replace all old period labels/content with {{period_label}} content.
+- Preserve the Olympic Holidays reference deck design: clean white slide body, compact KPI cards, dark header/footer treatments, table styling, restrained chart colors, Summon branding, typography, chart placement, and spacing.
+- Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
+- Do not invent testing, next steps, other updates, or recommendations if they are not in report.txt.
+- Keep the deck to the 11-slide reference structure unless explicitly instructed otherwise.
+- Every report.txt source section must be represented.
+- Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart/table-heavy slide. Charts and tables must not be squashed, clipped, or overlapping; inspect full-slide screenshots/thumbnails after replacement.
+- Run QA_CHECKLIST.txt before returning.
+
+Output
+Return the new copied Google Slides deck URL if you edited Google Slides directly. If you used the PPTX bridge, return the finished PPTX only and note that it should be imported into Google Slides. Also list any placeholders or source gaps that remain for manual completion.

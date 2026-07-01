@@ -1,0 +1,59 @@
+Chart and Table QA Addendum for Olympic Holidays Decks
+
+Problem to prevent
+Deck content can be correct while chart or table visuals are too tightly rendered or incorrectly scaled inside the template slots. This causes labels, value annotations, legends, axis text, and table numbers to look squashed, clipped, or overlapping.
+
+Reference standard
+Use the Olympic Holidays Q1 2026 reference deck as the visual standard for chart scale, spacing, margins, label size, table styling, border treatment, and composition. Generated charts should feel like the reference charts were updated with new data, not like newly designed charts.
+
+Slides to inspect
+- Trend slides: 2, 3
+- Auction Insights table: 5
+- Overall Performance table: 6
+- YoY Matched-Month table: 7
+- End of Period comparison cards: 8
+- Channel Performance table/chart content: 9
+- Generic Performance table: 10
+- ATC Analysis table and KPI callouts: 11
+
+Chart rendering rules
+- Preserve the chart/table slot size and position from the reference deck.
+- Do not stretch chart images non-proportionally.
+- Use fit/contain placement, not crop/fill placement.
+- Export chart images at high resolution, ideally 2x or 3x the displayed slide size.
+- Leave internal padding inside every exported chart image so labels cannot be cut off after insertion.
+- Add at least 10-15% internal padding around chart labels; use 20-25% right padding for charts with end labels.
+- Use font sizes that match the reference chart appearance after insertion.
+- Avoid chart titles inside the image when the slide already has a title, unless the reference chart image includes a title in that same position.
+- Keep legends readable but compact.
+- For line charts, do not let labels or legends cover the plotted lines.
+- Keep color coding consistent across trend and performance slides.
+
+Table rendering rules
+- Prefer editable tables when possible.
+- Preserve reference table borders, header fill, row heights, type size, and alignment.
+- Do not shrink text below readability just to fit too many columns.
+- If a table has more columns than the reference slot supports, use sensible abbreviation, wrapped labels, or split notes below the table rather than clipping numbers.
+- Preserve currency symbols, percentage signs, decimal places, and dashes exactly as shown in report.txt.
+
+Required visual QA
+For every chart or table-heavy slide, create or inspect a full-slide screenshot/thumbnail after replacement. The pass is not complete until each slide passes these checks:
+- No number is clipped.
+- No label overlaps another label, legend, line, bar, point, axis, or table border.
+- No chart appears squeezed vertically or horizontally.
+- The chart/table is centered in its intended slot.
+- The chart/table has comparable whitespace to the reference.
+- The chart/table does not collide with bullets, card text, headers, footers, or logos.
+- The slide still matches the reference deck layout.
+
+Second-pass instruction
+If a chart cannot be made readable within the existing slot, prioritize legibility while preserving the template:
+1. reduce nonessential chart text,
+2. abbreviate category labels,
+3. move or simplify legends,
+4. increase chart image padding,
+5. reduce marker/annotation density,
+6. only then slightly resize the chart within the existing visual bounds.
+
+Final response
+List the slides whose charts/tables were changed and confirm that screenshots/thumbnails were checked after the fix.

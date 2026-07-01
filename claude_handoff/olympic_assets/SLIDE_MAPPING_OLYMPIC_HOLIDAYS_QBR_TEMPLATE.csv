@@ -1,0 +1,12 @@
+target_slide,reference_title,source_section_or_action,required_action
+1,Cover,"Cover + Executive Summary","Update client name, report title, {{period_label}}, and prepared-by text. Use headline KPIs: Revenue {{headline_revenue}}; Purchases {{headline_purchases}}; CPA {{headline_cpa}}."
+2,Olympic Holidays Trends,"Olympic Holidays Trends / brand trend source","Retitle using {{trend_brand_display_name}} if source header differs. Update monthly trend cards, trend chart, and bullets exactly from report.txt/source_data. Preserve reference spacing and chart scale."
+3,Holidays to Greece Trends,"Category Trends / Holidays to Greece Trends","Retitle using {{trend_category_display_name}} if source header differs. Update monthly trend cards, trend chart, and bullets exactly from report.txt/source_data. Preserve reference spacing and chart scale."
+4,Executive Summary,"Executive Summary","Update KPI cards and bullets exactly from report.txt. KPI values should include Revenue, Purchases, CPA, Cost, AOV, and Cost/ATC when available."
+5,Auction Insights,"Auction Insights","Update competitor/auction table and bullets exactly from report.txt. Preserve row order and table style. Do not invent competitor metrics."
+6,Overall Performance,"Overall Performance","Update monthly performance table and bullets exactly from report.txt. Use reference table layout and avoid overflowing cells."
+7,YoY Matched-Month Comparison,"YoY Matched-Month Comparison","Update note, matched-month table, and bullets exactly from report.txt. Keep comparison labels and caveats visible."
+8,End of Period,"End of Period / latest month comparison","Update latest-month comparison cards and bullets exactly from report.txt. Preserve reference KPI-card layout."
+9,Channel Performance,"Channel Performance","Update channel table, cost/revenue share content, and bullets exactly from report.txt. Keep category labels readable."
+10,Generic Performance,"Generic Performance","Update generic monthly table and bullets exactly from report.txt. If Generic Performance is absent, use the closest explicitly supplied priority channel section and record the substitution in PACKAGE_MANIFEST.json."
+11,ATC Analysis,"ATC Analysis","Update ATC table, TOTAL ATC, COST PER ATC, and bullets exactly from report.txt. Preserve reference KPI callout styling and table readability."

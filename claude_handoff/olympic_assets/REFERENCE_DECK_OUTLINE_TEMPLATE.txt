@@ -1,0 +1,29 @@
+Reference deck outline
+
+Deck URL
+{{reference_deck_url}}
+
+Title
+Olympic Holidays Q1 2026 Performance Review
+
+Slide count
+11 slides
+
+01. Cover
+02. Olympic Holidays Trends
+03. Holidays to Greece Trends
+04. Executive Summary
+05. Auction Insights
+06. Overall Performance
+07. YoY Matched-Month Comparison
+08. End of Period
+09. Channel Performance
+10. Generic Performance
+11. ATC Analysis
+
+Template interpretation
+- Keep the visual style and slide archetypes.
+- Replace old reference copy with current report copy where source data exists.
+- Keep the compact 11-slide structure unless the user explicitly asks to extend the deck.
+- Convert unsupported source gaps into concise placeholders, rather than inventing content.
+- Preserve cover treatment, header/footer styling, KPI cards, table treatment, chart spacing, and Summon branding.
