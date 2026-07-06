@@ -15,13 +15,16 @@ def build_trends_narrative(trend_section: dict[str, Any] | None, fallback: list[
         return list(fallback or [])
 
     bullets: list[str] = []
-    if len(series) >= 2:
+    separate_normalized = bool(trend_section.get("separate_normalized_exports"))
+    if len(series) >= 2 and not separate_normalized:
         current_avg = _mean(series[0].get("data", []))
         prior_avg = _mean(series[1].get("data", []))
         delta = _pct_change(current_avg, prior_avg)
         if delta is not None:
             direction = "higher" if delta > 0 else "lower"
             bullets.append(f"Overall demand was {abs(delta) * 100:.0f}% {direction} YoY across the supplied trend comparison.")
+    elif len(series) >= 2:
+        bullets.append("Current and previous YTD exports are separately normalized, so read this as a shape and seasonality comparison.")
 
     primary = series[0]
     peak_index = _peak_index(primary.get("data", []))

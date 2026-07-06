@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from report_generator.builders.wightlink_json_builder import build_wightlink_json_payload, write_wightlink_json
 from report_generator.builders.wightlink_pptx_builder import WightlinkPptxBuilder
 from report_generator.builders.wightlink_text_builder import build_wightlink_text, write_wightlink_text
@@ -20,6 +22,7 @@ from report_generator.parsers.generic_trends_parser import parse_trends_inputs
 from report_generator.parsers.wightlink_auction_parser import parse_wightlink_auction_csv
 from report_generator.parsers.wightlink_plan_parser import parse_wightlink_plan_workbook
 from report_generator.parsers.wightlink_performance_parser import parse_wightlink_performance_csv
+from report_generator.parsers.wightlink_ytd_parser import parse_ytd_trend_inputs
 from report_generator.pipelines.wightlink_pipeline_common import build_auction_slide, build_chart_spec, merge_manual_inputs, resolve_output_paths
 from report_generator.reference.wightlink_reference_content import DEFAULT_WIGHTLINK_MANUAL_INPUTS
 
@@ -29,14 +32,20 @@ def generate_wightlink_report(
     output_path: str | Path,
     manual_inputs: dict[str, Any] | None = None,
     trends_dir: str | Path | None = None,
+    trends_ytd_current_dir: str | Path | None = None,
+    trends_ytd_previous_dir: str | Path | None = None,
     auction_csv: str | Path | None = None,
+    red_funnel_auction_csv: str | Path | None = None,
     plan_workbook: str | Path | None = None,
 ) -> dict[str, Any]:
     performance = parse_wightlink_performance_csv(performance_csv)
     merged_manual = merge_manual_inputs(DEFAULT_WIGHTLINK_MANUAL_INPUTS, manual_inputs or {})
 
-    trends_sections = parse_trends_inputs(trends_dir)
+    trends_sections = parse_ytd_trend_inputs(trends_ytd_current_dir or trends_dir, trends_ytd_previous_dir, performance["quarter"])
+    if not trends_sections:
+        trends_sections = parse_trends_inputs(trends_dir)
     generic_auction = parse_wightlink_auction_csv(auction_csv, subtype="generic")
+    red_funnel_quarter_auction = parse_wightlink_auction_csv(red_funnel_auction_csv, subtype="red_funnel_quarter") if red_funnel_auction_csv else generic_auction
     brand_auction = None
     if manual_inputs and manual_inputs.get("auction", {}).get("brand_csv"):
         brand_auction = parse_wightlink_auction_csv(manual_inputs["auction"]["brand_csv"], subtype="brand")
@@ -52,7 +61,7 @@ def generate_wightlink_report(
 
     charts_dir = pptx_path.parent / f"{pptx_path.stem}_charts"
     ppt_builder = WightlinkPptxBuilder(pptx_path, charts_dir)
-    slides = _build_slides(performance, merged_manual, ppt_builder, trends_sections, generic_auction, brand_auction, plan_section)
+    slides = _build_slides(performance, merged_manual, ppt_builder, trends_sections, generic_auction, brand_auction, red_funnel_quarter_auction, plan_section)
 
     payload = build_wightlink_json_payload(
         client_id="wightlink",
@@ -86,10 +95,18 @@ def _build_slides(
     trends_sections: list[dict[str, Any]],
     generic_auction: dict[str, Any] | None,
     brand_auction: dict[str, Any] | None,
+    red_funnel_quarter_auction: dict[str, Any] | None,
     plan_section: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     quarter = performance["quarter"]
     subtitle = f"{quarter.label} ({quarter.start.strftime('%b')} - {quarter.end.strftime('%b %Y')})"
+    ytd = performance.get("ytd", {})
+    ytd_windows = ytd.get("windows")
+    ytd_subtitle = (
+        f"{ytd_windows.ytd_period_label} vs {ytd_windows.previous_ytd_period_label}"
+        if ytd_windows
+        else subtitle
+    )
     current = performance["current"]
     prior = performance["prior_year"]
     brand = performance["campaigns"]["Brand"]
@@ -103,9 +120,10 @@ def _build_slides(
     current_label = quarter.label
     prior_label = quarter.prior_year.label
     agenda_items = [
-        "Trends",
+        "YTD Trends",
         "Auction Insights",
         "Performance",
+        "YTD Performance Breakdowns",
     ]
     if any(scope.get("has_data") for scope in data_types.values()):
         agenda_items.append("Ferry & Routes")
@@ -181,12 +199,12 @@ def _build_slides(
             slides.append({
                 "type": "single_chart_bullets",
                 "section": "trends",
-                "section_title": f"Trends - {trend_title}",
-                "title": trend_title,
-                "subtitle": subtitle,
+                "section_title": trend_section.get("section_title") or f"Trends - {trend_title}",
+                "title": f"Google Trends - {trend_title}" if trend_section.get("chart_style") == "ytd_comparison" else trend_title,
+                "subtitle": ytd_subtitle if trend_section.get("chart_style") == "ytd_comparison" else subtitle,
                 "charts": [{"title": trend_title, "path": str(trend_chart)}],
                 "bullets": build_trends_narrative(trend_section, manual["trends"].get("fallback_bullets")),
-                "source_note": "Source: Google Trends",
+                "source_note": "Source: Google Trends (GB)",
             })
     else:
         slides.append({
@@ -202,6 +220,7 @@ def _build_slides(
 
     slides.append(build_auction_slide("generic", subtitle, generic_auction, manual))
     slides.append(build_auction_slide("brand", subtitle, brand_auction, manual))
+    slides.append(_build_red_funnel_quarter_slide(subtitle, red_funnel_quarter_auction))
     slides.append({"type": "divider", "section": "performance", "section_title": "Performance", "title": "Performance"})
     slides.extend(_build_segment_slides(
         ppt_builder,
@@ -303,12 +322,18 @@ def _build_slides(
     slides.extend(_build_segment_slides(
         ppt_builder, "performance", "Brand Performance", subtitle, brand, brand_prior, "brand", current_label, prior_label, build_brand_narrative(brand, brand_prior)
     ))
+    if ytd.get("campaigns", {}).get("Brand"):
+        slides.append(_build_ytd_breakdown_slide("Brand Monthly Breakdown YTD", ytd_subtitle, ytd["campaigns"]["Brand"]))
     slides.extend(_build_segment_slides(
         ppt_builder, "performance", "Generics Performance", subtitle, generic, generic_prior, "generic", current_label, prior_label, build_generics_narrative(generic, generic_prior)
     ))
+    if ytd.get("campaigns", {}).get("Generic"):
+        slides.append(_build_ytd_breakdown_slide("Generics Monthly Breakdown YTD", ytd_subtitle, ytd["campaigns"]["Generic"]))
     slides.extend(_build_segment_slides(
         ppt_builder, "performance", "PMax Performance", subtitle, pmax, pmax_prior, "pmax", current_label, prior_label, build_pmax_narrative(pmax)
     ))
+    if ytd.get("campaigns", {}).get("Performance Max"):
+        slides.append(_build_ytd_breakdown_slide("PMax Performance Summary YTD", ytd_subtitle, ytd["campaigns"]["Performance Max"]))
     data_type_slides = []
     for data_type in ("Ferry", "Routes"):
         scope = data_types.get(data_type)
@@ -407,6 +432,89 @@ def _build_segment_slides(
     ]
 
 
+def _build_red_funnel_quarter_slide(subtitle: str, auction_section: dict[str, Any] | None) -> dict[str, Any]:
+    table_rows, bullets = _red_funnel_quarter_rows_and_bullets(auction_section)
+    return {
+        "type": "table_bullets",
+        "section": "auction",
+        "subtype": "red_funnel_quarter",
+        "section_title": "Auction Insights - Red Funnel Quarter",
+        "title": "Competitive Landscape - Red Funnel Quarter",
+        "subtitle": subtitle,
+        "table": {"rows": table_rows},
+        "bullets": bullets,
+        "source_note": "Source: Quarter Auction Insights CSV",
+    }
+
+
+def _red_funnel_quarter_rows_and_bullets(auction_section: dict[str, Any] | None) -> tuple[list[dict[str, Any]], list[str]]:
+    rows = auction_section.get("rows", []) if auction_section else []
+    red_funnel = next((row for row in rows if _is_red_funnel(row.get("display_url_domain"))), None)
+    wightlink = next((row for row in rows if str(row.get("display_url_domain", "")).strip().lower() == "you"), None)
+    if not red_funnel:
+        return (
+            [{"Status": "Review required", "Detail": "No Red Funnel row was found in the uploaded quarter auction insights source."}],
+            ["Review required - upload a quarter-only Auction Insights export containing Red Funnel to populate this slide."],
+        )
+
+    metrics = [
+        ("Impression Share", "impression_share", "Visible share of eligible quarter auctions."),
+        ("Overlap Rate", "overlap_rate", "How often Red Funnel appeared in the same auctions."),
+        ("Position Above Rate", "position_above_rate", "How often Red Funnel ranked above Wightlink when both appeared."),
+        ("Top of Page Rate", "top_of_page_rate", "How often ads appeared at the top of results."),
+        ("Abs. Top of Page Rate", "abs_top_of_page_rate", "How often ads held the absolute top position."),
+        ("Outranking Share", "outranking_share", "How often Wightlink outranked Red Funnel or Red Funnel did not show."),
+    ]
+    table_rows = [
+        {
+            "Metric": label,
+            "Wightlink": _format_pct(wightlink.get(key) if wightlink else None),
+            "Red Funnel": _format_pct(red_funnel.get(key)),
+            "What it means": note,
+        }
+        for label, key, note in metrics
+    ]
+    bullets = []
+    overlap = red_funnel.get("overlap_rate")
+    if overlap is not None:
+        bullets.append(f"Red Funnel overlapped in {_format_pct(overlap)} of eligible quarter auctions.")
+    abs_top = red_funnel.get("abs_top_of_page_rate")
+    if abs_top is not None:
+        bullets.append(f"Red Funnel's absolute top-of-page rate was {_format_pct(abs_top)} in the quarter source.")
+    outranking = red_funnel.get("outranking_share")
+    if outranking is not None:
+        bullets.append(f"Wightlink outranking share versus Red Funnel was {_format_pct(outranking)}.")
+    return table_rows, bullets or ["Quarter-only Red Funnel metrics are shown from the uploaded Auction Insights source."]
+
+
+def _build_ytd_breakdown_slide(title: str, subtitle: str, scope: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "table_bullets",
+        "section": "performance",
+        "section_title": title,
+        "title": title,
+        "subtitle": subtitle,
+        "table": {"rows": scope.get("table_rows", [])},
+        "bullets": _build_ytd_breakdown_bullets(scope),
+        "source_note": "Source: Uploaded performance CSV",
+    }
+
+
+def _build_ytd_breakdown_bullets(scope: dict[str, Any]) -> list[str]:
+    monthly = [row for row in scope.get("monthly", []) if row.get("month_label") != "Total"]
+    if not monthly:
+        return ["No YTD monthly rows were available after filtering the performance CSV."]
+    bullets: list[str] = []
+    strongest_volume = max(monthly, key=lambda row: _sortable(row.get("purchases")))
+    best_cpa = min(monthly, key=lambda row: _sortable(row.get("cpa"), none_default=float("inf")))
+    bullets.append(f"{strongest_volume['month_label']} was the strongest YTD month for purchase volume.")
+    bullets.append(f"{best_cpa['month_label']} was the most efficient YTD month on CPA.")
+    if not all(row.get("roas") is None for row in monthly):
+        best_roas = max(monthly, key=lambda row: _sortable(row.get("roas")))
+        bullets.append(f"{best_roas['month_label']} recorded the strongest YTD ROAS.")
+    return bullets[:3]
+
+
 def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_section: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     metrics = [
         ("cost", "Cost", _format_plan_currency),
@@ -424,7 +532,7 @@ def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_
     for key, label, formatter in metrics:
         current_value = current_totals.get(key)
         yoy = _pct_change(current_value, prior_totals.get(key)) if prior_totals else None
-        context = [f"YoY: {_format_delta(yoy)}"]
+        context_items = [{"label": "YoY", "text": f"YoY: {_format_delta(yoy)}", "value": yoy}]
         plan_delta = None
         if key == "cost":
             plan_delta = plan_summary.get("spend_variance_pct")
@@ -434,8 +542,12 @@ def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_
             plan_delta = plan_summary.get("revenue_variance_pct")
         elif key == "cpa":
             plan_delta = plan_summary.get("cpa_variance_pct")
+        elif key == "roas":
+            plan_delta = plan_summary.get("roas_variance_pct")
+        elif key == "aov":
+            plan_delta = plan_summary.get("aov_variance_pct")
         if plan_delta is not None:
-            context.append(f"Plan: {_format_delta(plan_delta)}")
+            context_items.append({"label": "Plan", "text": f"Plan: {_format_delta(plan_delta)}", "value": plan_delta})
         kpis.append({
             "key": key,
             "label": label,
@@ -443,7 +555,8 @@ def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_
             "value_raw": current_value,
             "yoy": yoy,
             "yoy_label": _format_delta(yoy),
-            "context": context,
+            "context": [item["text"] for item in context_items],
+            "context_items": context_items,
         })
     return kpis
 
@@ -676,3 +789,28 @@ def _format_plan_delta(value: Any) -> str:
         return "--"
     sign = "+" if float(value) > 0 else ""
     return f"{sign}{float(value) * 100:.1f}%"
+
+
+def _format_pct(value: Any) -> str:
+    if value is None:
+        return "--"
+    try:
+        return f"{float(value) * 100:.2f}%"
+    except (TypeError, ValueError):
+        return "--"
+
+
+def _is_red_funnel(value: Any) -> bool:
+    normalized = "".join(char.lower() for char in str(value) if char.isalnum())
+    return "redfunnel" in normalized
+
+
+def _sortable(value: Any, none_default: float = 0.0) -> float:
+    if value is None:
+        return none_default
+    try:
+        if pd.isna(value):
+            return none_default
+        return float(value)
+    except (TypeError, ValueError):
+        return none_default

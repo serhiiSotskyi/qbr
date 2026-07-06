@@ -9,7 +9,11 @@ import pandas as pd
 from report_generator.parsers.wightlink_auction_parser import parse_wightlink_auction_csv
 from report_generator.parsers.wightlink_performance_parser import parse_wightlink_performance_csv
 from report_generator.parsers.wightlink_plan_parser import parse_wightlink_plan_workbook
+from report_generator.parsers.wightlink_ytd_parser import derive_ytd_windows, parse_ytd_trend_inputs
 from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
+
+
+PACK_V2 = Path(__file__).resolve().parent / "fixtures" / "wightlink_v2_sample_inputs"
 
 
 class WightlinkQuarterlyTests(unittest.TestCase):
@@ -161,6 +165,97 @@ class WightlinkQuarterlyTests(unittest.TestCase):
                 result["text"],
             )
             self.assertIn("- Actual vs Prior Year Spend\n  Bars: Prior Year, Actual", result["text"])
+
+    def test_ytd_period_derivation_uses_report_quarter_end(self) -> None:
+        csv_path = PACK_V2 / "performance_daily_over_year_sample.csv"
+        performance = parse_wightlink_performance_csv(csv_path)
+        windows = derive_ytd_windows(performance["quarter"])
+
+        self.assertEqual(str(windows.current_start.date()), "2026-01-01")
+        self.assertEqual(str(windows.current_end.date()), "2026-06-30")
+        self.assertEqual(str(windows.previous_start.date()), "2025-01-01")
+        self.assertEqual(str(windows.previous_end.date()), "2025-06-30")
+        self.assertEqual(windows.ytd_period_label, "YTD 2026 (Jan - Jun 2026)")
+        self.assertEqual(windows.previous_ytd_period_label, "YTD 2025 (Jan - Jun 2025)")
+
+    def test_ytd_trend_pair_parser_aggregates_weekly_rows_to_months(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            current = root / "current"
+            previous = root / "previous"
+            current.mkdir()
+            previous.mkdir()
+            current_file = PACK_V2 / "google_trends_wightlink_ferries_current_ytd_sample.csv"
+            previous_file = PACK_V2 / "google_trends_wightlink_ferries_previous_ytd_sample.csv"
+            (current / current_file.name).write_bytes(current_file.read_bytes())
+            (previous / previous_file.name).write_bytes(previous_file.read_bytes())
+
+            performance = parse_wightlink_performance_csv(PACK_V2 / "performance_daily_over_year_sample.csv")
+            sections = parse_ytd_trend_inputs(current, previous, performance["quarter"])
+
+        self.assertEqual(len(sections), 1)
+        section = sections[0]
+        self.assertEqual(section["section_title"], "Google Trends YTD - Wightlink Ferries")
+        self.assertEqual(section["labels"], ["Jan", "Feb", "Mar", "Apr", "May", "Jun"])
+        self.assertEqual([series["name"] for series in section["series"]], ["2026 YTD", "2025 YTD"])
+        self.assertTrue(section["separate_normalized_exports"])
+        self.assertTrue(any(value is not None for value in section["series"][0]["data"]))
+        self.assertTrue(any(value is not None for value in section["series"][1]["data"]))
+
+    def test_middle_plan_table_parser_uses_first_plan_table(self) -> None:
+        performance = parse_wightlink_performance_csv(PACK_V2 / "performance_daily_over_year_sample.csv")
+        plan = parse_wightlink_plan_workbook(
+            PACK_V2 / "wightlink_plan_2026_27_middle_scenario.csv",
+            performance["quarter"],
+            performance["current"],
+        )
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan["source_table"], "PPC Middle Plan Scenario")
+        self.assertEqual(plan["missing_months"], [])
+        self.assertAlmostEqual(plan["summary"]["planned_spend"], 91383.41, places=2)
+        self.assertAlmostEqual(plan["summary"]["planned_purchases"], 44026.0, places=2)
+        self.assertIn("ROAS", plan["metrics_available"])
+        self.assertIn("AOV", plan["metrics_available"])
+        self.assertIsNotNone(plan["summary"]["roas_variance_pct"])
+        self.assertIsNotNone(plan["summary"]["aov_variance_pct"])
+
+    def test_v2_pipeline_adds_ytd_and_red_funnel_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            current = root / "current"
+            previous = root / "previous"
+            current.mkdir()
+            previous.mkdir()
+            current_file = PACK_V2 / "google_trends_wightlink_ferries_current_ytd_sample.csv"
+            previous_file = PACK_V2 / "google_trends_wightlink_ferries_previous_ytd_sample.csv"
+            (current / current_file.name).write_bytes(current_file.read_bytes())
+            (previous / previous_file.name).write_bytes(previous_file.read_bytes())
+
+            result = generate_wightlink_report(
+                PACK_V2 / "performance_daily_over_year_sample.csv",
+                root / "wightlink.pptx",
+                trends_ytd_current_dir=current,
+                trends_ytd_previous_dir=previous,
+                auction_csv=PACK_V2 / "auction_insights.csv",
+                red_funnel_auction_csv=PACK_V2 / "auction_insights.csv",
+                plan_workbook=PACK_V2 / "wightlink_plan_2026_27_middle_scenario.csv",
+            )
+
+        titles = [slide.get("section_title") for slide in result["slides"]]
+        self.assertIn("Google Trends YTD - Wightlink Ferries", titles)
+        self.assertIn("Auction Insights - Red Funnel Quarter", titles)
+        self.assertIn("Brand Monthly Breakdown YTD", titles)
+        self.assertIn("Generics Monthly Breakdown YTD", titles)
+        self.assertIn("PMax Performance Summary YTD", titles)
+
+        overall_summary = next(slide for slide in result["slides"] if slide.get("section_title") == "All Performance Summary")
+        plan_context = {kpi["label"]: [item for item in kpi["context"] if str(item).startswith("Plan:")] for kpi in overall_summary["kpis"]}
+        for label in ["Cost", "Purchases", "Purchase Revenue", "CPA", "ROAS", "AOV"]:
+            self.assertTrue(plan_context[label], label)
+        self.assertIn("[Brand Monthly Breakdown YTD]", result["text"])
+        self.assertIn("[Auction Insights - Red Funnel Quarter]", result["text"])
 
 
 def _write_performance_csv(path: Path, include_data_type: bool) -> Path:

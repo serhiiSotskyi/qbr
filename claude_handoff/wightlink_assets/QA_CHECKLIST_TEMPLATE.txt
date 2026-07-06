@@ -1,33 +1,40 @@
 Required QA before delivery
 
+V2 packages
+If QA_CHECKLIST_V2_ADDENDUM.txt is included, run it in addition to this checklist.
+
 Deck identity
-- Final deck is a copy of the Wightlink Google Slides reference deck or a PPTX built from reference_deck_exported_from_google_slides.pptx.
-- Final deck is suitable for Google Slides import.
-- Final deck follows the Wightlink reference visual system, not a generic design style.
-- Final deck keeps the 27-slide reference structure unless the user explicitly approves a shorter QBR deck.
+- Final deck is a copy of the Google Slides reference deck or a PPTX built from reference_deck_exported_from_google_slides.pptx.
+- Final deck follows the Wightlink reference deck structure.
+- Final deck is editable after Google Slides import, not one image per slide.
+- Client naming is Wightlink.
+- Period is {{period_label}}.
 
 Stale content
-- No unsupported old-period current content remains.
-- No old month labels remain unless part of a prior-period comparison.
-- No unsupported creative analysis, testing, next-step, or other-update content remains.
+- No old period labels remain unless clearly part of a comparison that report.txt provides.
+- No old KPI values remain.
+- No old Red Funnel YoY, ad creative, testing, next steps, or other updates content remains unless report.txt provides it.
+- No wrong-client copy remains.
 
 Data integrity
-- Headline KPI values match report.txt exactly.
-- All KPI cards, YoY values, tables, and bullets pulled from report.txt match exactly unless a source inconsistency is documented.
-- Trend slide titles use human-readable query names from CSV headers, not raw filenames.
-- Auction insight table values match report.txt/raw_inputs exactly.
-- Plan-book values are not used to override report.txt KPIs.
+- All KPI values match report.txt exactly.
+- All YoY values match report.txt exactly.
+- All tables match report.txt exactly, including symbols, percentages, dashes, and row order.
+- Auction Insights tables match report.txt.
+- Google Trends slides are correctly titled using source_data CSV headers.
+- Every report.txt section is represented somewhere in the deck.
 
 Manual placeholders
-- Unsupported Testing slides are clearly marked for account-team completion.
-- Unsupported Next Steps are clearly marked for account-team completion or labelled as draft recommendations for review.
-- Unsupported Other Updates are clearly marked for account-team completion.
-- Top Performing Campaigns slide is a placeholder unless campaign-level source data exists.
+- Missing Red Funnel/ad creative slide is a clear placeholder.
+- Missing Testing slides are clearly marked for human completion.
+- Missing Next Steps slide is clearly marked for human completion.
+- Missing Other Updates slide is clearly marked for human completion.
 
 Visual fidelity
-- Typography, colors, footer style, KPI block styling, tables, dividers, and chart frames match the Wightlink reference deck.
+- Typography, Wightlink colors, dark navy sections, footer treatment, KPI cards, and table styling match the reference deck.
 - Text does not overflow or wrap awkwardly in title/footer bands.
 - Tables fit within slide bounds and remain readable.
+- Chart/image slots are replaced with current-period visuals and no stale chart images remain.
 - Every chart slide has been checked against CHART_QA_ADDENDUM_FOR_CLAUDE.txt.
 - No chart labels, value annotations, legends, or axis labels are clipped or overlapping.
 - Chart images are placed with fit/contain behavior and are not stretched non-proportionally.

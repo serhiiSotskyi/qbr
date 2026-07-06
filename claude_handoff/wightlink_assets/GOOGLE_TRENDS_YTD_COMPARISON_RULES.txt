@@ -1,0 +1,69 @@
+Google Trends YTD Comparison Rules
+
+Goal
+Replace the old single-period trend treatment with a two-line comparison of current YTD vs the same YTD period last year.
+
+Required inputs per trend term
+For each trend term, accept either:
+1. Preferred: one combined export that can be safely filtered into current YTD and previous YTD on the same normalized scale.
+2. Supported fallback: two separate Google Trends CSVs:
+   - current YTD export
+   - previous YTD export
+
+The user expects the fallback mode because Google Trends often cannot supply both comparison periods in one export.
+
+Required trend terms
+- Wightlink Ferries
+- Isle of Wight Ferry
+- Isle of Wight Holidays
+
+Period derivation
+- report_year = year of report quarter end date
+- ytd_start = Jan 1 of report_year
+- ytd_end = last day of last month of report quarter
+- previous_ytd_start = ytd_start minus one year
+- previous_ytd_end = ytd_end minus one year
+
+Example for Q2 2026
+- current YTD: Jan 1, 2026 to Jun 30, 2026
+- previous YTD: Jan 1, 2025 to Jun 30, 2025
+
+CSV parsing
+- Google Trends CSVs usually have columns:
+  - Time
+  - trend value column, e.g. Wightlink Ferries
+- Use the trend value column header as the display term.
+- Parse Time as date.
+- Values may be weekly.
+
+Weekly-to-monthly aggregation
+For monthly charts, assign each weekly row to a month using the midpoint of the week:
+- week_midpoint = Time + 3 days
+- include row if week_midpoint falls inside the selected period
+- month = month of week_midpoint
+- monthly value = average of weekly values in that month, rounded consistently for display
+
+Chart output
+- One chart per trend term.
+- X-axis: months in current YTD, e.g. Jan, Feb, Mar, Apr, May, Jun.
+- Current line label: current year, e.g. 2026 YTD.
+- Previous line label: previous year, e.g. 2025 YTD.
+- Use reference styling: red line for current period, grey line for previous period.
+- Show both series on the same chart.
+- Title should use the trend term, not the raw filename.
+- Subtitle/source should say Google Trends (GB).
+
+Important normalization note
+If two separate Google Trends exports are used, each file is normalized independently. Treat the result as an indexed shape comparison, not a precise absolute search-volume comparison. The deck can still show the two lines, but the app/package manifest should record:
+"Google Trends current and previous YTD series were supplied as separate normalized exports."
+
+Generated report sections
+Add or update these report.txt sections:
+- [Google Trends YTD - Wightlink Ferries]
+- [Google Trends YTD - Isle of Wight Ferry]
+- [Google Trends YTD - Isle of Wight Holidays]
+
+Claude handoff requirements
+- Include all current/previous trend CSVs in source_data/.
+- Include chart QA instructions requiring no clipped labels and no overlapping line labels.
+- Generated bullets should discuss the pattern comparison, not overclaim exact volume deltas when separate normalized exports were used.

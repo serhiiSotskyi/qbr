@@ -13,6 +13,7 @@ from report_generator.parsers.wightlink_performance_common import (
     filter_quarter,
     load_wightlink_performance_csv,
 )
+from report_generator.parsers.wightlink_ytd_parser import build_ytd_campaign_scopes
 
 
 def parse_wightlink_performance_csv(csv_path: str | Path) -> dict[str, Any]:
@@ -22,6 +23,7 @@ def parse_wightlink_performance_csv(csv_path: str | Path) -> dict[str, Any]:
     prior_rows = filter_quarter(working, quarter.prior_year)
     campaigns, campaigns_prior_year = build_period_campaigns(current_rows, prior_rows)
     data_types, data_types_prior_year = build_period_data_types(current_rows, prior_rows)
+    ytd = build_ytd_campaign_scopes(working, quarter)
 
     return {
         "raw": working,
@@ -32,4 +34,5 @@ def parse_wightlink_performance_csv(csv_path: str | Path) -> dict[str, Any]:
         "campaigns_prior_year": campaigns_prior_year,
         "data_types": data_types,
         "data_types_prior_year": data_types_prior_year,
+        "ytd": ytd,
     }

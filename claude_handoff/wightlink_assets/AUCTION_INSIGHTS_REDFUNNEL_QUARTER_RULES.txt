@@ -1,0 +1,49 @@
+Auction Insights - Red Funnel Quarter Rules
+
+Goal
+Add a quarter-only Red Funnel competitive landscape slide for the quarter being reported.
+
+Do not replace existing slides
+This slide is an addition. Keep the existing Red Funnel YoY/competitive landscape slide if it exists.
+
+Required source
+Use a quarter-only Auction Insights export for the report quarter.
+For Q2 2026 this means Apr 1, 2026 through Jun 30, 2026.
+
+If the uploaded auction insights file contains more than the report quarter, filter it to the quarter before generating the Red Funnel section.
+
+Required competitor
+The slide should focus on Red Funnel. If the source uses a different exact domain/name, detect likely Red Funnel rows by normalized text matching, for example:
+- redfunnel.co.uk
+- Red Funnel
+- red funnel
+
+Metrics to include where available
+- Impression Share
+- Overlap Rate
+- Position Above Rate
+- Top of Page Rate
+- Absolute Top of Page Rate
+- Outranking Share
+
+Comparison behavior
+- Quarter-only means current quarter only unless the source explicitly includes a comparable previous period.
+- Do not label the slide YoY unless the source includes prior-period Red Funnel metrics.
+- If previous-period metrics are supplied, show current quarter vs previous comparable quarter and label dates clearly.
+- If only current-quarter metrics are supplied, show current-quarter values and explain what they mean.
+
+Slide title
+Use one of:
+- Competitive Landscape - Red Funnel Quarter
+- Auction Insights - Red Funnel Quarter
+
+Generated report section
+Add:
+[Auction Insights - Red Funnel Quarter]
+
+Claude handoff requirements
+- Add a new slide after the existing Red Funnel YoY/competitive landscape slide.
+- Use the same table styling as the reference competitive landscape slide.
+- Include a concise headline box above the table.
+- Include bullets below the table.
+- Do not invent metrics that are absent from the source.

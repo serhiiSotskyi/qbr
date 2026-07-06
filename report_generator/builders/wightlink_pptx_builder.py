@@ -53,7 +53,7 @@ class WightlinkPptxBuilder:
             tick_positions.append(x_values[-1])
 
         fig, ax = plt.subplots(figsize=(7.2, 3.8))
-        palette = ["#0C5460", "#94A3B8", "#1D4ED8", "#14B8A6"]
+        palette = ["#D63C31", "#A3A3A3"] if trend_section.get("chart_style") == "ytd_comparison" else ["#0C5460", "#94A3B8", "#1D4ED8", "#14B8A6"]
         for index, item in enumerate(series):
             data = item.get("data", [])
             marker = "o" if len(data) <= 20 else None
@@ -64,7 +64,7 @@ class WightlinkPptxBuilder:
                 marker=marker,
                 markersize=4.5,
                 label=item.get("name", f"Series {index+1}"),
-                color=palette[index % len(palette)],
+                color=item.get("color") or palette[index % len(palette)],
             )
         ax.set_title(trend_section.get("title", "Google Trends"), fontsize=15)
         ax.set_xticks(tick_positions, [labels[index] for index in tick_positions])
@@ -426,20 +426,22 @@ class WightlinkPptxBuilder:
             value_run.font.bold = True
             value_run.font.color.rgb = self.text_primary
 
-            lines = list(kpi.get("context", [])) or [f"YoY: {kpi.get('yoy_label', '--')}"]
+            context_items = list(kpi.get("context_items", []))
+            if not context_items:
+                context_items = [{"text": line, "value": kpi.get("yoy")} for line in (list(kpi.get("context", [])) or [f"YoY: {kpi.get('yoy_label', '--')}"])]
             context_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + card_height - Inches(0.55), card_width - Inches(0.32), Inches(0.36)).text_frame
             context_frame.clear()
-            for line_index, line in enumerate(lines[:2]):
+            for line_index, item in enumerate(context_items[:2]):
                 para = context_frame.paragraphs[0] if line_index == 0 else context_frame.add_paragraph()
-                para.text = str(line)
+                para.text = str(item.get("text", ""))
                 para.font.size = Pt(9)
                 para.font.bold = True
-                para.font.color.rgb = self._resolve_delta_color(str(kpi.get("key", "")), kpi.get("yoy"))
+                para.font.color.rgb = self._resolve_delta_color(str(kpi.get("key", "")), item.get("value"))
 
     def _resolve_delta_color(self, key: str, value: Any) -> RGBColor:
         if value is None or (isinstance(value, float) and pd.isna(value)):
             return self.text_secondary
-        lower_is_better = key in {"cost", "cpa"}
+        lower_is_better = key in {"cost", "cpa", "cpc"}
         positive = float(value) >= 0
         if positive != lower_is_better:
             return RGBColor(22, 101, 52)

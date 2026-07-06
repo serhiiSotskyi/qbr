@@ -1,25 +1,53 @@
 {
   "package_type": "claude_handoff",
-  "report_family": "Wightlink QBR",
+  "report_family": "Wightlink PPC QBR",
   "client_display_name": "Wightlink",
   "period_label": "string",
   "quarter_short": "string",
+  "ytd_period_label": "string",
+  "previous_ytd_period_label": "string",
   "generated_at": "ISO-8601 datetime string",
   "reference_deck_url": "string",
   "reference_slide_count": 27,
+  "target_output_slide_count": 31,
   "streamlit_slide_count": "number",
   "has_reference_pptx": "boolean",
+  "has_plan_source": "boolean",
+  "plan_source_url": "string",
+  "files": [
+    {
+      "name": "string",
+      "role": "string",
+      "required": "boolean"
+    }
+  ],
   "headline_kpis": {
-    "cost": "string",
     "purchases": "string",
+    "cost": "string",
     "purchase_revenue": "string",
     "cpa": "string",
     "roas": "string",
     "aov": "string"
   },
-  "trend_queries": [
-    "string"
+  "trend_sources": [
+    {
+      "standard_name": "string",
+      "original_filename": "string",
+      "display_name": "string",
+      "current_ytd_filename": "string",
+      "previous_ytd_filename": "string",
+      "normalization_note": "string"
+    }
   ],
+  "plan_comparison": {
+    "source_table": "PPC Middle Plan Scenario",
+    "metrics_available": [
+      "string"
+    ],
+    "missing_months": [
+      "string"
+    ]
+  },
   "source_sections": [
     {
       "index": "number",
@@ -28,12 +56,8 @@
       "slide": "number"
     }
   ],
-  "files": [
-    {
-      "name": "string",
-      "role": "string",
-      "required": "boolean"
-    }
+  "placeholder_sections": [
+    "string"
   ],
   "warnings": [
     "string"

@@ -1,0 +1,66 @@
+Input files and roles
+
+Primary generated files
+- report.txt: Source of truth for final deck content.
+- {{streamlit_pptx_filename}}: Streamlit-generated structure/content aid only.
+- original_streamlit_prompt.txt: Background only.
+- reference_deck_exported_from_google_slides.pptx: Visual template bridge if included.
+
+Raw source data files
+- source_data/performance.csv
+  Original upload: {{performance_original_filename}}
+  Role: Performance source. Columns should include Date, Campaign Type, Purchases, Purchase Revenue, Cost, CPA, ROAS, AOV, Impressions, Clicks, CTR, CPC.
+
+- source_data/auction_insights.csv
+  Original upload: {{auction_original_filename}}
+  Role: Auction Insights source.
+
+- source_data/google_trends_wightlink_ferries.csv
+  Original upload: {{trend_1_original_filename}}
+  Display term: {{trend_1_display_name}}
+
+- source_data/google_trends_wightlink_ferries_current_ytd.csv
+  Original upload: {{trend_1_current_ytd_original_filename}}
+  Display term: {{trend_1_display_name}}
+
+- source_data/google_trends_wightlink_ferries_previous_ytd.csv
+  Original upload: {{trend_1_previous_ytd_original_filename}}
+  Display term: {{trend_1_display_name}}
+
+- source_data/google_trends_isle_of_wight_ferry.csv
+  Original upload: {{trend_2_original_filename}}
+  Display term: {{trend_2_display_name}}
+
+- source_data/google_trends_isle_of_wight_ferry_current_ytd.csv
+  Original upload: {{trend_2_current_ytd_original_filename}}
+  Display term: {{trend_2_display_name}}
+
+- source_data/google_trends_isle_of_wight_ferry_previous_ytd.csv
+  Original upload: {{trend_2_previous_ytd_original_filename}}
+  Display term: {{trend_2_display_name}}
+
+- source_data/google_trends_isle_of_wight_holidays.csv
+  Original upload: {{trend_3_original_filename}}
+  Display term: {{trend_3_display_name}}
+
+- source_data/google_trends_isle_of_wight_holidays_current_ytd.csv
+  Original upload: {{trend_3_current_ytd_original_filename}}
+  Display term: {{trend_3_display_name}}
+
+- source_data/google_trends_isle_of_wight_holidays_previous_ytd.csv
+  Original upload: {{trend_3_previous_ytd_original_filename}}
+  Display term: {{trend_3_display_name}}
+
+- source_data/wightlink_plan_2026_27_middle_scenario.csv
+  Original upload: {{plan_original_filename}}
+  Role: Wightlink plan source. Use only as audit/context unless plan comparisons are explicitly in report.txt.
+
+- source_data/auction_insights_red_funnel_quarter.csv
+  Original upload: {{red_funnel_quarter_auction_original_filename}}
+  Role: Quarter-only Red Funnel Auction Insights source for the report quarter.
+
+Plan source note
+For V2, the plan source should come from the first table in the Google Sheet tab "2026/27 Middle Scenario Plan", headed "PPC Middle Plan Scenario". Do not use the Actuals table as the plan source.
+
+Priority rule
+report.txt is primary. Raw CSVs are secondary and should not override report.txt values unless report.txt lacks enough detail to render a chart and the CSV clearly provides the exact underlying source.

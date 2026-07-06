@@ -1,0 +1,71 @@
+YTD Monthly Breakdown Rules
+
+Goal
+Add extra YTD slides for selected campaign types/channels without replacing the existing quarterly slides.
+
+New slides
+- Brand Monthly Breakdown YTD
+- Generics Monthly Breakdown YTD
+- PMax Performance Summary YTD
+
+YTD definition
+YTD means first month of the report year through the last month of the report quarter.
+For Q2 2026:
+- Jan 2026
+- Feb 2026
+- Mar 2026
+- Apr 2026
+- May 2026
+- Jun 2026
+
+Source
+Use the performance CSV with daily rows. Example supplied:
+sample_inputs_ytd_plan/performance_daily_over_year_sample.csv
+
+Required filtering
+- Brand Monthly Breakdown YTD: Campaign Type = Brand
+- Generics Monthly Breakdown YTD: Campaign Type = Generic or Generics, depending on source naming
+- PMax Performance Summary YTD: Campaign Type = PMax, Performance Max, or equivalent source naming
+
+Monthly aggregation
+For each month, calculate:
+- Cost = sum Cost
+- Purchases = sum Purchases
+- Purchase Revenue = sum Purchase Revenue
+- CPA = Cost / Purchases
+- ROAS = Purchase Revenue / Cost
+- AOV = Purchase Revenue / Purchases
+- Impressions = sum Impressions if shown
+- Clicks = sum Clicks if shown
+- CTR = Clicks / Impressions if shown
+- CPC = Cost / Clicks if shown
+
+Table format
+Use the same visual style as the reference monthly breakdown table:
+- dark header row
+- white/very light body rows
+- total row at bottom
+- red Total label
+- currency and numeric formatting matching the deck
+
+Required report sections
+Add:
+- [Brand Monthly Breakdown YTD]
+- [Generics Monthly Breakdown YTD]
+- [PMax Performance Summary YTD]
+
+Placement
+Add each YTD slide immediately after the matching existing quarterly slide:
+- Brand Monthly Breakdown YTD after Brand Monthly Breakdown
+- Generics Monthly Breakdown YTD after Generics Monthly Breakdown
+- PMax Performance Summary YTD after PMax Performance Summary
+
+Bullets
+Generate 1-3 concise bullets based on the YTD monthly table:
+- strongest month by purchase volume
+- most efficient month by CPA
+- strongest revenue or ROAS month
+- any clear risk/outlier
+
+Plan comparison
+Only add Plan lines to cards on these YTD slides if the plan source covers the exact YTD months. If not, omit Plan lines and record the reason in PACKAGE_MANIFEST.json.

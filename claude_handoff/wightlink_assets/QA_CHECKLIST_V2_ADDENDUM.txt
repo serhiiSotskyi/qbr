@@ -1,0 +1,52 @@
+Wightlink QBR V2 QA Addendum
+
+Period checks
+- Report remains quarter-led overall.
+- Cover/headline KPI cards use the quarter period, not YTD.
+- YTD trend period is Jan 1 through the last day of the report quarter.
+- Previous YTD period is the same date range one year earlier.
+- YTD monthly breakdown slides include only Jan through the report quarter end month.
+
+Google Trends checks
+- Each trend slide has two lines on one chart: current YTD and previous YTD.
+- X-axis months match the YTD period.
+- Current year is red and previous year is grey.
+- Trend display names come from CSV headers, not raw filenames.
+- If separate normalized Google Trends exports were used, bullets do not claim exact search-volume deltas.
+- Labels are not clipped or overlapping.
+
+Auction Insights checks
+- Red Funnel Quarter slide exists as an added slide.
+- Existing Red Funnel YoY/competitive landscape slide was not removed.
+- Red Funnel Quarter slide uses only report-quarter data.
+- The slide is not labelled YoY unless prior-period data is actually supplied.
+- Table metrics match the source exactly.
+
+YTD performance checks
+- Brand Monthly Breakdown YTD exists as an added slide.
+- Generics Monthly Breakdown YTD exists as an added slide.
+- PMax Performance Summary YTD exists as an added slide.
+- Existing quarterly slides remain.
+- Monthly tables aggregate daily performance rows correctly.
+- Totals equal the sum of included months.
+
+Plan comparison checks
+- KPI cards include YoY and Plan lines where plan metrics exist.
+- Plan source is the PPC Middle Plan Scenario table, not the Actuals table.
+- Purchases map to Sales.
+- Purchase Revenue maps to Revenue.
+- ROAS is calculated as Revenue / Cost from plan totals.
+- CPA and AOV are calculated from summed components where possible.
+- Plan variance uses (actual - plan) / plan.
+- Color direction is business-aware: lower is good for Cost, CPA, CPC; higher is good for volume, revenue, ROAS, AOV, CTR, CVR.
+- Missing plan months are recorded in PACKAGE_MANIFEST.json rather than silently ignored.
+
+Slide count
+- Reference deck has 27 slides.
+- V2 output target has 31 slides unless the user explicitly requests otherwise.
+
+Final deck checks
+- No stale FY labels remain on YTD trend slides.
+- No stale Red Funnel YoY values are reused for the quarter-only slide.
+- No old table values remain on added YTD slides.
+- All new chart/table slides pass CHART_QA_ADDENDUM_FOR_CLAUDE.txt.

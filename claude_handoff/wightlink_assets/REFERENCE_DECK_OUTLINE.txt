@@ -1,16 +1,27 @@
-Reference deck outline: Wightlink 2025/26 Year Report
+Reference deck outline
 
-Reference URL
-https://docs.google.com/presentation/d/1QBixtNRD_N_qZ6J56RyfM1vvrTudrZUowZIMdBoGhso
+Deck URL
+{{reference_deck_url}}
 
-Reference slide count: 27
+Title
+Wightlink 2025/26 Year Report
 
-01. Wightlink Financial Year Review / cover
-02. What We'll Cover Today / agenda
+Slide count
+27 slides
+
+V2 output target
+The V2 output deck should add four slides, for a target of 31 slides:
+- Red Funnel Quarter after the existing Red Funnel YoY/competitive landscape slide.
+- Brand Monthly Breakdown YTD after Brand Monthly Breakdown.
+- Generics Monthly Breakdown YTD after Generics Monthly Breakdown.
+- PMax Performance Summary YTD after PMax Performance Summary.
+
+01. Wightlink - Financial Year Review
+02. What We'll Cover Today
 03. Trends divider
-04. Google Trends - Wightlink / Isle of Wight Ferry visual layout
-05. Google Trends - Isle of Wight Ferry visual layout
-06. Google Trends - Isle of Wight Holidays visual layout
+04. Google Trends - Wightlink
+05. Google Trends - Isle of Wight Ferry
+06. Google Trends - Isle of Wight Holidays
 07. Auction Insights divider
 08. Auction Insights - Generic
 09. Competitive Landscape - Red Funnel YoY
@@ -33,7 +44,8 @@ Reference slide count: 27
 26. Ad Monitor Now Live
 27. Thank you
 
-Template guidance
-- Use the visual system, typography, footer style, tables, section dividers, and chart treatment from this deck.
-- Do not keep FY 2025/26 content unless it is intentionally being used as a prior-period comparison.
-- Some reference slides have no current Q2 source. Convert those to manual placeholders.
+Template interpretation
+- Keep the visual style and slide archetypes.
+- Replace old reference copy with current report copy where source data exists.
+- Convert unsupported reference sections into placeholders, rather than inventing content.
+- Preserve section divider styling and footer treatment.

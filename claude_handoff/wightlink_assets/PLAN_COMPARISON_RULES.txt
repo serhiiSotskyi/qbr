@@ -1,0 +1,93 @@
+Plan Comparison Rules for Wightlink KPI Cards
+
+Goal
+Every KPI card/tile that has a matching plan metric should show both:
+- YoY: signed percent vs same period last year
+- Plan: signed percent vs plan
+
+Plan source
+Google Sheet:
+https://docs.google.com/spreadsheets/d/18w3DWmDtJ5plGWuzHjGNnnQ-M-uvyCrhIBKeaSTOl9Q/edit?gid=596378878#gid=596378878
+
+Tab:
+2026/27 Middle Scenario Plan
+
+Use the first table only:
+Heading: PPC Middle Plan Scenario
+Columns:
+- Month
+- Impressions
+- Clicks
+- CTR
+- CPC
+- Cost
+- Sales
+- CVR
+- CPA
+- Revenue
+- AOV
+
+Do not use the Actuals table as the plan source.
+
+Metric mapping
+- Purchases maps to Sales
+- Purchase Revenue maps to Revenue
+- Cost maps to Cost
+- CPA maps to CPA
+- AOV maps to AOV
+- ROAS is calculated from plan Revenue / plan Cost
+- CTR maps to CTR when used
+- CPC maps to CPC when used
+- CVR maps to CVR when used
+- Impressions maps to Impressions
+- Clicks maps to Clicks
+
+Aggregation rules
+For additive metrics, sum plan values across selected months:
+- Cost
+- Sales / Purchases
+- Revenue
+- Impressions
+- Clicks
+
+For ratio metrics, calculate from summed components when possible:
+- CPA = Cost / Sales
+- ROAS = Revenue / Cost
+- AOV = Revenue / Sales
+- CTR = Clicks / Impressions
+- CPC = Cost / Clicks
+- CVR = Sales / Clicks
+
+Period rules
+- Quarter KPI cards use the report quarter months.
+- YTD KPI cards use current YTD months if the plan table covers those months.
+- Do not mix fiscal-plan Jan-Mar rows that belong to a different fiscal year into calendar YTD unless the app has an explicit plan source for that calendar period.
+- If a required plan month is missing, omit the Plan line for that card and record a warning in PACKAGE_MANIFEST.json.
+
+Variance formula
+Plan variance should be:
+(actual - plan) / plan
+
+Display
+- Format as signed percent with one decimal place unless the existing deck uses a different precision.
+- Example: Plan: +4.4%
+- Main value remains unchanged.
+- Add the Plan line under the YoY line, matching the reference card style.
+
+Color rules
+Use business-performance coloring, not just positive/negative coloring:
+- Higher is good: Purchases, Sales, Purchase Revenue, ROAS, AOV, CVR, CTR, Impressions, Clicks.
+- Lower is good: Cost, CPA, CPC.
+- For lower-is-good metrics, negative variance should be green.
+- For higher-is-good metrics, positive variance should be green.
+- Neutral/missing values should be grey or left uncolored according to the reference style.
+
+Generated report requirements
+In report.txt, KPI card sections should include both YoY and Plan values where available.
+Example:
+Cost: GBP 259,615
+YoY: +10.7%
+Plan: -4.4%
+
+Claude handoff requirements
+The handoff package should include plan source metadata in INPUT_FILES_MANIFEST.txt and PACKAGE_MANIFEST.json.
