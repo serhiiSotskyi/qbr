@@ -15,7 +15,6 @@ from claude_handoff import (
     build_olympic_holidays_claude_handoff_package,
     build_wightlink_claude_handoff_package,
     is_olympic_holidays_report,
-    is_wendy_wu_report,
     is_wightlink_qbr,
     resolve_wendy_wu_client_display_name,
     resolve_wendy_wu_handoff_slug,
@@ -28,6 +27,7 @@ from presentation_prompt_builder import build_presentation_prompt
 BASE_DIR = Path(__file__).resolve().parent
 TEMP_DIR = BASE_DIR / "temp_uploads"
 TEMP_DIR.mkdir(exist_ok=True)
+WENDY_WU_CLIENT_IDS = {"wendy_wu", "wendy_wu_australia"}
 
 
 def load_client_options() -> list[dict[str, str]]:
@@ -149,6 +149,10 @@ def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path
         archive.write(report_txt_path, arcname="report.txt")
         archive.write(prompt_txt_path, arcname="prompt.txt")
     return package_path
+
+
+def is_wendy_wu_streamlit_report(client_id: str, report_mode: str) -> bool:
+    return client_id in WENDY_WU_CLIENT_IDS and report_mode in {"quarterly", "monthly"}
 
 
 def create_claude_handoff_bundle(
@@ -279,12 +283,12 @@ def main() -> None:
     report_mode = "quarterly"
     if client_id == "wightlink":
         report_mode = st.selectbox("Wightlink report mode", ["quarterly", "annual"], index=0)
-    elif client_id in {"wendy_wu", "wendy_wu_australia"}:
+    elif client_id in WENDY_WU_CLIENT_IDS:
         report_mode = st.selectbox("Wendy Wu report mode", ["quarterly", "monthly"], index=0)
 
     st.subheader("File Uploads")
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
-    is_wendy_monthly = client_id in {"wendy_wu", "wendy_wu_australia"} and report_mode == "monthly"
+    is_wendy_monthly = client_id in WENDY_WU_CLIENT_IDS and report_mode == "monthly"
     auction_file = None if is_wendy_monthly else st.file_uploader("Auction CSV", type=["csv"])
     trends_files = [] if is_wendy_monthly else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
     plan_workbook_file = None
@@ -405,7 +409,7 @@ def main() -> None:
             package_path = create_package_bundle(client_id, generated_pptx, generated_txt, prompt_txt_path, request_dir)
             claude_handoff_path = None
             claude_handoff_manifest = None
-            if is_wendy_wu_report(client_id, report_mode):
+            if is_wendy_wu_streamlit_report(client_id, report_mode):
                 claude_handoff_path, claude_handoff_manifest = create_claude_handoff_bundle(
                     client_id=client_id,
                     pptx_path=generated_pptx,
