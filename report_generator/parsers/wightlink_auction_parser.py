@@ -36,13 +36,14 @@ def parse_wightlink_auction_csv(csv_path: str | Path | None, subtype: str = "gen
     if not path.exists():
         return None
 
-    lines = path.read_text(encoding="utf-8-sig").splitlines()
+    text, encoding = _read_text_with_encoding(path)
+    lines = text.splitlines()
     header_index = next((idx for idx, line in enumerate(lines) if HEADER_LABEL.lower() in line.lower()), None)
     if header_index is None:
         return None
 
     metadata = [line.strip() for line in lines[:header_index] if line.strip()]
-    df = pd.read_csv(path, skiprows=header_index)
+    df = pd.read_csv(path, skiprows=header_index, encoding=encoding, sep=None, engine="python")
     if df.empty:
         return None
 
@@ -67,6 +68,15 @@ def parse_wightlink_auction_csv(csv_path: str | Path | None, subtype: str = "gen
         "rows": df.to_dict(orient="records"),
         "table": _format_rows(df),
     }
+
+
+def _read_text_with_encoding(path: Path) -> tuple[str, str]:
+    for encoding in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252"):
+        try:
+            return path.read_text(encoding=encoding), encoding
+        except UnicodeDecodeError:
+            continue
+    return path.read_text(encoding="utf-8-sig", errors="replace"), "utf-8-sig"
 
 
 def _format_rows(df: pd.DataFrame) -> list[dict[str, Any]]:

@@ -80,6 +80,30 @@ class WightlinkQuarterlyTests(unittest.TestCase):
             self.assertEqual(parsed["table"][0]["Display URL domain"], "You")
             self.assertEqual(parsed["rows"][0]["display_url_domain"], "You")
 
+    def test_auction_parser_accepts_utf16_google_ads_export(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            auction_path = Path(tmpdir) / "auction_utf16.csv"
+            auction_path.write_text(
+                "\n".join(
+                    [
+                        "Auction insights report",
+                        "1 April 2025 - 30 June 2025",
+                        "Display URL domain,Impression share,Overlap rate,Position above rate,Top of page rate,Abs. Top of page rate,Outranking share",
+                        "You,35.76%, --, --,88.98%,49.65%, --",
+                        "redfunnel.co.uk,22.41%,37.84%,48.14%,89.42%,36.16%,29.25%",
+                    ]
+                ),
+                encoding="utf-16",
+            )
+
+            parsed = parse_wightlink_auction_csv(auction_path)
+
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        red_funnel = next(row for row in parsed["rows"] if row["display_url_domain"] == "redfunnel.co.uk")
+        self.assertAlmostEqual(red_funnel["impression_share"], 0.2241)
+        self.assertEqual(parsed["metadata"], ["Auction insights report", "1 April 2025 - 30 June 2025"])
+
     def test_plan_sales_drive_purchase_and_cpa_plan_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
