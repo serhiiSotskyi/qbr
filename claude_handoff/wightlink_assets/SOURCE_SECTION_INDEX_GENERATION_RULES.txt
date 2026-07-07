@@ -20,30 +20,25 @@ Expected current Wightlink sections
 01. Cover
 02. Agenda
 03. Trends
-04. Trends - ...
-05. Trends - ...
-06. Trends - ...
+04. Google Trends YTD - Wightlink Ferries
+05. Google Trends YTD - Isle of Wight Ferry
+06. Google Trends YTD - Isle of Wight Holidays
 07. Auction Insights - Generic
 08. Auction Insights - Brand
-09. Performance
-10. All Performance Summary
-11. All Performance YoY Trend
-12. Brand Performance Summary
-13. Brand Performance YoY Trend
-14. Generics Performance Summary
-15. Generics Performance YoY Trend
-16. PMax Performance Summary
-17. PMax Performance YoY Trend
-18. Closing
-
-Expected V2 additional sections
-19. Google Trends YTD - Wightlink Ferries
-20. Google Trends YTD - Isle of Wight Ferry
-21. Google Trends YTD - Isle of Wight Holidays
-22. Auction Insights - Red Funnel Quarter
-23. Brand Monthly Breakdown YTD
-24. Generics Monthly Breakdown YTD
-25. PMax Performance Summary YTD
+09. Auction Insights - Red Funnel Quarter
+10. Performance
+11. All Performance Summary
+12. All Performance Purchases YoY
+13. Brand Performance Summary
+14. Brand Performance Monthly Purchases and Revenue
+15. Brand Monthly Breakdown YTD
+16. Generics Performance Summary
+17. Generics Performance Monthly Purchases and Revenue
+18. Generics Monthly Breakdown YTD
+19. PMax Performance Summary
+20. PMax Performance Monthly Purchases and Revenue
+21. PMax Performance Summary YTD
+22. Closing
 
 V2 period metadata
 - Extract ytd_period_label when present.
@@ -52,7 +47,7 @@ V2 period metadata
 - Record plan source URL or plan CSV filename when present.
 
 Important checks
-- If Testing, Next Steps, or Other Updates sections are absent, record them as missing/placeholders in PACKAGE_MANIFEST.json.
-- If Red Funnel YoY, ad creative review, or top campaign data are absent, record them as missing/placeholders.
+- Do not treat removed Plan vs Actual detail slides as missing.
+- If the Red Funnel prior-year auction source is absent, record a warning that YoY change values may be unavailable.
 - Google Trends section display names should come from CSV headers, not from report section names when report section names are export filenames.
 - For V2, do not treat missing YTD trend pairs or missing quarter-only Red Funnel source as successful; record a warning and produce a clear placeholder only if the user allows package generation to continue.

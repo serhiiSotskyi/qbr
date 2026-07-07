@@ -69,7 +69,8 @@ def build_request_inputs(
     wightlink_trends_current_ytd_files=None,
     wightlink_trends_previous_ytd_files=None,
     red_funnel_auction_file=None,
-) -> tuple[Path, str, str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
+    red_funnel_prior_auction_file=None,
+) -> tuple[Path, str, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
     request_id = uuid4().hex
     request_dir = TEMP_DIR / request_id
     request_dir.mkdir(parents=True, exist_ok=True)
@@ -120,6 +121,13 @@ def build_request_inputs(
     if red_funnel_auction_file is not None:
         red_funnel_auction_path = save_uploaded_file(red_funnel_auction_file, request_dir / "auction_red_funnel_quarter" / red_funnel_auction_file.name)
 
+    red_funnel_prior_auction_path = None
+    if red_funnel_prior_auction_file is not None:
+        red_funnel_prior_auction_path = save_uploaded_file(
+            red_funnel_prior_auction_file,
+            request_dir / "auction_red_funnel_prior_quarter" / red_funnel_prior_auction_file.name,
+        )
+
     return (
         request_dir,
         perf_path,
@@ -130,6 +138,7 @@ def build_request_inputs(
         trends_ytd_current_dir,
         trends_ytd_previous_dir,
         red_funnel_auction_path,
+        red_funnel_prior_auction_path,
     )
 
 
@@ -177,6 +186,7 @@ def create_wightlink_claude_handoff_bundle(
     trends_ytd_current_dir: str | Path | None,
     trends_ytd_previous_dir: str | Path | None,
     red_funnel_auction_csv_path: str | Path | None,
+    red_funnel_prior_auction_csv_path: str | Path | None,
     plan_book_path: str | Path | None,
 ) -> tuple[Path, dict]:
     trend_csv_files = sorted(Path(trends_dir).glob("*.csv")) if trends_dir else []
@@ -192,6 +202,7 @@ def create_wightlink_claude_handoff_bundle(
         trend_ytd_current_csv_files=trend_ytd_current_files,
         trend_ytd_previous_csv_files=trend_ytd_previous_files,
         red_funnel_auction_csv=red_funnel_auction_csv_path,
+        red_funnel_prior_auction_csv=red_funnel_prior_auction_csv_path,
         plan_book_csv=plan_book_path,
         reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
     )
@@ -275,6 +286,7 @@ def main() -> None:
     wightlink_trends_current_ytd_files = []
     wightlink_trends_previous_ytd_files = []
     red_funnel_auction_file = None
+    red_funnel_prior_auction_file = None
     if client_id == "wightlink":
         plan_workbook_file = st.file_uploader(
             "Wightlink Plan Sheet CSV or Workbook",
@@ -298,6 +310,11 @@ def main() -> None:
                 "Wightlink Red Funnel quarter Auction Insights CSV",
                 type=["csv"],
                 help="Quarter-only Auction Insights export for the report quarter. Used for the added Red Funnel Quarter slide.",
+            )
+            red_funnel_prior_auction_file = st.file_uploader(
+                "Wightlink Red Funnel prior-year quarter Auction Insights CSV",
+                type=["csv"],
+                help="Same-quarter-prior-year Auction Insights export, e.g. Q2 2025 for a Q2 2026 report. Used for Red Funnel YoY comparison.",
             )
     other_campaign_files = []
     if client_id == "wendy_wu":
@@ -326,6 +343,7 @@ def main() -> None:
             trends_ytd_current_dir,
             trends_ytd_previous_dir,
             red_funnel_auction_path,
+            red_funnel_prior_auction_path,
         ) = build_request_inputs(
             performance_file,
             auction_file,
@@ -335,6 +353,7 @@ def main() -> None:
             wightlink_trends_current_ytd_files,
             wightlink_trends_previous_ytd_files,
             red_funnel_auction_file,
+            red_funnel_prior_auction_file,
         )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -354,6 +373,7 @@ def main() -> None:
                     trends_ytd_previous_dir=trends_ytd_previous_dir,
                     auction_csv=auction_path,
                     red_funnel_auction_csv=red_funnel_auction_path,
+                    red_funnel_prior_auction_csv=red_funnel_prior_auction_path,
                     plan_workbook=plan_workbook_path,
                     other_campaigns_dir=other_campaigns_dir,
                     output_path=str(pptx_path),
@@ -369,6 +389,7 @@ def main() -> None:
                     trends_ytd_previous_dir=trends_ytd_previous_dir,
                     auction_csv=auction_path,
                     red_funnel_auction_csv=red_funnel_auction_path,
+                    red_funnel_prior_auction_csv=red_funnel_prior_auction_path,
                     plan_workbook=plan_workbook_path,
                     other_campaigns_dir=other_campaigns_dir,
                     output_path=str(report_txt_path),
@@ -400,6 +421,7 @@ def main() -> None:
                     trends_ytd_current_dir=trends_ytd_current_dir,
                     trends_ytd_previous_dir=trends_ytd_previous_dir,
                     red_funnel_auction_csv_path=red_funnel_auction_path,
+                    red_funnel_prior_auction_csv_path=red_funnel_prior_auction_path,
                     plan_book_path=plan_workbook_path,
                 )
             elif is_olympic_holidays_report(client_id, report_mode):

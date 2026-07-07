@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.ticker import FuncFormatter
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
@@ -179,6 +180,108 @@ class WightlinkPptxBuilder:
         plt.close(fig)
         return output
 
+    def build_yoy_bar_chart(
+        self,
+        monthly_rows: list[dict[str, Any]],
+        filename: str,
+        current_metric: str,
+        prior_metric: str,
+        title: str,
+        current_label: str,
+        prior_label: str,
+    ) -> Path:
+        output = self.charts_dir / filename
+        if not monthly_rows:
+            return self._plot_empty(output, "No YoY data")
+
+        df = pd.DataFrame(monthly_rows)
+        if df.empty or "month_label" not in df.columns:
+            return self._plot_empty(output, "No YoY data")
+
+        labels = df["month_label"].tolist()
+        x_positions = range(len(labels))
+        width = 0.34
+        current_values = df[current_metric].fillna(0) if current_metric in df.columns else [0] * len(labels)
+        prior_values = df[prior_metric].fillna(0) if prior_metric in df.columns else [0] * len(labels)
+
+        fig, ax = plt.subplots(figsize=(8.4, 4.4))
+        current_bars = ax.bar(
+            [position - width / 2 for position in x_positions],
+            current_values,
+            width=width,
+            color="#C7372F",
+            label=current_label,
+        )
+        prior_bars = ax.bar(
+            [position + width / 2 for position in x_positions],
+            prior_values,
+            width=width,
+            color="#B8B5B1",
+            label=prior_label,
+        )
+        ax.set_title(title.upper(), fontsize=12, color="#888888", fontweight="bold")
+        ax.set_xticks(list(x_positions), labels)
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+        ax.tick_params(axis="both", labelsize=9, colors="#888888")
+        ax.grid(axis="y", alpha=0.22)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        ax.legend(fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=2, frameon=False)
+        for bars in (current_bars, prior_bars):
+            ax.bar_label(bars, labels=[f"{bar.get_height():,.0f}" if bar.get_height() else "" for bar in bars], padding=3, fontsize=8)
+        plt.tight_layout()
+        fig.savefig(output, dpi=180)
+        plt.close(fig)
+        return output
+
+    def build_monthly_purchases_revenue_chart(self, scope: dict[str, Any], filename: str, title: str) -> Path:
+        output = self.charts_dir / filename
+        monthly = scope.get("monthly", [])
+        if not monthly:
+            return self._plot_empty(output, "No monthly data")
+
+        df = pd.DataFrame(monthly)
+        if df.empty or "month_label" not in df.columns:
+            return self._plot_empty(output, "No monthly data")
+
+        labels = df["month_label"].tolist()
+        x_positions = range(len(labels))
+        width = 0.34
+        purchases = df["purchases"].fillna(0) if "purchases" in df.columns else [0] * len(labels)
+        revenue = df["purchase_revenue"].fillna(0) if "purchase_revenue" in df.columns else [0] * len(labels)
+
+        fig, ax1 = plt.subplots(figsize=(8.4, 4.4))
+        ax2 = ax1.twinx()
+        purchase_bars = ax1.bar(
+            [position - width / 2 for position in x_positions],
+            purchases,
+            width=width,
+            color="#C7372F",
+            label="Purchases",
+        )
+        revenue_bars = ax2.bar(
+            [position + width / 2 for position in x_positions],
+            revenue,
+            width=width,
+            color="#B8B5B1",
+            label="Revenue",
+        )
+        ax1.set_title(title.upper(), fontsize=12, color="#888888", fontweight="bold")
+        ax1.set_xticks(list(x_positions), labels)
+        ax1.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+        ax2.yaxis.set_major_formatter(FuncFormatter(_compact_currency_tick))
+        ax1.tick_params(axis="both", labelsize=9, colors="#888888")
+        ax2.tick_params(axis="y", labelsize=9, colors="#888888")
+        ax1.grid(axis="y", alpha=0.22)
+        ax1.spines[["top", "right", "left"]].set_visible(False)
+        ax2.spines[["top", "right", "left"]].set_visible(False)
+        ax1.legend([purchase_bars, revenue_bars], ["Purchases", "Revenue"], fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=2, frameon=False)
+        ax1.bar_label(purchase_bars, labels=[f"{bar.get_height():,.0f}" if bar.get_height() else "" for bar in purchase_bars], padding=3, fontsize=8)
+        ax2.bar_label(revenue_bars, labels=[_compact_currency_label(bar.get_height()) if bar.get_height() else "" for bar in revenue_bars], padding=3, fontsize=8)
+        plt.tight_layout()
+        fig.savefig(output, dpi=180)
+        plt.close(fig)
+        return output
+
     def build_plan_comparison_chart(
         self,
         monthly_rows: list[dict[str, Any]],
@@ -290,6 +393,10 @@ class WightlinkPptxBuilder:
             if charts:
                 slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.6), Inches(1.5), width=Inches(6.7), height=Inches(3.8))
             self._add_bullets(slide, bullets, Inches(7.65), Inches(1.6), Inches(4.6), Inches(3.7))
+        elif slide_type == "wide_chart_bullets":
+            if charts:
+                slide.shapes.add_picture(str(charts[0]["path"]), Inches(1.0), Inches(1.28), width=Inches(11.3), height=Inches(4.55))
+            self._add_bullets(slide, bullets, Inches(1.05), Inches(6.0), Inches(11.0), Inches(0.7), font_size=13)
         elif slide_type == "table_bullets":
             self._render_table(slide, table_rows, Inches(0.4), Inches(1.35), Inches(12.45), Inches(3.35))
             self._add_bullets(slide, bullets, Inches(0.8), Inches(4.95), Inches(11.8), Inches(1.45))
@@ -476,3 +583,16 @@ class WightlinkPptxBuilder:
         fig.savefig(output, dpi=180)
         plt.close(fig)
         return output
+
+
+def _compact_currency_tick(value: float, _: Any) -> str:
+    return _compact_currency_label(value)
+
+
+def _compact_currency_label(value: float) -> str:
+    absolute = abs(float(value))
+    if absolute >= 1_000_000:
+        return f"£{float(value) / 1_000_000:.1f}m"
+    if absolute >= 1_000:
+        return f"£{float(value) / 1_000:.0f}k"
+    return f"£{float(value):,.0f}"

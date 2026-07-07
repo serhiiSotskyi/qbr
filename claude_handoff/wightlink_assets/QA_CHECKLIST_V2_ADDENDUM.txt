@@ -16,10 +16,9 @@ Google Trends checks
 - Labels are not clipped or overlapping.
 
 Auction Insights checks
-- Red Funnel Quarter slide exists as an added slide.
-- Existing Red Funnel YoY/competitive landscape slide was not removed.
-- Red Funnel Quarter slide uses only report-quarter data.
-- The slide is not labelled YoY unless prior-period data is actually supplied.
+- Red Funnel slide exists and is Red Funnel only.
+- Red Funnel slide uses report-quarter data and same-quarter-prior-year data when supplied.
+- The YoY change column is populated only from a supplied prior-year auction insights file.
 - Table metrics match the source exactly.
 
 YTD performance checks
@@ -32,6 +31,7 @@ YTD performance checks
 
 Plan comparison checks
 - KPI cards include YoY and Plan lines where plan metrics exist.
+- Removed Plan vs Actual detail slides are not recreated.
 - Plan source is the PPC Middle Plan Scenario table, not the Actuals table.
 - Purchases map to Sales.
 - Purchase Revenue maps to Revenue.
@@ -43,10 +43,11 @@ Plan comparison checks
 
 Slide count
 - Reference deck has 27 slides.
-- V2 output target has 31 slides unless the user explicitly requests otherwise.
+- Lean V2 Streamlit output target has 22 slides when all current Wightlink V2 sources are supplied.
 
 Final deck checks
 - No stale FY labels remain on YTD trend slides.
-- No stale Red Funnel YoY values are reused for the quarter-only slide.
+- No stale Red Funnel values are reused; prior-year values must come from source_data/auction_insights_red_funnel_prior_year_quarter.csv when present.
+- Campaign-type chart slides use one monthly purchases and purchase revenue chart only.
 - No old table values remain on added YTD slides.
 - All new chart/table slides pass CHART_QA_ADDENDUM_FOR_CLAUDE.txt.

@@ -17,7 +17,7 @@ ASSETS_DIR = Path(__file__).resolve().parent / "wightlink_assets"
 DEFAULT_REFERENCE_PPTX_PATH = ASSETS_DIR / "reference_deck_exported_from_google_slides.pptx"
 DEFAULT_REFERENCE_DECK_URL = "https://docs.google.com/presentation/d/1QBixtNRD_N_qZ6J56RyfM1vvrTudrZUowZIMdBoGhso"
 REFERENCE_SLIDE_COUNT = 27
-TARGET_OUTPUT_SLIDE_COUNT = 31
+TARGET_OUTPUT_SLIDE_COUNT = 22
 PLAN_SOURCE_URL = "https://docs.google.com/spreadsheets/d/18w3DWmDtJ5plGWuzHjGNnnQ-M-uvyCrhIBKeaSTOl9Q/edit?gid=596378878#gid=596378878"
 EXPECTED_TREND_TERMS = (
     "Wightlink Ferries",
@@ -42,22 +42,15 @@ EXPECTED_EXACT_SECTIONS = (
     "Auction Insights - Red Funnel Quarter",
     "Performance",
     "All Performance Summary",
-    "All Performance YoY Trend",
-    "Plan vs Actual Overview",
-    "Actual vs Prior Year Overview",
-    "Plan vs Actual Monthly Trend",
-    "Plan vs Actual Monthly Table",
-    "Actual YoY Spend and Revenue",
-    "Plan vs Actual Purchases and CPA",
-    "Actual YoY Purchases and CPA",
+    "All Performance Purchases YoY",
     "Brand Performance Summary",
-    "Brand Performance YoY Trend",
+    "Brand Performance Monthly Purchases and Revenue",
     "Brand Monthly Breakdown YTD",
     "Generics Performance Summary",
-    "Generics Performance YoY Trend",
+    "Generics Performance Monthly Purchases and Revenue",
     "Generics Monthly Breakdown YTD",
     "PMax Performance Summary",
-    "PMax Performance YoY Trend",
+    "PMax Performance Monthly Purchases and Revenue",
     "PMax Performance Summary YTD",
     "Closing",
 )
@@ -97,6 +90,7 @@ def build_wightlink_claude_handoff_package(
     trend_ytd_current_csv_files: Sequence[bytes | Path | str] | None = None,
     trend_ytd_previous_csv_files: Sequence[bytes | Path | str] | None = None,
     red_funnel_auction_csv: bytes | Path | str | None = None,
+    red_funnel_prior_auction_csv: bytes | Path | str | None = None,
     plan_book_csv: bytes | Path | str | None = None,
     reference_pptx: bytes | Path | str | None = DEFAULT_REFERENCE_PPTX_PATH,
     reference_deck_url: str = DEFAULT_REFERENCE_DECK_URL,
@@ -111,6 +105,7 @@ def build_wightlink_claude_handoff_package(
         trend_ytd_current_csv_files=trend_ytd_current_csv_files or [],
         trend_ytd_previous_csv_files=trend_ytd_previous_csv_files or [],
         red_funnel_auction_csv=red_funnel_auction_csv,
+        red_funnel_prior_auction_csv=red_funnel_prior_auction_csv,
         plan_book_csv=plan_book_csv,
     )
 
@@ -155,6 +150,7 @@ def build_wightlink_claude_handoff_package(
         "auction_original_filename": _source_name(auction_csv) if auction_csv is not None else "not supplied",
         "plan_original_filename": _source_name(plan_book_csv) if plan_book_csv is not None else "not supplied",
         "red_funnel_quarter_auction_original_filename": _source_name(red_funnel_auction_csv) if red_funnel_auction_csv is not None else "not supplied",
+        "red_funnel_prior_auction_original_filename": _source_name(red_funnel_prior_auction_csv) if red_funnel_prior_auction_csv is not None else "not supplied",
         "headline_cost": headline_kpis["cost"],
         "headline_purchases": headline_kpis["purchases"],
         "headline_purchase_revenue": headline_kpis["purchase_revenue"],
@@ -273,6 +269,7 @@ def build_raw_inputs(
     trend_ytd_current_csv_files: Sequence[bytes | Path | str],
     trend_ytd_previous_csv_files: Sequence[bytes | Path | str],
     red_funnel_auction_csv: bytes | Path | str | None,
+    red_funnel_prior_auction_csv: bytes | Path | str | None,
     plan_book_csv: bytes | Path | str | None,
 ) -> list[WightlinkRawInput]:
     inputs = [
@@ -304,6 +301,17 @@ def build_raw_inputs(
                 role="Quarter-only Red Funnel Auction Insights source",
                 required=True,
                 payload=_read_payload(red_funnel_auction_csv),
+            )
+        )
+
+    if red_funnel_prior_auction_csv is not None:
+        inputs.append(
+            WightlinkRawInput(
+                source_name=_source_name(red_funnel_prior_auction_csv),
+                archive_name="source_data/auction_insights_red_funnel_prior_year_quarter.csv",
+                role="Same-quarter-prior-year Red Funnel Auction Insights source",
+                required=True,
+                payload=_read_payload(red_funnel_prior_auction_csv),
             )
         )
 
@@ -673,6 +681,8 @@ def _build_v2_source_warnings(
             warnings.append(f"Missing current/previous YTD Google Trends pair for {term}.")
     if not any(raw_input.archive_name == "source_data/auction_insights_red_funnel_quarter.csv" for raw_input in raw_inputs):
         warnings.append("Missing quarter-only Red Funnel Auction Insights source.")
+    if not any(raw_input.archive_name == "source_data/auction_insights_red_funnel_prior_year_quarter.csv" for raw_input in raw_inputs):
+        warnings.append("Missing same-quarter-prior-year Red Funnel Auction Insights source; Red Funnel YoY change column may be unavailable.")
     if plan_book_csv is None:
         warnings.append("Missing Wightlink plan source; KPI Plan lines may be unavailable.")
     return warnings
@@ -710,8 +720,8 @@ def _build_files_manifest(raw_inputs: list[WightlinkRawInput], *, has_reference_
         },
         {"name": "README_FOR_CLAUDE.txt", "role": "operator README", "required": True},
         {"name": "CLAUDE_PROMPT.txt", "role": "Claude execution prompt", "required": True},
-        {"name": "SLIDE_MAPPING.csv", "role": "31-slide V2 reference deck mapping", "required": True},
-        {"name": "UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv", "role": "31-slide V2 reference deck mapping alias", "required": True},
+        {"name": "SLIDE_MAPPING.csv", "role": "22-slide lean V2 reference deck mapping", "required": True},
+        {"name": "UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv", "role": "22-slide lean V2 reference deck mapping alias", "required": True},
         {"name": "SOURCE_SECTION_INDEX.txt", "role": "report section line index", "required": True},
         {"name": "INPUT_FILES_MANIFEST.txt", "role": "raw input descriptions and query names", "required": True},
         {"name": "REFERENCE_DECK_OUTLINE.txt", "role": "Wightlink reference deck outline", "required": True},

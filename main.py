@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--client-id", help="Client ID from config/clients_config.json.")
     parser.add_argument("--auction-csv", help="Path to Auction Insights CSV export.")
     parser.add_argument("--red-funnel-auction-csv", help="Path to Wightlink quarter-only Red Funnel Auction Insights CSV export.")
+    parser.add_argument("--red-funnel-prior-auction-csv", help="Path to Wightlink same-quarter-prior-year Red Funnel Auction Insights CSV export.")
     parser.add_argument("--trends-dir", help="Directory containing Google Trends CSV exports.")
     parser.add_argument("--trends-ytd-current-dir", help="Directory containing Wightlink current YTD Google Trends CSV exports.")
     parser.add_argument("--trends-ytd-previous-dir", help="Directory containing Wightlink previous YTD Google Trends CSV exports.")
@@ -48,6 +49,7 @@ def run_report(
     trends_ytd_previous_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
     red_funnel_auction_csv: Optional[str] = None,
+    red_funnel_prior_auction_csv: Optional[str] = None,
     plan_workbook: Optional[str] = None,
     other_campaigns_dir: Optional[str] = None,
     output_path: Optional[str] = None,
@@ -94,6 +96,7 @@ def run_report(
                 trends_ytd_previous_dir=trends_ytd_previous_dir,
                 auction_csv=auction_csv,
                 red_funnel_auction_csv=red_funnel_auction_csv,
+                red_funnel_prior_auction_csv=red_funnel_prior_auction_csv,
                 plan_workbook=plan_workbook,
             )
         return str(result["pptx_path"])
@@ -120,6 +123,7 @@ def run_text_report(
     trends_ytd_previous_dir: Optional[str] = None,
     auction_csv: Optional[str] = None,
     red_funnel_auction_csv: Optional[str] = None,
+    red_funnel_prior_auction_csv: Optional[str] = None,
     plan_workbook: Optional[str] = None,
     other_campaigns_dir: Optional[str] = None,
     output_path: Optional[str] = None,
@@ -166,6 +170,7 @@ def run_text_report(
                 trends_ytd_previous_dir=trends_ytd_previous_dir,
                 auction_csv=auction_csv,
                 red_funnel_auction_csv=red_funnel_auction_csv,
+                red_funnel_prior_auction_csv=red_funnel_prior_auction_csv,
                 plan_workbook=plan_workbook,
             )
         return str(result["text_path"])
@@ -199,6 +204,7 @@ def main() -> None:
         trends_ytd_previous_dir=args.trends_ytd_previous_dir,
         auction_csv=args.auction_csv,
         red_funnel_auction_csv=args.red_funnel_auction_csv,
+        red_funnel_prior_auction_csv=args.red_funnel_prior_auction_csv,
         other_campaigns_dir=args.other_campaigns_dir,
         plan_workbook=args.plan_workbook,
         output_path=args.output,

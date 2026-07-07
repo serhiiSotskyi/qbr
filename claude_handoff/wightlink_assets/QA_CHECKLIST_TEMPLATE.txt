@@ -13,7 +13,7 @@ Deck identity
 Stale content
 - No old period labels remain unless clearly part of a comparison that report.txt provides.
 - No old KPI values remain.
-- No old Red Funnel YoY, ad creative, testing, next steps, or other updates content remains unless report.txt provides it.
+- No stale Red Funnel, plan-detail, ad creative, testing, next steps, or other updates content remains unless report.txt provides it.
 - No wrong-client copy remains.
 
 Data integrity
@@ -21,14 +21,14 @@ Data integrity
 - All YoY values match report.txt exactly.
 - All tables match report.txt exactly, including symbols, percentages, dashes, and row order.
 - Auction Insights tables match report.txt.
+- Red Funnel table is Red Funnel only and uses prior-year quarter values when supplied.
 - Google Trends slides are correctly titled using source_data CSV headers.
 - Every report.txt section is represented somewhere in the deck.
 
-Manual placeholders
-- Missing Red Funnel/ad creative slide is a clear placeholder.
-- Missing Testing slides are clearly marked for human completion.
-- Missing Next Steps slide is clearly marked for human completion.
-- Missing Other Updates slide is clearly marked for human completion.
+Lean V2 structure
+- Removed Plan vs Actual detail slides are not recreated.
+- All Performance has KPI cards plus one Purchases YoY monthly bar chart.
+- Brand, Generics, and PMax each have one monthly purchases and purchase revenue chart, not the old two-chart YoY pair.
 
 Visual fidelity
 - Typography, Wightlink colors, dark navy sections, footer treatment, KPI cards, and table styling match the reference deck.

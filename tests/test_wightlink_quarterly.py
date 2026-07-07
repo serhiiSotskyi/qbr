@@ -39,22 +39,26 @@ class WightlinkQuarterlyTests(unittest.TestCase):
 
             titles = [slide.get("section_title") for slide in slides]
             for expected in [
+                "All Performance Purchases YoY",
                 "Brand Performance Summary",
-                "Brand Performance YoY Trend",
+                "Brand Performance Monthly Purchases and Revenue",
                 "Generics Performance Summary",
-                "Generics Performance YoY Trend",
+                "Generics Performance Monthly Purchases and Revenue",
                 "PMax Performance Summary",
-                "PMax Performance YoY Trend",
+                "PMax Performance Monthly Purchases and Revenue",
                 "Ferry Performance Summary",
-                "Ferry Performance YoY Trend",
+                "Ferry Performance Monthly Purchases and Revenue",
                 "Routes Performance Summary",
-                "Routes Performance YoY Trend",
+                "Routes Performance Monthly Purchases and Revenue",
             ]:
                 self.assertIn(expected, titles)
 
-            chart_slides = [slide for slide in slides if slide.get("section_title", "").endswith("YoY Trend")]
+            self.assertFalse(any(str(title).endswith("YoY Trend") for title in titles))
+
+            chart_slides = [slide for slide in slides if slide.get("section_title", "").endswith("Monthly Purchases and Revenue")]
             for slide in chart_slides:
-                self.assertEqual([chart["title"] for chart in slide["charts"]], ["Purchases + CPA YoY", "Revenue + ROAS YoY"])
+                self.assertEqual(slide["type"], "wide_chart_bullets")
+                self.assertEqual([chart["title"] for chart in slide["charts"]], ["Monthly Purchases and Revenue"])
                 self.assertTrue(slide["bullets"])
                 for chart in slide["charts"]:
                     self.assertTrue(Path(chart["path"]).exists())
@@ -102,69 +106,35 @@ class WightlinkQuarterlyTests(unittest.TestCase):
             for label in ["Cost", "Purchases", "Purchase Revenue", "CPA"]:
                 self.assertTrue(plan_context[label], label)
 
-            overview = next(slide for slide in slides if slide.get("section_title") == "Plan vs Actual Overview")
-            self.assertEqual([row["Metric"] for row in overview["table"]["rows"]], ["Spend", "Purchases", "Revenue", "CPA"])
-
-            yoy_overview = next(slide for slide in slides if slide.get("section_title") == "Actual vs Prior Year Overview")
-            self.assertEqual([row["Metric"] for row in yoy_overview["table"]["rows"]], ["Spend", "Purchases", "Revenue", "CPA"])
-            self.assertIn("Prior Year", yoy_overview["table"]["rows"][0])
-
-            monthly_trend = next(slide for slide in slides if slide.get("section_title") == "Plan vs Actual Monthly Trend")
-            self.assertEqual(monthly_trend["type"], "dual_chart_bullets")
-            self.assertNotIn("table", monthly_trend)
-
-            monthly_table = next(slide for slide in slides if slide.get("section_title") == "Plan vs Actual Monthly Table")
-            self.assertEqual(monthly_table["type"], "table_only")
-            headers = monthly_table["table"]["rows"][0].keys()
-            self.assertNotIn("Planned Spend", headers)
-            self.assertNotIn("Planned Purchases", headers)
-            self.assertNotIn("Planned Revenue", headers)
-            self.assertNotIn("Planned CPA", headers)
-            self.assertIn("Actual Purchases", headers)
-            self.assertIn("Actual CPA", headers)
-
             section_titles = [slide.get("section_title") for slide in slides]
-            actual_yoy_spend_revenue = next(slide for slide in slides if slide.get("section_title") == "Actual YoY Spend and Revenue")
-            self.assertEqual(actual_yoy_spend_revenue["type"], "dual_chart_bullets")
-            self.assertGreater(
-                section_titles.index("Actual YoY Spend and Revenue"),
-                section_titles.index("Plan vs Actual Monthly Table"),
-            )
-            self.assertLess(
-                section_titles.index("Actual YoY Spend and Revenue"),
-                section_titles.index("Plan vs Actual Purchases and CPA"),
-            )
-            self.assertEqual(
-                [chart["title"] for chart in actual_yoy_spend_revenue["charts"]],
-                ["Actual vs Prior Year Spend", "Actual vs Prior Year Revenue"],
-            )
-            for chart in actual_yoy_spend_revenue["charts"]:
-                self.assertTrue(Path(chart["path"]).exists())
+            for removed in [
+                "Plan vs Actual Overview",
+                "Actual vs Prior Year Overview",
+                "Plan vs Actual Monthly Trend",
+                "Plan vs Actual Monthly Table",
+                "Actual YoY Spend and Revenue",
+                "Plan vs Actual Purchases and CPA",
+                "Actual YoY Purchases and CPA",
+            ]:
+                self.assertNotIn(removed, section_titles)
+
+            purchases_yoy = next(slide for slide in slides if slide.get("section_title") == "All Performance Purchases YoY")
+            self.assertEqual(purchases_yoy["type"], "wide_chart_bullets")
+            self.assertEqual([chart["title"] for chart in purchases_yoy["charts"]], ["Purchases YoY"])
+            self.assertTrue(Path(purchases_yoy["charts"][0]["path"]).exists())
 
             chart_titles = [
                 chart["title"]
                 for slide in slides
                 for chart in slide.get("charts", [])
             ]
-            self.assertIn("Actual vs Prior Year Spend", chart_titles)
-            self.assertIn("Actual vs Prior Year Revenue", chart_titles)
-            self.assertIn("Plan vs Actual Purchases", chart_titles)
-            self.assertIn("Plan vs Actual CPA", chart_titles)
-            self.assertIn("Plan vs Actual Monthly Trend", section_titles)
-            self.assertIn("Plan vs Actual Purchases and CPA", section_titles)
-            self.assertIn("Actual YoY Purchases and CPA", section_titles)
             self.assertIn("Purchases YoY", chart_titles)
-            self.assertIn("CPA YoY", chart_titles)
-            self.assertLess(
-                result["text"].index("[Plan vs Actual Monthly Table]"),
-                result["text"].index("[Actual YoY Spend and Revenue]"),
-            )
+            self.assertIn("Monthly Purchases and Revenue", chart_titles)
             self.assertIn("Slide: 1", result["text"])
             self.assertIn(
-                "- Purchases + CPA YoY\n  Lines: Q1 2025 Purchases, Q1 2024 Purchases, Q1 2025 CPA, Q1 2024 CPA",
+                "- Purchases YoY\n  Bars: Q1 2025 Purchases, Q1 2024 Purchases",
                 result["text"],
             )
-            self.assertIn("- Actual vs Prior Year Spend\n  Bars: Prior Year, Actual", result["text"])
 
     def test_ytd_period_derivation_uses_report_quarter_end(self) -> None:
         csv_path = PACK_V2 / "performance_daily_over_year_sample.csv"
@@ -240,12 +210,15 @@ class WightlinkQuarterlyTests(unittest.TestCase):
                 trends_ytd_previous_dir=previous,
                 auction_csv=PACK_V2 / "auction_insights.csv",
                 red_funnel_auction_csv=PACK_V2 / "auction_insights.csv",
+                red_funnel_prior_auction_csv=PACK_V2 / "auction_insights.csv",
                 plan_workbook=PACK_V2 / "wightlink_plan_2026_27_middle_scenario.csv",
             )
 
         titles = [slide.get("section_title") for slide in result["slides"]]
         self.assertIn("Google Trends YTD - Wightlink Ferries", titles)
         self.assertIn("Auction Insights - Red Funnel Quarter", titles)
+        self.assertIn("All Performance Purchases YoY", titles)
+        self.assertIn("Brand Performance Monthly Purchases and Revenue", titles)
         self.assertIn("Brand Monthly Breakdown YTD", titles)
         self.assertIn("Generics Monthly Breakdown YTD", titles)
         self.assertIn("PMax Performance Summary YTD", titles)
@@ -256,6 +229,11 @@ class WightlinkQuarterlyTests(unittest.TestCase):
             self.assertTrue(plan_context[label], label)
         self.assertIn("[Brand Monthly Breakdown YTD]", result["text"])
         self.assertIn("[Auction Insights - Red Funnel Quarter]", result["text"])
+        red_funnel = next(slide for slide in result["slides"] if slide.get("section_title") == "Auction Insights - Red Funnel Quarter")
+        first_row = red_funnel["table"]["rows"][0]
+        self.assertIn("Q2 2025", first_row)
+        self.assertIn("Q2 2026", first_row)
+        self.assertIn("Change", first_row)
 
 
 def _write_performance_csv(path: Path, include_data_type: bool) -> Path:

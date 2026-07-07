@@ -1,7 +1,7 @@
 Wightlink {{quarter_short}} PPC Report Deck Handoff
 
 V2 note
-This handoff may include the July 2026 Wightlink QBR V2 requirements: YTD trend comparison charts, quarter-only Red Funnel Auction Insights, additional YTD monthly breakdown slides, and Plan comparison lines on KPI cards. Use UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv and QA_CHECKLIST_V2_ADDENDUM.txt when included.
+This handoff may include the July 2026 Wightlink QBR V2 requirements: YTD trend comparison charts, Red Funnel same-quarter YoY Auction Insights, YTD monthly breakdown slides, Plan comparison lines on KPI cards, and a leaner performance section. Use UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv and QA_CHECKLIST_V2_ADDENDUM.txt when included.
 
 Goal
 Transform the Streamlit output in this upload pack into a polished Wightlink Google Slides-style report that matches the visual system, slide language, typography, chart treatment, table styling, footer, and overall look of this reference deck:
@@ -35,7 +35,7 @@ Non-negotiable target mode
 - Preserve the Wightlink/Summon visual system from the reference deck.
 - Do not invent sections that are not present in report.txt.
 - Do not silently drop source sections from report.txt. Every report.txt section must be represented in the final deck.
-- For V2 packages, keep the deck quarter-led overall, but update trend slides to YTD comparison and add the specified YTD/Red Funnel slides.
+- For V2 packages, keep the deck quarter-led overall and follow the lean V2 structure in SLIDE_MAPPING.csv. Do not recreate removed Plan vs Actual detail slides or the old campaign chart-pair slides.
 
 Specific source notes
 - Google Trends section titles in report.txt may be file-name based. Retitle them using the source_data CSV headers:
@@ -43,7 +43,7 @@ Specific source notes
   - {{trend_2_file}} = {{trend_2_display_name}}
   - {{trend_3_file}} = {{trend_3_display_name}}
 - The plan CSV is secondary. Use it only for audit/context unless plan comparison values are explicitly present in report.txt.
-- Missing reference sections should become clear human-review placeholders.
+- Missing Red Funnel prior-year source should become a clear note on the Red Funnel slide, not invented YoY values.
 
 Recommended workflow
 1. Copy the Google Slides reference deck, or use reference_deck_exported_from_google_slides.pptx as the intermediate template if direct Google Slides editing is unavailable.

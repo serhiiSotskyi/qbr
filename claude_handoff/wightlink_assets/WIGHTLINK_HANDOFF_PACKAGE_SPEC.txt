@@ -106,11 +106,7 @@ https://docs.google.com/presentation/d/1QBixtNRD_N_qZ6J56RyfM1vvrTudrZUowZIMdBoG
 The reference deck is the visual target. The Streamlit PPTX is not the visual target.
 
 V2 target slide count
-The reference deck has 27 slides. The V2 output target has 31 slides after adding:
-- Red Funnel Quarter.
-- Brand Monthly Breakdown YTD.
-- Generics Monthly Breakdown YTD.
-- PMax Performance Summary YTD.
+The reference deck has 27 slides. The lean V2 Streamlit output target has 22 slides when all current Wightlink V2 sources are supplied. The lean structure keeps the report quarter-led, includes Red Funnel YoY comparison when the prior-year auction source is supplied, keeps Plan comparison on KPI cards, and removes the extra Plan vs Actual detail slides.
 
 Chart QA
 Every handoff package must include CHART_QA_ADDENDUM_FOR_CLAUDE.txt and the generated prompt/checklist must reference it.

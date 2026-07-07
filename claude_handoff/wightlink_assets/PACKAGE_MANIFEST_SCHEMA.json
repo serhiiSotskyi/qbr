@@ -9,7 +9,7 @@
   "generated_at": "ISO-8601 datetime string",
   "reference_deck_url": "string",
   "reference_slide_count": 27,
-  "target_output_slide_count": 31,
+  "target_output_slide_count": 22,
   "streamlit_slide_count": "number",
   "has_reference_pptx": "boolean",
   "has_plan_source": "boolean",

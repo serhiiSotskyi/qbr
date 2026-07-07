@@ -12,8 +12,6 @@ from report_generator.narratives.wightlink_narratives import (
     build_all_performance_narrative,
     build_brand_narrative,
     build_generics_narrative,
-    build_plan_comparison_detail_narrative,
-    build_plan_comparison_overview_narrative,
     build_plan_delivery_bullets,
     build_pmax_narrative,
     build_trends_narrative,
@@ -36,6 +34,7 @@ def generate_wightlink_report(
     trends_ytd_previous_dir: str | Path | None = None,
     auction_csv: str | Path | None = None,
     red_funnel_auction_csv: str | Path | None = None,
+    red_funnel_prior_auction_csv: str | Path | None = None,
     plan_workbook: str | Path | None = None,
 ) -> dict[str, Any]:
     performance = parse_wightlink_performance_csv(performance_csv)
@@ -46,6 +45,11 @@ def generate_wightlink_report(
         trends_sections = parse_trends_inputs(trends_dir)
     generic_auction = parse_wightlink_auction_csv(auction_csv, subtype="generic")
     red_funnel_quarter_auction = parse_wightlink_auction_csv(red_funnel_auction_csv, subtype="red_funnel_quarter") if red_funnel_auction_csv else generic_auction
+    red_funnel_prior_auction = (
+        parse_wightlink_auction_csv(red_funnel_prior_auction_csv, subtype="red_funnel_prior_quarter")
+        if red_funnel_prior_auction_csv
+        else None
+    )
     brand_auction = None
     if manual_inputs and manual_inputs.get("auction", {}).get("brand_csv"):
         brand_auction = parse_wightlink_auction_csv(manual_inputs["auction"]["brand_csv"], subtype="brand")
@@ -61,7 +65,17 @@ def generate_wightlink_report(
 
     charts_dir = pptx_path.parent / f"{pptx_path.stem}_charts"
     ppt_builder = WightlinkPptxBuilder(pptx_path, charts_dir)
-    slides = _build_slides(performance, merged_manual, ppt_builder, trends_sections, generic_auction, brand_auction, red_funnel_quarter_auction, plan_section)
+    slides = _build_slides(
+        performance,
+        merged_manual,
+        ppt_builder,
+        trends_sections,
+        generic_auction,
+        brand_auction,
+        red_funnel_quarter_auction,
+        red_funnel_prior_auction,
+        plan_section,
+    )
 
     payload = build_wightlink_json_payload(
         client_id="wightlink",
@@ -96,6 +110,7 @@ def _build_slides(
     generic_auction: dict[str, Any] | None,
     brand_auction: dict[str, Any] | None,
     red_funnel_quarter_auction: dict[str, Any] | None,
+    red_funnel_prior_auction: dict[str, Any] | None,
     plan_section: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     quarter = performance["quarter"]
@@ -127,52 +142,6 @@ def _build_slides(
     ]
     if any(scope.get("has_data") for scope in data_types.values()):
         agenda_items.append("Ferry & Routes")
-    if plan_section:
-        agenda_items.append("Plan vs Actual")
-
-    plan_charts = {}
-    if plan_section:
-        actual_yoy_monthly = _build_actual_yoy_monthly_rows(current, prior)
-        plan_charts = {
-            "spend": ppt_builder.build_plan_comparison_chart(
-                plan_section["monthly"], "plan_vs_actual_spend.png", "planned_spend", "actual_spend", "Plan vs Actual Spend"
-            ),
-            "revenue": ppt_builder.build_plan_comparison_chart(
-                plan_section["monthly"], "plan_vs_actual_revenue.png", "planned_revenue", "actual_revenue", "Plan vs Actual Revenue"
-            ),
-            "purchases": ppt_builder.build_plan_comparison_chart(
-                plan_section["monthly"], "plan_vs_actual_purchases.png", "planned_purchases", "actual_purchases", "Plan vs Actual Purchases"
-            ),
-            "cpa": ppt_builder.build_plan_comparison_chart(
-                plan_section["monthly"], "plan_vs_actual_cpa.png", "planned_cpa", "actual_cpa", "Plan vs Actual CPA"
-            ),
-            "yoy_spend": ppt_builder.build_bar_comparison_chart(
-                actual_yoy_monthly,
-                "actual_yoy_spend.png",
-                "prior_spend",
-                "actual_spend",
-                "Actual vs Prior Year Spend",
-                "Prior Year",
-                "Actual",
-                empty_message="No YoY spend data",
-            ),
-            "yoy_revenue": ppt_builder.build_bar_comparison_chart(
-                actual_yoy_monthly,
-                "actual_yoy_revenue.png",
-                "prior_revenue",
-                "actual_revenue",
-                "Actual vs Prior Year Revenue",
-                "Prior Year",
-                "Actual",
-                empty_message="No YoY revenue data",
-            ),
-            "yoy_purchases": ppt_builder.build_yoy_performance_chart(
-                current, prior, "actual_yoy_purchases.png", "purchases", None, "Purchases YoY", current_label, prior_label
-            ),
-            "yoy_cpa": ppt_builder.build_yoy_performance_chart(
-                current, prior, "actual_yoy_cpa.png", "cpa", None, "CPA YoY", current_label, prior_label
-            ),
-        }
 
     slides: list[dict[str, Any]] = []
     slides.append({
@@ -220,11 +189,20 @@ def _build_slides(
 
     slides.append(build_auction_slide("generic", subtitle, generic_auction, manual))
     slides.append(build_auction_slide("brand", subtitle, brand_auction, manual))
-    slides.append(_build_red_funnel_quarter_slide(subtitle, red_funnel_quarter_auction))
+    slides.append(_build_red_funnel_quarter_slide(subtitle, red_funnel_quarter_auction, red_funnel_prior_auction, current_label, prior_label))
     slides.append({"type": "divider", "section": "performance", "section_title": "Performance", "title": "Performance"})
-    slides.extend(_build_segment_slides(
-        ppt_builder,
+    slides.append(_build_summary_slide(
         section="performance",
+        title="All Performance",
+        subtitle=subtitle,
+        scope=current,
+        prior_scope=prior,
+        bullets=build_all_performance_narrative(current) + (build_plan_delivery_bullets(plan_section) if plan_section else []),
+        plan_section=plan_section,
+        source_note="Source: Uploaded performance CSV",
+    ))
+    slides.append(_build_purchases_yoy_slide(
+        ppt_builder,
         title="All Performance",
         subtitle=subtitle,
         scope=current,
@@ -232,93 +210,7 @@ def _build_slides(
         filename_prefix="all",
         current_label=current_label,
         prior_label=prior_label,
-        bullets=build_all_performance_narrative(current) + (build_plan_delivery_bullets(plan_section) if plan_section else []),
-        plan_section=plan_section,
-        source_note="Source: Uploaded performance CSV",
     ))
-    if plan_section:
-        slides.append({
-            "type": "table_bullets",
-            "section": "plan_vs_actual",
-            "section_title": "Plan vs Actual Overview",
-            "title": "Plan vs Actual Overview",
-            "subtitle": subtitle,
-            "table": {"rows": _build_plan_overview_rows(plan_section)},
-            "bullets": build_plan_comparison_overview_narrative(plan_section),
-            "source_note": "Source: Wightlink planning workbook and uploaded performance CSV",
-        })
-        slides.append({
-            "type": "table_bullets",
-            "section": "performance",
-            "section_title": "Actual vs Prior Year Overview",
-            "title": "Actual vs Prior Year Overview",
-            "subtitle": subtitle,
-            "table": {"rows": _build_actual_yoy_overview_rows(current, prior)},
-            "bullets": _build_yoy_trend_bullets("All Performance", current, prior),
-            "source_note": "Source: Uploaded performance CSV",
-        })
-        slides.append({
-            "type": "dual_chart_bullets",
-            "section": "plan_vs_actual",
-            "section_title": "Plan vs Actual Monthly Trend",
-            "title": "Plan vs Actual Monthly Trend",
-            "subtitle": subtitle,
-            "charts": [
-                build_chart_spec("Plan vs Actual Spend", plan_charts["spend"], ["Plan", "Actual"], "Bars"),
-                build_chart_spec("Plan vs Actual Revenue", plan_charts["revenue"], ["Plan", "Actual"], "Bars"),
-            ],
-            "bullets": build_plan_comparison_detail_narrative(plan_section),
-            "source_note": "Source: Wightlink planning workbook and uploaded performance CSV",
-        })
-        slides.append({
-            "type": "table_only",
-            "section": "plan_vs_actual",
-            "section_title": "Plan vs Actual Monthly Table",
-            "title": "Plan vs Actual Monthly Table",
-            "subtitle": subtitle,
-            "table": {"rows": plan_section.get("table_rows", [])},
-            "bullets": ["The table shows actual monthly delivery and variance against plan; planned values are shown in the charted comparison."],
-            "source_note": "Source: Wightlink planning workbook and uploaded performance CSV",
-        })
-        slides.append({
-            "type": "dual_chart_bullets",
-            "section": "plan_vs_actual",
-            "section_title": "Actual YoY Spend and Revenue",
-            "title": "Actual YoY Spend and Revenue",
-            "subtitle": subtitle,
-            "charts": [
-                build_chart_spec("Actual vs Prior Year Spend", plan_charts["yoy_spend"], ["Prior Year", "Actual"], "Bars"),
-                build_chart_spec("Actual vs Prior Year Revenue", plan_charts["yoy_revenue"], ["Prior Year", "Actual"], "Bars"),
-            ],
-            "bullets": _build_yoy_spend_revenue_bullets(current, prior),
-            "source_note": "Source: Uploaded performance CSV",
-        })
-        slides.append({
-            "type": "dual_chart_bullets",
-            "section": "plan_vs_actual",
-            "section_title": "Plan vs Actual Purchases and CPA",
-            "title": "Plan vs Actual Purchases and CPA",
-            "subtitle": subtitle,
-            "charts": [
-                build_chart_spec("Plan vs Actual Purchases", plan_charts["purchases"], ["Plan", "Actual"], "Bars"),
-                build_chart_spec("Plan vs Actual CPA", plan_charts["cpa"], ["Plan", "Actual"], "Bars"),
-            ],
-            "bullets": build_plan_comparison_detail_narrative(plan_section),
-            "source_note": "Source: Wightlink planning workbook and uploaded performance CSV",
-        })
-        slides.append({
-            "type": "dual_chart_bullets",
-            "section": "performance",
-            "section_title": "Actual YoY Purchases and CPA",
-            "title": "Actual YoY Purchases and CPA",
-            "subtitle": subtitle,
-            "charts": [
-                build_chart_spec("Purchases YoY", plan_charts["yoy_purchases"], _build_yoy_chart_series(current_label, prior_label, "Purchases", prior_scope=prior), "Lines"),
-                build_chart_spec("CPA YoY", plan_charts["yoy_cpa"], _build_yoy_chart_series(current_label, prior_label, "CPA", prior_scope=prior), "Lines"),
-            ],
-            "bullets": _build_yoy_purchase_cpa_bullets(current, prior),
-            "source_note": "Source: Uploaded performance CSV",
-        })
     slides.extend(_build_segment_slides(
         ppt_builder, "performance", "Brand Performance", subtitle, brand, brand_prior, "brand", current_label, prior_label, build_brand_narrative(brand, brand_prior)
     ))
@@ -373,84 +265,123 @@ def _build_segment_slides(
     plan_section: dict[str, Any] | None = None,
     source_note: str = "",
 ) -> list[dict[str, Any]]:
-    charts = {
-        "purchases_cpa": ppt_builder.build_yoy_performance_chart(
-            scope,
-            prior_scope,
-            f"{filename_prefix}_purchases_cpa_yoy.png",
-            "purchases",
-            "cpa",
-            f"{title} Purchases + CPA YoY",
-            current_label,
-            prior_label,
-        ),
-        "revenue_roas": ppt_builder.build_yoy_performance_chart(
-            scope,
-            prior_scope,
-            f"{filename_prefix}_revenue_roas_yoy.png",
-            "purchase_revenue",
-            "roas",
-            f"{title} Revenue + ROAS YoY",
-            current_label,
-            prior_label,
-        ),
-    }
     return [
-        {
-            "type": "kpi_cards_bullets",
-            "section": section,
-            "section_title": f"{title} Summary",
-            "title": f"{title} Summary",
-            "subtitle": subtitle,
-            "kpis": _build_kpis(scope, prior_scope, plan_section),
-            "bullets": bullets,
-            "source_note": source_note,
-        },
-        {
-            "type": "dual_chart_bullets",
-            "section": section,
-            "section_title": f"{title} YoY Trend",
-            "title": f"{title} YoY Trend",
-            "subtitle": subtitle,
-            "charts": [
-                build_chart_spec(
-                    "Purchases + CPA YoY",
-                    charts["purchases_cpa"],
-                    _build_yoy_chart_series(current_label, prior_label, "Purchases", "CPA", prior_scope=prior_scope),
-                    "Lines",
-                ),
-                build_chart_spec(
-                    "Revenue + ROAS YoY",
-                    charts["revenue_roas"],
-                    _build_yoy_chart_series(current_label, prior_label, "Purchase Revenue", "ROAS", prior_scope=prior_scope),
-                    "Lines",
-                ),
-            ],
-            "bullets": _build_yoy_trend_bullets(title, scope, prior_scope),
-            "source_note": source_note,
-        },
+        _build_summary_slide(section, title, subtitle, scope, prior_scope, bullets, plan_section, source_note),
+        _build_monthly_purchases_revenue_slide(ppt_builder, section, title, subtitle, scope, filename_prefix, source_note),
     ]
 
 
-def _build_red_funnel_quarter_slide(subtitle: str, auction_section: dict[str, Any] | None) -> dict[str, Any]:
-    table_rows, bullets = _red_funnel_quarter_rows_and_bullets(auction_section)
+def _build_summary_slide(
+    section: str,
+    title: str,
+    subtitle: str,
+    scope: dict[str, Any],
+    prior_scope: dict[str, Any] | None,
+    bullets: list[str],
+    plan_section: dict[str, Any] | None = None,
+    source_note: str = "",
+) -> dict[str, Any]:
+    return {
+        "type": "kpi_cards_bullets",
+        "section": section,
+        "section_title": f"{title} Summary",
+        "title": f"{title} Summary",
+        "subtitle": subtitle,
+        "kpis": _build_kpis(scope, prior_scope, plan_section),
+        "bullets": bullets,
+        "source_note": source_note,
+    }
+
+
+def _build_purchases_yoy_slide(
+    ppt_builder: WightlinkPptxBuilder,
+    title: str,
+    subtitle: str,
+    scope: dict[str, Any],
+    prior_scope: dict[str, Any] | None,
+    filename_prefix: str,
+    current_label: str,
+    prior_label: str,
+) -> dict[str, Any]:
+    rows = _build_yoy_metric_monthly_rows(scope, prior_scope, "purchases")
+    chart = ppt_builder.build_yoy_bar_chart(
+        rows,
+        f"{filename_prefix}_purchases_yoy_bars.png",
+        "current_purchases",
+        "prior_purchases",
+        "Purchases YoY",
+        f"{current_label} Purchases",
+        f"{prior_label} Purchases",
+    )
+    return {
+        "type": "wide_chart_bullets",
+        "section": "performance",
+        "section_title": f"{title} Purchases YoY",
+        "title": f"{title} Purchases YoY",
+        "subtitle": subtitle,
+        "charts": [build_chart_spec("Purchases YoY", chart, [f"{current_label} Purchases", f"{prior_label} Purchases"], "Bars")],
+        "bullets": _build_yoy_purchase_bullets(scope, prior_scope),
+        "source_note": "Source: Uploaded performance CSV",
+    }
+
+
+def _build_monthly_purchases_revenue_slide(
+    ppt_builder: WightlinkPptxBuilder,
+    section: str,
+    title: str,
+    subtitle: str,
+    scope: dict[str, Any],
+    filename_prefix: str,
+    source_note: str = "",
+) -> dict[str, Any]:
+    chart = ppt_builder.build_monthly_purchases_revenue_chart(
+        scope,
+        f"{filename_prefix}_monthly_purchases_revenue.png",
+        "Monthly Purchases and Revenue",
+    )
+    return {
+        "type": "wide_chart_bullets",
+        "section": section,
+        "section_title": f"{title} Monthly Purchases and Revenue",
+        "title": f"{title} Monthly Purchases and Revenue",
+        "subtitle": subtitle,
+        "charts": [build_chart_spec("Monthly Purchases and Revenue", chart, ["Purchases", "Revenue"], "Bars")],
+        "bullets": _build_monthly_purchases_revenue_bullets(scope),
+        "source_note": source_note,
+    }
+
+
+def _build_red_funnel_quarter_slide(
+    subtitle: str,
+    auction_section: dict[str, Any] | None,
+    prior_auction_section: dict[str, Any] | None,
+    current_label: str,
+    prior_label: str,
+) -> dict[str, Any]:
+    table_rows, bullets = _red_funnel_quarter_rows_and_bullets(auction_section, prior_auction_section, current_label, prior_label)
     return {
         "type": "table_bullets",
         "section": "auction",
         "subtype": "red_funnel_quarter",
         "section_title": "Auction Insights - Red Funnel Quarter",
-        "title": "Competitive Landscape - Red Funnel Quarter",
+        "title": "Competitive Landscape - Red Funnel YoY",
         "subtitle": subtitle,
         "table": {"rows": table_rows},
         "bullets": bullets,
-        "source_note": "Source: Quarter Auction Insights CSV",
+        "source_note": "Source: Quarter Auction Insights CSVs",
     }
 
 
-def _red_funnel_quarter_rows_and_bullets(auction_section: dict[str, Any] | None) -> tuple[list[dict[str, Any]], list[str]]:
+def _red_funnel_quarter_rows_and_bullets(
+    auction_section: dict[str, Any] | None,
+    prior_auction_section: dict[str, Any] | None,
+    current_label: str,
+    prior_label: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
     rows = auction_section.get("rows", []) if auction_section else []
     red_funnel = next((row for row in rows if _is_red_funnel(row.get("display_url_domain"))), None)
-    wightlink = next((row for row in rows if str(row.get("display_url_domain", "")).strip().lower() == "you"), None)
+    prior_rows = prior_auction_section.get("rows", []) if prior_auction_section else []
+    prior_red_funnel = next((row for row in prior_rows if _is_red_funnel(row.get("display_url_domain"))), None)
     if not red_funnel:
         return (
             [{"Status": "Review required", "Detail": "No Red Funnel row was found in the uploaded quarter auction insights source."}],
@@ -458,32 +389,39 @@ def _red_funnel_quarter_rows_and_bullets(auction_section: dict[str, Any] | None)
         )
 
     metrics = [
-        ("Impression Share", "impression_share", "Visible share of eligible quarter auctions."),
-        ("Overlap Rate", "overlap_rate", "How often Red Funnel appeared in the same auctions."),
-        ("Position Above Rate", "position_above_rate", "How often Red Funnel ranked above Wightlink when both appeared."),
-        ("Top of Page Rate", "top_of_page_rate", "How often ads appeared at the top of results."),
-        ("Abs. Top of Page Rate", "abs_top_of_page_rate", "How often ads held the absolute top position."),
-        ("Outranking Share", "outranking_share", "How often Wightlink outranked Red Funnel or Red Funnel did not show."),
+        ("Impression Share", "impression_share"),
+        ("Overlap Rate", "overlap_rate"),
+        ("Position Above Rate", "position_above_rate"),
+        ("Top of Page Rate", "top_of_page_rate"),
+        ("Abs. Top of Page Rate", "abs_top_of_page_rate"),
+        ("Outranking Share", "outranking_share"),
     ]
-    table_rows = [
-        {
+    table_rows = []
+    for label, key in metrics:
+        current_value = red_funnel.get(key)
+        prior_value = prior_red_funnel.get(key) if prior_red_funnel else None
+        delta = _delta(current_value, prior_value)
+        table_rows.append({
             "Metric": label,
-            "Wightlink": _format_pct(wightlink.get(key) if wightlink else None),
-            "Red Funnel": _format_pct(red_funnel.get(key)),
-            "What it means": note,
-        }
-        for label, key, note in metrics
-    ]
+            prior_label: _format_pct(prior_value),
+            current_label: _format_pct(current_value),
+            "Change": _format_pp_delta(delta),
+            "What it means": _red_funnel_metric_note(key, delta),
+        })
+
     bullets = []
     overlap = red_funnel.get("overlap_rate")
     if overlap is not None:
         bullets.append(f"Red Funnel overlapped in {_format_pct(overlap)} of eligible quarter auctions.")
-    abs_top = red_funnel.get("abs_top_of_page_rate")
-    if abs_top is not None:
-        bullets.append(f"Red Funnel's absolute top-of-page rate was {_format_pct(abs_top)} in the quarter source.")
-    outranking = red_funnel.get("outranking_share")
-    if outranking is not None:
-        bullets.append(f"Wightlink outranking share versus Red Funnel was {_format_pct(outranking)}.")
+    if prior_red_funnel:
+        impression_delta = _delta(red_funnel.get("impression_share"), prior_red_funnel.get("impression_share"))
+        outranking_delta = _delta(red_funnel.get("outranking_share"), prior_red_funnel.get("outranking_share"))
+        if impression_delta is not None:
+            bullets.append(f"Red Funnel impression share moved {_format_pp_delta(impression_delta)} versus {prior_label}.")
+        if outranking_delta is not None:
+            bullets.append(f"Wightlink outranking share versus Red Funnel moved {_format_pp_delta(outranking_delta)}.")
+    else:
+        bullets.append("Upload the same-quarter prior-year Red Funnel Auction Insights CSV to populate the YoY change column.")
     return table_rows, bullets or ["Quarter-only Red Funnel metrics are shown from the uploaded Auction Insights source."]
 
 
@@ -513,6 +451,46 @@ def _build_ytd_breakdown_bullets(scope: dict[str, Any]) -> list[str]:
         best_roas = max(monthly, key=lambda row: _sortable(row.get("roas")))
         bullets.append(f"{best_roas['month_label']} recorded the strongest YTD ROAS.")
     return bullets[:3]
+
+
+def _build_yoy_metric_monthly_rows(scope: dict[str, Any], prior_scope: dict[str, Any] | None, metric: str) -> list[dict[str, Any]]:
+    current_monthly = scope.get("monthly", [])
+    prior_monthly = prior_scope.get("monthly", []) if prior_scope and prior_scope.get("has_data") else []
+    prior_by_month = {row.get("month_label"): row for row in prior_monthly}
+    rows = []
+    for current_row in current_monthly:
+        month_label = current_row.get("month_label")
+        prior_row = prior_by_month.get(month_label, {})
+        rows.append({
+            "month_label": month_label,
+            f"current_{metric}": current_row.get(metric),
+            f"prior_{metric}": prior_row.get(metric),
+        })
+    return rows
+
+
+def _build_yoy_purchase_bullets(scope: dict[str, Any], prior_scope: dict[str, Any] | None) -> list[str]:
+    current_totals = scope.get("totals", {})
+    prior_totals = prior_scope.get("totals", {}) if prior_scope and prior_scope.get("has_data") else {}
+    if not prior_totals:
+        return [f"The quarter delivered {_format_number(current_totals.get('purchases'))} purchases."]
+
+    purchase_delta = _pct_change(current_totals.get("purchases"), prior_totals.get("purchases"))
+    if purchase_delta is None:
+        return ["The uploaded CSV did not contain enough prior-year purchase values to narrate the YoY chart movement."]
+    return [f"Purchases were {_direction_text(purchase_delta)} versus the same quarter last year."]
+
+
+def _build_monthly_purchases_revenue_bullets(scope: dict[str, Any]) -> list[str]:
+    monthly = [row for row in scope.get("monthly", []) if row.get("month_label") != "Total"]
+    if not monthly:
+        return ["No monthly performance rows were available for this chart."]
+    strongest_purchases = max(monthly, key=lambda row: _sortable(row.get("purchases")))
+    strongest_revenue = max(monthly, key=lambda row: _sortable(row.get("purchase_revenue")))
+    return [
+        f"{strongest_purchases['month_label']} delivered the strongest purchase volume.",
+        f"{strongest_revenue['month_label']} generated the highest purchase revenue.",
+    ]
 
 
 def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_section: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -732,8 +710,36 @@ def _direction_text(delta: float, lower_is_better: bool = False) -> str:
     return f"{direction} {abs(float(delta)) * 100:.1f}%"
 
 
+def _red_funnel_metric_note(metric: str, delta: float | None) -> str:
+    if delta is None:
+        notes = {
+            "impression_share": "Current Red Funnel visibility.",
+            "overlap_rate": "Current Red Funnel overlap in eligible auctions.",
+            "position_above_rate": "Current rate Red Funnel ranked above Wightlink.",
+            "top_of_page_rate": "Current top-of-page presence.",
+            "abs_top_of_page_rate": "Current absolute top position rate.",
+            "outranking_share": "Current Wightlink outranking share versus Red Funnel.",
+        }
+        return notes.get(metric, "Current Red Funnel metric.")
+
+    increased = delta > 0
+    if metric == "impression_share":
+        return "Red Funnel visibility increased YoY." if increased else "Red Funnel visibility decreased YoY."
+    if metric == "overlap_rate":
+        return "Red Funnel appeared in more auctions YoY." if increased else "Red Funnel appeared in fewer auctions YoY."
+    if metric == "position_above_rate":
+        return "Red Funnel ranked above Wightlink more often." if increased else "Wightlink beat Red Funnel on position more often."
+    if metric == "top_of_page_rate":
+        return "Red Funnel top-of-page rate increased." if increased else "Red Funnel top-of-page rate decreased."
+    if metric == "abs_top_of_page_rate":
+        return "Red Funnel absolute top rate increased." if increased else "Red Funnel absolute top rate decreased."
+    if metric == "outranking_share":
+        return "Wightlink outranked Red Funnel more often." if increased else "Wightlink outranked Red Funnel less often."
+    return "Metric increased YoY." if increased else "Metric decreased YoY."
+
+
 def _delta(current: Any, prior: Any) -> float | None:
-    if current is None or prior is None:
+    if _is_missing(current) or _is_missing(prior):
         return None
     try:
         return float(current) - float(prior)
@@ -742,7 +748,7 @@ def _delta(current: Any, prior: Any) -> float | None:
 
 
 def _pct_change(current: Any, prior: Any) -> float | None:
-    if current is None or prior is None:
+    if _is_missing(current) or _is_missing(prior):
         return None
     try:
         current_value = float(current)
@@ -755,19 +761,19 @@ def _pct_change(current: Any, prior: Any) -> float | None:
 
 
 def _format_number(value: Any) -> str:
-    if value is None:
+    if _is_missing(value):
         return "--"
     return f"{float(value):,.0f}"
 
 
 def _format_ratio(value: Any) -> str:
-    if value is None:
+    if _is_missing(value):
         return "--"
     return f"{float(value):.2f}"
 
 
 def _format_delta(value: Any) -> str:
-    if value is None:
+    if _is_missing(value):
         return "--"
     sign = "+" if float(value) > 0 else ""
     return f"{sign}{float(value) * 100:.1f}%"
@@ -779,25 +785,41 @@ def _slug(value: Any) -> str:
 
 
 def _format_plan_currency(value: Any) -> str:
-    if value is None:
+    if _is_missing(value):
         return "--"
     return f"£{float(value):,.2f}"
 
 
 def _format_plan_delta(value: Any) -> str:
-    if value is None:
+    if _is_missing(value):
         return "--"
     sign = "+" if float(value) > 0 else ""
     return f"{sign}{float(value) * 100:.1f}%"
 
 
 def _format_pct(value: Any) -> str:
-    if value is None:
+    if _is_missing(value):
         return "--"
     try:
         return f"{float(value) * 100:.2f}%"
     except (TypeError, ValueError):
         return "--"
+
+
+def _format_pp_delta(value: Any) -> str:
+    if _is_missing(value):
+        return "--"
+    sign = "+" if float(value) > 0 else ""
+    return f"{sign}{float(value) * 100:.1f}pp"
+
+
+def _is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
 
 
 def _is_red_funnel(value: Any) -> bool:

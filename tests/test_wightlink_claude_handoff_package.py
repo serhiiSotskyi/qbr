@@ -59,7 +59,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
         self.assertEqual(manifest["period_label"], "Q2 2026 (Apr - Jun 2026)")
         self.assertEqual(manifest["quarter_short"], "Q2 2026")
         self.assertEqual(manifest["reference_slide_count"], 27)
-        self.assertEqual(manifest["target_output_slide_count"], 31)
+        self.assertEqual(manifest["target_output_slide_count"], 22)
         self.assertEqual(manifest["streamlit_slide_count"], 18)
         self.assertTrue(manifest["has_reference_pptx"])
         self.assertEqual(
@@ -88,10 +88,9 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
 
         slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
         rows = list(csv.DictReader(StringIO(slide_mapping)))
-        self.assertEqual(len(rows), 31)
-        self.assertIn("Manual placeholder", slide_mapping)
-        self.assertIn("Review required - Testing section", slide_mapping)
-        self.assertIn("Review required - Other Updates", slide_mapping)
+        self.assertEqual(len(rows), 22)
+        self.assertIn("All Performance Purchases YoY", slide_mapping)
+        self.assertIn("Monthly Purchases and Revenue", slide_mapping)
         self.assertIn("Brand Monthly Breakdown YTD", slide_mapping)
         self.assertIn("Auction Insights - Red Funnel Quarter", slide_mapping)
 
@@ -109,7 +108,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
         self.assertEqual(manifest_from_zip["generated_at"], "2026-06-30T12:00:00Z")
         self.assertEqual(manifest_from_zip["headline_kpis"], manifest["headline_kpis"])
         self.assertEqual(manifest_from_zip["trend_queries"], manifest["trend_queries"])
-        self.assertEqual(manifest_from_zip["target_output_slide_count"], 31)
+        self.assertEqual(manifest_from_zip["target_output_slide_count"], 22)
         self.assertTrue(any("filename-derived" in warning for warning in manifest_from_zip["warnings"]))
 
     def test_v2_handoff_package_includes_ytd_sources_and_manifest(self) -> None:
@@ -131,6 +130,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
                 trends_ytd_previous_dir=previous,
                 auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
                 red_funnel_auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
+                red_funnel_prior_auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
                 plan_workbook=SAMPLE_V2_INPUTS / "wightlink_plan_2026_27_middle_scenario.csv",
             )
 
@@ -143,6 +143,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
                 trend_ytd_current_csv_files=[current / current_file.name],
                 trend_ytd_previous_csv_files=[previous / previous_file.name],
                 red_funnel_auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
+                red_funnel_prior_auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
                 plan_book_csv=SAMPLE_V2_INPUTS / "wightlink_plan_2026_27_middle_scenario.csv",
                 reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
                 generated_at=GENERATED_AT,
@@ -153,6 +154,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
         self.assertIn("source_data/google_trends_wightlink_ferries_current_ytd.csv", names)
         self.assertIn("source_data/google_trends_wightlink_ferries_previous_ytd.csv", names)
         self.assertIn("source_data/auction_insights_red_funnel_quarter.csv", names)
+        self.assertIn("source_data/auction_insights_red_funnel_prior_year_quarter.csv", names)
         self.assertIn("INPUT_FILES_MANIFEST.txt", names)
         self.assertEqual(manifest["ytd_period_label"], "YTD 2026 (Jan - Jun 2026)")
         self.assertEqual(manifest["previous_ytd_period_label"], "YTD 2025 (Jan - Jun 2025)")

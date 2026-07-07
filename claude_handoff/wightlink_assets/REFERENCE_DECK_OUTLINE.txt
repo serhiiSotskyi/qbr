@@ -10,11 +10,11 @@ Slide count
 27 slides
 
 V2 output target
-The V2 output deck should add four slides, for a target of 31 slides:
-- Red Funnel Quarter after the existing Red Funnel YoY/competitive landscape slide.
-- Brand Monthly Breakdown YTD after Brand Monthly Breakdown.
-- Generics Monthly Breakdown YTD after Generics Monthly Breakdown.
-- PMax Performance Summary YTD after PMax Performance Summary.
+The lean V2 Streamlit output target is 22 slides when all current Wightlink V2 sources are supplied:
+- Red Funnel YoY comparison as one Red Funnel-only slide.
+- All Performance KPI cards plus one Purchases YoY monthly bar chart.
+- Brand, Generics, and PMax KPI cards plus one monthly purchases/revenue chart each.
+- Brand, Generics, and PMax YTD breakdown table slides.
 
 01. Wightlink - Financial Year Review
 02. What We'll Cover Today
@@ -47,5 +47,5 @@ The V2 output deck should add four slides, for a target of 31 slides:
 Template interpretation
 - Keep the visual style and slide archetypes.
 - Replace old reference copy with current report copy where source data exists.
-- Convert unsupported reference sections into placeholders, rather than inventing content.
+- Do not recreate unsupported reference sections or removed V2 detail slides unless the user supplies explicit content for them.
 - Preserve section divider styling and footer treatment.

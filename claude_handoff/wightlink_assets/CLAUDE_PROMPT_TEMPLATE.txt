@@ -1,7 +1,7 @@
 You are preparing a Wightlink {{quarter_short}} PPC report deck.
 
 V2 note
-If the upload includes UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv and QA_CHECKLIST_V2_ADDENDUM.txt, follow those V2 files. The V2 deck remains quarter-led overall, but trend slides compare current YTD vs previous YTD, KPI cards include Plan lines where available, and additional YTD/Red Funnel slides are added.
+If the upload includes UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv and QA_CHECKLIST_V2_ADDENDUM.txt, follow those V2 files. The V2 deck remains quarter-led overall. Trend slides compare current YTD vs previous YTD, KPI cards include Plan lines where available, Red Funnel is a same-quarter YoY comparison when prior-year auction data is supplied, and the performance section is intentionally lean.
 
 I am uploading:
 - report.txt
@@ -45,7 +45,9 @@ Hard requirements
 - Do not invent Red Funnel, ad creative, testing, next steps, other updates, or top-campaign content if it is not in report.txt.
 - Every report.txt source section must be represented.
 - Convert missing reference sections into clearly marked human-review placeholders.
-- If V2 files are present, add the Red Funnel Quarter, Brand Monthly Breakdown YTD, Generics Monthly Breakdown YTD, and PMax Performance Summary YTD slides rather than replacing existing slides.
+- If V2 files are present, use the lean V2 structure in SLIDE_MAPPING.csv. Do not recreate removed Plan vs Actual detail slides or the old Purchases+CPA / Revenue+ROAS chart-pair slides.
+- Red Funnel slide must show Red Funnel only. If source_data/auction_insights_red_funnel_prior_year_quarter.csv is supplied, include the YoY pp change columns.
+- Campaign-type chart slides must use one monthly purchases and purchase revenue chart only.
 - Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping; inspect full-slide screenshots/thumbnails after chart replacement.
 - Run QA_CHECKLIST.txt before returning.
 
