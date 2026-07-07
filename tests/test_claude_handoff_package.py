@@ -140,6 +140,34 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
             slide_mapping,
         )
 
+    def test_builds_monthly_handoff_package_without_qbr_trends_or_auction_requirements(self) -> None:
+        handoff_bytes, manifest = build_claude_handoff_package(
+            report_text=_monthly_report_text(),
+            prompt_text="Original monthly Streamlit prompt",
+            generated_pptx=b"pptx-bytes",
+            client_display_name="Wendy Wu Tours UK",
+            client_slug="wendy_wu_uk",
+            report_mode="monthly",
+            reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
+            generated_at=GENERATED_AT,
+        )
+        package = ZipFile(BytesIO(handoff_bytes))
+
+        self.assertEqual(manifest["report_family"], "Wendy Wu Monthly")
+        self.assertEqual(manifest["report_mode"], "monthly")
+        self.assertEqual(manifest["period_label"], "Jun 2026 (YTD Jan - Jun 2026)")
+        self.assertEqual(manifest["quarter_short"], "Jun 2026")
+        self.assertFalse(any("GOOGLE TRENDS" in warning for warning in manifest["warnings"]))
+        self.assertFalse(any("AUCTION INSIGHTS" in warning for warning in manifest["warnings"]))
+
+        slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
+        self.assertIn("Overall Month Summary", slide_mapping)
+        self.assertIn("Campaign Type YTD Mix", slide_mapping)
+        self.assertIn("China Month Summary + YoY", slide_mapping)
+        self.assertNotIn("Google Trends", slide_mapping)
+        self.assertNotIn("Auction Insights", slide_mapping)
+        self.assert_package_references_chart_qa(package)
+
     def assert_package_references_chart_qa(self, package: ZipFile) -> None:
         self.assertIn("CHART_QA_ADDENDUM_FOR_CLAUDE.txt", package.namelist())
         addendum = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
@@ -253,3 +281,88 @@ Central Asia Microsoft Ads    485       26.15      12,000   £632 £1.30  £24.1
 """
     marker = "\n----------------------------------------\n\nGOOGLE TRENDS"
     return report_text.replace(marker, section + marker, 1)
+
+
+def _monthly_report_text() -> str:
+    return """
+----------------------------------------
+
+Wendy Wu Tours | Monthly PPC Performance Report
+Jun 2026 (YTD Jan - Jun 2026)
+
+----------------------------------------
+
+PERFORMANCE
+
+----------------------------------------
+
+Overall Month Summary
+Jun 2026 (YTD Jan - Jun 2026)
+Key Metrics + MoM + YoY
+Cost £600.00 +20.00% +50.00%
+Sales Leads 60 +20.00% +50.00%
+CPL £10.00 +0.00% +0.00%
+CVR 5.00% +0.00% +0.00%
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
+  Jan       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+  Feb       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+  Mar       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+  Apr       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+  May       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+  Jun       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+Total       6,000    600 10.00% £1.00   £600.00          60 £10.00 10.00%
+
+----------------------------------------
+
+Overall YTD Trend
+Jun 2026 (YTD Jan - Jun 2026)
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
+  Jan       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+  Jun       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
+Total       6,000    600 10.00% £1.00   £600.00          60 £10.00 10.00%
+
+----------------------------------------
+
+Campaign Type YTD Mix
+Jun 2026 (YTD Jan - Jun 2026)
+Campaign Type    Cost Sales Leads Cost Share Lead Share    CPL
+        Brand £300.00          30     50.00%     50.00% £10.00
+      Generic £300.00          30     50.00%     50.00% £10.00
+
+----------------------------------------
+
+Brand Month Summary
+Jun 2026 (YTD Jan - Jun 2026)
+Key Metrics + MoM + YoY
+Cost £300.00 +20.00% +50.00%
+Sales Leads 30 +20.00% +50.00%
+
+----------------------------------------
+
+Brand YTD Trend
+Jun 2026 (YTD Jan - Jun 2026)
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
+  Jun       1,000    100 10.00% £1.00   £300.00          30 £10.00 10.00%
+
+----------------------------------------
+
+China Month Summary + YoY
+Jun 2026 (YTD Jan - Jun 2026)
+Key Metrics + MoM + YoY
+Cost £300.00 +20.00% +50.00%
+Sales Leads 30 +20.00% +50.00%
+
+----------------------------------------
+
+China YTD Trend
+Jun 2026 (YTD Jan - Jun 2026)
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
+  Jun       1,000    100 10.00% £1.00   £300.00          30 £10.00 10.00%
+
+----------------------------------------
+
+China Campaign YTD Mix
+Jun 2026 (YTD Jan - Jun 2026)
+Campaign Type    Cost Sales Leads Cost Share Lead Share    CPL
+        Brand £300.00          30    100.00%    100.00% £10.00
+""".strip()

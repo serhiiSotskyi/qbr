@@ -15,7 +15,7 @@ from claude_handoff import (
     build_olympic_holidays_claude_handoff_package,
     build_wightlink_claude_handoff_package,
     is_olympic_holidays_report,
-    is_wendy_wu_qbr,
+    is_wendy_wu_report,
     is_wightlink_qbr,
     resolve_wendy_wu_client_display_name,
     resolve_wendy_wu_handoff_slug,
@@ -159,6 +159,7 @@ def create_claude_handoff_bundle(
     prompt_txt_path: Path,
     request_dir: Path,
     client_name: str,
+    report_mode: str = "quarterly",
 ) -> tuple[Path, dict]:
     client_slug = resolve_wendy_wu_handoff_slug(client_id)
     handoff_bytes, manifest = build_claude_handoff_package(
@@ -167,6 +168,7 @@ def create_claude_handoff_bundle(
         generated_pptx=pptx_path,
         client_display_name=resolve_wendy_wu_client_display_name(client_id, fallback=client_name),
         client_slug=client_slug,
+        report_mode=report_mode,
         reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
     )
     handoff_path = request_dir / f"{client_slug}_claude_handoff_package.zip"
@@ -277,11 +279,14 @@ def main() -> None:
     report_mode = "quarterly"
     if client_id == "wightlink":
         report_mode = st.selectbox("Wightlink report mode", ["quarterly", "annual"], index=0)
+    elif client_id in {"wendy_wu", "wendy_wu_australia"}:
+        report_mode = st.selectbox("Wendy Wu report mode", ["quarterly", "monthly"], index=0)
 
     st.subheader("File Uploads")
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
-    auction_file = st.file_uploader("Auction CSV", type=["csv"])
-    trends_files = st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
+    is_wendy_monthly = client_id in {"wendy_wu", "wendy_wu_australia"} and report_mode == "monthly"
+    auction_file = None if is_wendy_monthly else st.file_uploader("Auction CSV", type=["csv"])
+    trends_files = [] if is_wendy_monthly else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
     plan_workbook_file = None
     wightlink_trends_current_ytd_files = []
     wightlink_trends_previous_ytd_files = []
@@ -396,11 +401,11 @@ def main() -> None:
                     report_mode=report_mode,
                 )
             )
-            prompt_txt_path.write_text(build_presentation_prompt(client_id), encoding="utf-8")
+            prompt_txt_path.write_text(build_presentation_prompt(client_id, report_mode=report_mode), encoding="utf-8")
             package_path = create_package_bundle(client_id, generated_pptx, generated_txt, prompt_txt_path, request_dir)
             claude_handoff_path = None
             claude_handoff_manifest = None
-            if is_wendy_wu_qbr(client_id, report_mode):
+            if is_wendy_wu_report(client_id, report_mode):
                 claude_handoff_path, claude_handoff_manifest = create_claude_handoff_bundle(
                     client_id=client_id,
                     pptx_path=generated_pptx,
@@ -408,6 +413,7 @@ def main() -> None:
                     prompt_txt_path=prompt_txt_path,
                     request_dir=request_dir,
                     client_name=selected_client["name"],
+                    report_mode=report_mode,
                 )
             elif is_wightlink_qbr(client_id, report_mode):
                 claude_handoff_path, claude_handoff_manifest = create_wightlink_claude_handoff_bundle(

@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-from .data_loader import QuarterInfo
+from .data_loader import MonthInfo, QuarterInfo
 
 
 RAW_COLUMNS = ["Impressions", "Clicks", "Cost", "Sales Leads"]
@@ -23,26 +23,31 @@ KPI_METRICS = [
 
 def prepare_report_data(
     df: pd.DataFrame,
-    quarter: QuarterInfo,
+    quarter: QuarterInfo | MonthInfo,
     campaign_order: List[str] | None = None,
     destination_order: List[str] | None = None,
     destination_other_config: Dict[str, Any] | None = None,
+    report_mode: str = "quarterly",
 ) -> Dict:
     include_revenue = "revenue" in df.columns
 
-    current_df = _quarter_filter(df, quarter)
-    prior_df = _quarter_filter(df, quarter.prior_year_same_quarter)
+    is_monthly = report_mode == "monthly" or isinstance(quarter, MonthInfo)
+    current_df = _period_filter(df, quarter)
+    prior_df = _period_filter(df, quarter.prior_year_same_quarter)
+    previous_df = _period_filter(df, quarter.previous_month) if is_monthly and isinstance(quarter, MonthInfo) else None
+    table_df = _ytd_filter(df, quarter) if is_monthly else current_df
     destination_other = destination_other_config or {}
 
     report = {
         "quarter": quarter,
+        "report_mode": "monthly" if is_monthly else "quarterly",
         "include_revenue": include_revenue,
-        "overall": build_scope_metrics(current_df, prior_df, quarter, include_revenue),
+        "overall": build_scope_metrics(current_df, prior_df, quarter, include_revenue, trend_df=table_df, previous_df=previous_df),
         "campaigns": {},
         "destinations": {},
-        "mix_overall": build_mix_table(current_df, include_revenue),
+        "mix_overall": build_mix_table(table_df, include_revenue),
         "dest_mix": {},
-        "available_campaigns": _ordered_values(current_df["campaign_type"].unique().tolist(), campaign_order or []),
+        "available_campaigns": _ordered_values(table_df["campaign_type"].unique().tolist(), campaign_order or []),
         "available_destinations": [],
         "destination_excluded_total": aggregate_totals(current_df.iloc[0:0].copy(), include_revenue),
     }
@@ -50,7 +55,16 @@ def prepare_report_data(
     for campaign in report["available_campaigns"]:
         current_subset = _filter_subset(current_df, "campaign_type", campaign)
         prior_subset = _filter_subset(prior_df, "campaign_type", campaign)
-        report["campaigns"][campaign] = build_scope_metrics(current_subset, prior_subset, quarter, include_revenue)
+        trend_subset = _filter_subset(table_df, "campaign_type", campaign)
+        previous_subset = _filter_subset(previous_df, "campaign_type", campaign) if previous_df is not None else None
+        report["campaigns"][campaign] = build_scope_metrics(
+            current_subset,
+            prior_subset,
+            quarter,
+            include_revenue,
+            trend_df=trend_subset,
+            previous_df=previous_subset,
+        )
         _validate_subset_not_global(
             subset_name=f"campaign:{campaign}",
             subset_df=current_subset,
@@ -63,6 +77,8 @@ def prepare_report_data(
         destination_scopes = _build_destination_scopes(
             current_df=current_df,
             prior_df=prior_df,
+            trend_df=table_df,
+            previous_df=previous_df,
             quarter=quarter,
             include_revenue=include_revenue,
             destination_order=destination_order or [],
@@ -74,12 +90,21 @@ def prepare_report_data(
         report["available_destinations"] = destination_scopes["available_destinations"]
         report["destination_excluded_total"] = destination_scopes["excluded_total"]
     else:
-        report["available_destinations"] = _ordered_values(current_df["destination"].unique().tolist(), destination_order or [])
+        report["available_destinations"] = _ordered_values(table_df["destination"].unique().tolist(), destination_order or [])
         for destination in report["available_destinations"]:
             current_subset = _filter_subset(current_df, "destination", destination)
             prior_subset = _filter_subset(prior_df, "destination", destination)
-            report["destinations"][destination] = build_scope_metrics(current_subset, prior_subset, quarter, include_revenue)
-            report["dest_mix"][destination] = build_mix_table(current_subset, include_revenue)
+            trend_subset = _filter_subset(table_df, "destination", destination)
+            previous_subset = _filter_subset(previous_df, "destination", destination) if previous_df is not None else None
+            report["destinations"][destination] = build_scope_metrics(
+                current_subset,
+                prior_subset,
+                quarter,
+                include_revenue,
+                trend_df=trend_subset,
+                previous_df=previous_subset,
+            )
+            report["dest_mix"][destination] = build_mix_table(trend_subset, include_revenue)
             _validate_subset_not_global(
                 subset_name=f"destination:{destination}",
                 subset_df=current_subset,
@@ -94,29 +119,37 @@ def prepare_report_data(
 def build_scope_metrics(
     current_df: pd.DataFrame,
     prior_df: pd.DataFrame,
-    quarter: QuarterInfo,
+    quarter: QuarterInfo | MonthInfo,
     include_revenue: bool,
+    trend_df: pd.DataFrame | None = None,
+    previous_df: pd.DataFrame | None = None,
 ) -> Dict:
-    monthly = build_monthly_table(current_df, quarter, include_revenue)
+    trend_source = current_df if trend_df is None else trend_df
+    monthly = build_monthly_table(trend_source, quarter, include_revenue)
     total = aggregate_totals(current_df, include_revenue)
     prior_total = aggregate_totals(prior_df, include_revenue)
+    previous_total = aggregate_totals(previous_df, include_revenue) if previous_df is not None else None
     yoy = compute_yoy(total, prior_total)
+    mom = compute_yoy(total, previous_total) if previous_total is not None else None
     validate_monthly_table(monthly, include_revenue)
 
     return {
         "monthly": monthly.copy(),
         "total": dict(total),
         "prior_total": dict(prior_total),
+        "previous_total": dict(previous_total) if previous_total is not None else None,
         "yoy": dict(yoy),
-        "kpis": build_kpi_summary(total, yoy),
+        "mom": dict(mom) if mom is not None else None,
+        "kpis": build_kpi_summary(total, yoy, mom=mom),
+        "report_mode": "monthly" if isinstance(quarter, MonthInfo) else "quarterly",
     }
 
 
-def compute_monthly_metrics(df: pd.DataFrame, quarter: QuarterInfo, include_revenue: bool = True) -> pd.DataFrame:
+def compute_monthly_metrics(df: pd.DataFrame, quarter: QuarterInfo | MonthInfo, include_revenue: bool = True) -> pd.DataFrame:
     return build_monthly_table(df, quarter, include_revenue)
 
 
-def build_monthly_table(df_subset: pd.DataFrame, quarter_info: QuarterInfo, include_revenue: bool = True) -> pd.DataFrame:
+def build_monthly_table(df_subset: pd.DataFrame, quarter_info: QuarterInfo | MonthInfo, include_revenue: bool = True) -> pd.DataFrame:
     rows: List[Dict] = []
     for month_start in quarter_info.month_starts:
         month_slice = df_subset[df_subset["month_start"] == month_start].copy()
@@ -189,34 +222,34 @@ def compute_yoy(current: Dict, prior: Dict) -> Dict[str, float | None]:
     return yoy
 
 
-def build_kpi_summary(total: Dict, yoy: Dict[str, float | None]) -> List[Dict[str, Any]]:
+def build_kpi_summary(total: Dict, yoy: Dict[str, float | None], mom: Dict[str, float | None] | None = None) -> List[Dict[str, Any]]:
     kpis: List[Dict[str, Any]] = []
     for metric in KPI_METRICS:
         key = str(metric["key"])
         format_type = str(metric["format"])
         value_raw = total.get(key)
         yoy_value = yoy.get(key)
-        kpis.append(
-            {
-                "key": key,
-                "label": str(metric["label"]),
-                "value": _format_metric_value(value_raw, format_type),
-                "value_raw": value_raw,
-                "yoy": yoy_value,
-                "yoy_label": _fmt_yoy(yoy_value),
-            }
-        )
+        item = {
+            "key": key,
+            "label": str(metric["label"]),
+            "value": _format_metric_value(value_raw, format_type),
+            "value_raw": value_raw,
+            "yoy": yoy_value,
+            "yoy_label": _fmt_yoy(yoy_value),
+        }
+        if mom is not None:
+            mom_value = mom.get(key)
+            item["mom"] = mom_value
+            item["mom_label"] = _fmt_yoy(mom_value)
+        kpis.append(item)
     return kpis
 
 
 def validate_monthly_table(monthly_df: pd.DataFrame, include_revenue: bool) -> None:
-    if len(monthly_df) != 4:
-        raise ValueError(f"Monthly table must contain 4 rows exactly: 3 months plus total. Got {len(monthly_df)} rows.")
-
     monthly_rows = monthly_df[monthly_df["Month"] != "Total"].copy()
     total_row = monthly_df[monthly_df["Month"] == "Total"].copy()
-    if len(monthly_rows) != 3 or total_row.empty:
-        raise ValueError("Monthly table must contain exactly 3 month rows and 1 Total row.")
+    if monthly_rows.empty or total_row.empty:
+        raise ValueError("Monthly table must contain at least one month row and one Total row.")
 
     columns = list(RAW_COLUMNS)
     if include_revenue and "Revenue" in monthly_df.columns:
@@ -271,7 +304,9 @@ def format_summary_table(table_df: pd.DataFrame, include_revenue: bool) -> pd.Da
 def _build_destination_scopes(
     current_df: pd.DataFrame,
     prior_df: pd.DataFrame,
-    quarter: QuarterInfo,
+    trend_df: pd.DataFrame,
+    previous_df: pd.DataFrame | None,
+    quarter: QuarterInfo | MonthInfo,
     include_revenue: bool,
     destination_order: List[str],
     destination_other_config: Dict[str, Any],
@@ -283,12 +318,21 @@ def _build_destination_scopes(
     named_destinations = [destination for destination in destination_order if str(destination).strip()]
 
     for destination in named_destinations:
-        current_subset = _filter_subset(current_df, "destination", destination)
-        if current_subset.empty:
+        trend_subset = _filter_subset(trend_df, "destination", destination)
+        if trend_subset.empty:
             continue
+        current_subset = _filter_subset(current_df, "destination", destination)
         prior_subset = _filter_subset(prior_df, "destination", destination)
-        destinations[destination] = build_scope_metrics(current_subset, prior_subset, quarter, include_revenue)
-        dest_mix[destination] = build_mix_table(current_subset, include_revenue)
+        previous_subset = _filter_subset(previous_df, "destination", destination) if previous_df is not None else None
+        destinations[destination] = build_scope_metrics(
+            current_subset,
+            prior_subset,
+            quarter,
+            include_revenue,
+            trend_df=trend_subset,
+            previous_df=previous_subset,
+        )
+        dest_mix[destination] = build_mix_table(trend_subset, include_revenue)
         available_destinations.append(destination)
         _validate_subset_not_global(
             subset_name=f"destination:{destination}",
@@ -306,6 +350,13 @@ def _build_destination_scopes(
         other_label=other_label,
         mode=str(destination_other_config.get("mode", "remainder")).strip().lower(),
     )
+    other_trend_base, other_previous_base = _select_other_destination_rows(
+        current_df=trend_df,
+        prior_df=previous_df if previous_df is not None else prior_df.iloc[0:0].copy(),
+        named_destinations=named_destinations,
+        other_label=other_label,
+        mode=str(destination_other_config.get("mode", "remainder")).strip().lower(),
+    )
     excluded_campaign_types = {
         str(campaign_type).strip()
         for campaign_type in destination_other_config.get("exclude_campaign_types", [])
@@ -315,14 +366,25 @@ def _build_destination_scopes(
         excluded_current = other_current_base[other_current_base["campaign_type"].isin(excluded_campaign_types)].copy()
         other_current = other_current_base[~other_current_base["campaign_type"].isin(excluded_campaign_types)].copy()
         other_prior = other_prior_base[~other_prior_base["campaign_type"].isin(excluded_campaign_types)].copy()
+        other_trend = other_trend_base[~other_trend_base["campaign_type"].isin(excluded_campaign_types)].copy()
+        other_previous = other_previous_base[~other_previous_base["campaign_type"].isin(excluded_campaign_types)].copy()
     else:
         excluded_current = other_current_base.iloc[0:0].copy()
         other_current = other_current_base
         other_prior = other_prior_base
+        other_trend = other_trend_base
+        other_previous = other_previous_base
 
-    if not other_current.empty:
-        destinations[other_label] = build_scope_metrics(other_current, other_prior, quarter, include_revenue)
-        dest_mix[other_label] = build_mix_table(other_current, include_revenue)
+    if not other_trend.empty:
+        destinations[other_label] = build_scope_metrics(
+            other_current,
+            other_prior,
+            quarter,
+            include_revenue,
+            trend_df=other_trend,
+            previous_df=other_previous if previous_df is not None else None,
+        )
+        dest_mix[other_label] = build_mix_table(other_trend, include_revenue)
         available_destinations.append(other_label)
         _validate_subset_not_global(
             subset_name=f"destination:{other_label}",
@@ -467,6 +529,25 @@ def _validate_total_alignment(
 
 def _quarter_filter(df: pd.DataFrame, q: QuarterInfo) -> pd.DataFrame:
     return df[(df["year"] == q.year) & (df["quarter"] == q.quarter)].copy()
+
+
+def _month_filter(df: pd.DataFrame, month_info: MonthInfo) -> pd.DataFrame:
+    return df[(df["year"] == month_info.year) & (df["month"] == month_info.month)].copy()
+
+
+def _ytd_filter(df: pd.DataFrame, month_info: QuarterInfo | MonthInfo) -> pd.DataFrame:
+    if isinstance(month_info, QuarterInfo):
+        return _quarter_filter(df, month_info)
+    return df[
+        (df["month_start"] >= pd.Timestamp(month_info.year, 1, 1))
+        & (df["month_start"] <= month_info.start)
+    ].copy()
+
+
+def _period_filter(df: pd.DataFrame, period_info: QuarterInfo | MonthInfo) -> pd.DataFrame:
+    if isinstance(period_info, MonthInfo):
+        return _month_filter(df, period_info)
+    return _quarter_filter(df, period_info)
 
 
 def _filter_subset(df: pd.DataFrame, column: str, value: str) -> pd.DataFrame:

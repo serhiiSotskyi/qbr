@@ -8,7 +8,7 @@ import pandas as pd
 from src.auction_loader import load_auction_csv
 from src.auction_metrics import summarize_auction_insights
 from src.config_loader import ConfigLoader
-from src.data_loader import detect_latest_complete_quarter, load_csv
+from src.data_loader import MonthInfo, QuarterInfo, detect_latest_complete_month, detect_latest_complete_quarter, load_csv
 from src.metrics import format_summary_table, prepare_report_data, validate_report_data
 from src.narrative_generator import (
     generate_auction_bullets,
@@ -89,7 +89,8 @@ class TextReportBuilder:
     ) -> None:
         body_parts = [subtitle]
         if kpis:
-            body_parts.extend(["", "Key Metrics + YoY", self._render_kpis(kpis)])
+            kpi_heading = "Key Metrics + MoM + YoY" if any("mom_label" in kpi for kpi in kpis) else "Key Metrics + YoY"
+            body_parts.extend(["", kpi_heading, self._render_kpis(kpis)])
         if not table_df.empty:
             body_parts.extend(["", self._render_table(table_df)])
         body_parts.extend(self._render_bullets(bullets))
@@ -189,14 +190,16 @@ class TextReportBuilder:
     @staticmethod
     def _render_kpis(kpis: Sequence[dict]) -> str:
         rows = []
+        include_mom = any("mom_label" in kpi for kpi in kpis)
         for kpi in kpis:
-            rows.append(
-                {
-                    "Metric": str(kpi.get("label", "")),
-                    "Value": str(kpi.get("value", "n/a")),
-                    "YoY": str(kpi.get("yoy_label", "n/a")),
-                }
-            )
+            row = {
+                "Metric": str(kpi.get("label", "")),
+                "Value": str(kpi.get("value", "n/a")),
+            }
+            if include_mom:
+                row["MoM"] = str(kpi.get("mom_label", "n/a"))
+            row["YoY"] = str(kpi.get("yoy_label", "n/a"))
+            rows.append(row)
         return pd.DataFrame(rows).to_string(index=False)
 
 
@@ -222,6 +225,7 @@ def generate_text_report(
     auction_summary = context.get("auction_summary")
     other_campaigns_summary = context.get("other_campaigns_summary")
     recommendations = context.get("recommendations", [])
+    report_mode = str(context.get("report_mode", report.get("report_mode", "quarterly")))
 
     builder = TextReportBuilder()
 
@@ -230,7 +234,16 @@ def generate_text_report(
     builder.add_title_slide(title_text, subtitle_text)
 
     if config_loader.is_slide_enabled("include_performance", client_config):
-        _build_performance_section(builder, report, subtitle, client_config, config_loader, campaigns, other_campaigns_summary)
+        _build_performance_section(
+            builder,
+            report,
+            subtitle,
+            client_config,
+            config_loader,
+            campaigns,
+            other_campaigns_summary,
+            report_mode=report_mode,
+        )
 
     if config_loader.is_slide_enabled("include_trends", client_config) and trends_summary:
         _build_trends_section(builder, trends_summary, subtitle, client_config, config_loader)
@@ -276,28 +289,33 @@ class TextReportPipeline:
         auction_csv: str | Path | None = None,
         trends_dir: str | Path | None = None,
         other_campaigns_dir: str | Path | None = None,
+        report_mode: str = "quarterly",
     ) -> Path:
         client_config = self.config_loader.get_client_config(client_id)
         df = load_csv(input_csv)
-        quarter = detect_latest_complete_quarter(df)
+        use_monthly = report_mode == "monthly" and client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}
+        quarter = detect_latest_complete_month(df) if use_monthly else detect_latest_complete_quarter(df)
         report = prepare_report_data(
             df,
             quarter,
             campaign_order=self.config_loader.get_campaign_types(client_config),
             destination_order=self.config_loader.get_destinations(client_config),
             destination_other_config=client_config.get("destination_other"),
+            report_mode="monthly" if use_monthly else "quarterly",
         )
         validate_report_data(report)
 
-        subtitle = f"{quarter.label} ({quarter.start.strftime('%b')} - {quarter.end.strftime('%b %Y')})"
+        subtitle = _format_period_subtitle(quarter, "monthly" if use_monthly else "quarterly")
         client_name = self.config_loader.get_client_name(client_config)
         report_title = self.config_loader.get_report_title(client_config)
+        if use_monthly:
+            report_title = report_title.replace("Quarterly", "Monthly")
         agency_name = self.config_loader.get_agency_name(client_config)
 
-        trends_summary = _load_trends_summary(self.project_root, self.config_loader, client_config, quarter, trends_dir)
-        auction_summary = _load_auction_summary(self.config_loader, client_config, auction_csv)
+        trends_summary = None if use_monthly else _load_trends_summary(self.project_root, self.config_loader, client_config, quarter, trends_dir)
+        auction_summary = None if use_monthly else _load_auction_summary(self.config_loader, client_config, auction_csv)
         other_campaigns_summary = _load_other_campaigns_summary(client_config, other_campaigns_dir)
-        recommendations = generate_recommendations(report, trends_summary=trends_summary, auction_summary=auction_summary)
+        recommendations = [] if use_monthly else generate_recommendations(report, trends_summary=trends_summary, auction_summary=auction_summary)
 
         output_path = Path(output_txt) if output_txt else self.project_root / "reports" / "report.txt"
         generate_text_report(
@@ -314,6 +332,7 @@ class TextReportPipeline:
                 "auction_summary": auction_summary,
                 "other_campaigns_summary": other_campaigns_summary,
                 "recommendations": recommendations,
+                "report_mode": "monthly" if use_monthly else "quarterly",
             },
             output_path=output_path,
         )
@@ -328,15 +347,19 @@ def _build_performance_section(
     config_loader: ConfigLoader,
     campaigns,
     other_campaigns_summary: dict | None = None,
+    report_mode: str = "quarterly",
 ) -> None:
     builder.add_divider_slide("Performance")
     use_kpi_cards = _use_kpi_summary_cards(client_config)
+    is_monthly = report_mode == "monthly"
+    summary_word = "Month" if is_monthly else "Quarter"
+    trend_word = "YTD" if is_monthly else "Monthly"
 
     if config_loader.is_slide_enabled("overview", client_config):
         overall_scope = report["overall"]
         if use_kpi_cards:
             builder.add_summary_slide(
-                title="Overall Quarter Summary",
+                title=f"Overall {summary_word} Summary",
                 subtitle=subtitle,
                 kpis=overall_scope["kpis"],
                 table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
@@ -344,14 +367,14 @@ def _build_performance_section(
             )
         else:
             builder.add_table_slide(
-                title="Overall Quarter Summary",
+                title=f"Overall {summary_word} Summary",
                 subtitle=subtitle,
                 table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
                 bullets=generate_scope_bullets("Overall", overall_scope),
             )
 
         builder.add_trend_slide(
-            title="Overall Performance Trend",
+            title=f"Overall {trend_word} Trend" if is_monthly else "Overall Performance Trend",
             subtitle=subtitle,
             table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
             bullets=[] if use_kpi_cards else generate_overall_bullets(overall_scope, report["mix_overall"]),
@@ -359,7 +382,7 @@ def _build_performance_section(
 
     if config_loader.is_slide_enabled("campaign_mix", client_config):
         builder.add_mix_slide(
-            title="Campaign Type Mix",
+            title="Campaign Type YTD Mix" if is_monthly else "Campaign Type Mix",
             subtitle=subtitle,
             table_df=_format_mix_table(report["mix_overall"]),
             bullets=generate_mix_bullets(report["mix_overall"], "overall"),
@@ -372,7 +395,7 @@ def _build_performance_section(
             summary_bullets = generate_scope_bullets(campaign, scope)
             if use_kpi_cards:
                 builder.add_summary_slide(
-                    title=f"{campaign} Summary",
+                    title=f"{campaign} {summary_word} Summary" if is_monthly else f"{campaign} Summary",
                     subtitle=subtitle,
                     kpis=scope["kpis"],
                     table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
@@ -380,14 +403,14 @@ def _build_performance_section(
                 )
             else:
                 builder.add_table_slide(
-                    title=f"{campaign} Summary",
+                    title=f"{campaign} {summary_word} Summary" if is_monthly else f"{campaign} Summary",
                     subtitle=subtitle,
                     table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
                     bullets=summary_bullets,
                 )
 
             builder.add_trend_slide(
-                title=f"{campaign} Monthly Trend",
+                title=f"{campaign} {trend_word} Trend",
                 subtitle=subtitle,
                 table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
                 bullets=[] if use_kpi_cards else summary_bullets,
@@ -399,7 +422,7 @@ def _build_performance_section(
             summary_bullets = generate_scope_bullets(destination, scope)
             if use_kpi_cards:
                 builder.add_summary_slide(
-                    title=f"{destination} Summary + YoY",
+                    title=f"{destination} {summary_word} Summary + YoY" if is_monthly else f"{destination} Summary + YoY",
                     subtitle=subtitle,
                     kpis=scope["kpis"],
                     table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
@@ -407,21 +430,21 @@ def _build_performance_section(
                 )
             else:
                 builder.add_table_slide(
-                    title=f"{destination} Summary + YoY",
+                    title=f"{destination} {summary_word} Summary + YoY" if is_monthly else f"{destination} Summary + YoY",
                     subtitle=subtitle,
                     table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
                     bullets=summary_bullets,
                 )
 
             builder.add_trend_slide(
-                title=f"{destination} Monthly Trend",
+                title=f"{destination} {trend_word} Trend",
                 subtitle=subtitle,
                 table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
                 bullets=[] if use_kpi_cards else summary_bullets,
             )
 
             builder.add_mix_slide(
-                title=f"{destination} Campaign Mix",
+                title=f"{destination} Campaign YTD Mix" if is_monthly else f"{destination} Campaign Mix",
                 subtitle=subtitle,
                 table_df=_format_mix_table(report["dest_mix"][destination]),
                 bullets=generate_mix_bullets(report["dest_mix"][destination], destination),
@@ -585,3 +608,9 @@ def _fmt_percent(value: float | None) -> str:
 
 def _use_kpi_summary_cards(client_config: dict) -> bool:
     return client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}
+
+
+def _format_period_subtitle(period: QuarterInfo | MonthInfo, report_mode: str) -> str:
+    if report_mode == "monthly" and isinstance(period, MonthInfo):
+        return f"{period.label} (YTD Jan - {period.start.strftime('%b %Y')})"
+    return f"{period.label} ({period.start.strftime('%b')} - {period.end.strftime('%b %Y')})"

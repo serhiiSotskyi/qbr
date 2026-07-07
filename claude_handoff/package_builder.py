@@ -90,7 +90,9 @@ CENTRAL_ASIA_SECTION_TITLES = (
 )
 
 PERIOD_RE = re.compile(r"\bQ[1-4]\s+\d{4}\s*\([^)]+\)")
+MONTHLY_PERIOD_RE = re.compile(r"\b[A-Z][a-z]{2,8}\s+\d{4}\s*\(YTD[^)]*\)")
 QUARTER_SHORT_RE = re.compile(r"\bQ[1-4]\s+\d{4}\b")
+MONTH_SHORT_RE = re.compile(r"\b[A-Z][a-z]{2,8}\s+\d{4}\b")
 HEADLINE_KPI_RE = re.compile(r"^\s*(Cost|Sales Leads|CPL|CVR)\s+(\S+)", re.MULTILINE)
 
 
@@ -110,6 +112,10 @@ def is_wendy_wu_qbr(client_id: str, report_mode: str = "quarterly") -> bool:
     return report_mode == "quarterly" and client_id in WENDY_WU_CLIENT_IDS
 
 
+def is_wendy_wu_report(client_id: str, report_mode: str = "quarterly") -> bool:
+    return report_mode in {"quarterly", "monthly"} and client_id in WENDY_WU_CLIENT_IDS
+
+
 def resolve_wendy_wu_handoff_slug(client_id: str) -> str:
     return WENDY_WU_HANDOFF_SLUGS.get(client_id, _slugify(client_id))
 
@@ -126,21 +132,28 @@ def build_claude_handoff_package(
     client_display_name: str,
     client_slug: str,
     period_label: str | None = None,
+    report_mode: str = "quarterly",
     reference_pptx: bytes | Path | str | None = DEFAULT_REFERENCE_PPTX_PATH,
     reference_deck_url: str = DEFAULT_REFERENCE_DECK_URL,
     generated_at: datetime | None = None,
 ) -> tuple[bytes, dict]:
-    """Build a Claude handoff zip for Wendy Wu QBR Streamlit outputs."""
+    """Build a Claude handoff zip for Wendy Wu Streamlit outputs."""
 
+    is_monthly = report_mode == "monthly"
     source_sections = parse_source_sections(report_text)
     resolved_period = period_label or extract_period_label(report_text)
     quarter_short = extract_quarter_short(resolved_period)
     headline_kpis = extract_headline_kpis(report_text)
     include_central_asia_slide = should_include_central_asia_slide(client_slug, source_sections)
     include_other_top_campaigns_slide = should_include_other_top_campaigns_slide(source_sections)
-    expected_sections = expected_source_sections(include_central_asia_slide, include_other_top_campaigns_slide)
-    missing_sections = find_missing_expected_sections(source_sections, expected_sections)
-    extra_sections = find_extra_source_sections(source_sections, expected_sections)
+    if is_monthly:
+        expected_sections = expected_monthly_source_sections(source_sections)
+        missing_sections: list[str] = []
+        extra_sections: list[str] = []
+    else:
+        expected_sections = expected_source_sections(include_central_asia_slide, include_other_top_campaigns_slide)
+        missing_sections = find_missing_expected_sections(source_sections, expected_sections)
+        extra_sections = find_extra_source_sections(source_sections, expected_sections)
 
     streamlit_pptx_filename = f"{client_slug}_streamlit_output.pptx"
     generated_pptx_bytes = _read_payload(generated_pptx)
@@ -160,6 +173,7 @@ def build_claude_handoff_package(
     variables = {
         "client_display_name": client_display_name,
         "client_slug": client_slug,
+        "report_mode": report_mode,
         "period_label": resolved_period,
         "quarter_short": quarter_short,
         "reference_deck_url": reference_deck_url,
@@ -171,11 +185,17 @@ def build_claude_handoff_package(
         "headline_cvr": headline_kpis["cvr"],
     }
 
-    readme_text = render_asset_template("README_FOR_CLAUDE_TEMPLATE.txt", variables)
-    claude_prompt_text = render_asset_template("CLAUDE_PROMPT_TEMPLATE.txt", variables)
-    slide_mapping_text = build_slide_mapping_text(variables, include_central_asia_slide, include_other_top_campaigns_slide)
-    qa_checklist_text = render_asset_template("QA_CHECKLIST_TEMPLATE.txt", variables)
-    if include_central_asia_slide:
+    if is_monthly:
+        readme_text = build_monthly_readme_text(variables)
+        claude_prompt_text = build_monthly_claude_prompt_text(variables)
+        slide_mapping_text = build_monthly_slide_mapping_text(source_sections, variables)
+        qa_checklist_text = build_monthly_qa_checklist_text(variables)
+    else:
+        readme_text = render_asset_template("README_FOR_CLAUDE_TEMPLATE.txt", variables)
+        claude_prompt_text = render_asset_template("CLAUDE_PROMPT_TEMPLATE.txt", variables)
+        slide_mapping_text = build_slide_mapping_text(variables, include_central_asia_slide, include_other_top_campaigns_slide)
+        qa_checklist_text = render_asset_template("QA_CHECKLIST_TEMPLATE.txt", variables)
+    if include_central_asia_slide and not is_monthly:
         readme_text = apply_central_asia_slide_instructions(readme_text)
         claude_prompt_text = apply_central_asia_slide_instructions(claude_prompt_text)
         qa_checklist_text = apply_central_asia_slide_instructions(qa_checklist_text)
@@ -212,7 +232,11 @@ def build_claude_handoff_package(
         {"name": "CLAUDE_PROMPT.txt", "role": "Claude execution prompt", "required": True},
         {
             "name": "SLIDE_MAPPING.csv",
-            "role": "39-slide UK reference deck mapping" if include_central_asia_slide else "38-slide reference deck mapping",
+            "role": (
+                "monthly Wendy Wu performance mapping"
+                if is_monthly
+                else "39-slide UK reference deck mapping" if include_central_asia_slide else "38-slide reference deck mapping"
+            ),
             "required": True,
         },
         {"name": "SOURCE_SECTION_INDEX.txt", "role": "report section line index", "required": True},
@@ -227,15 +251,16 @@ def build_claude_handoff_package(
 
     manifest = {
         "package_type": "claude_handoff",
-        "report_family": "Wendy Wu QBR",
+        "report_family": "Wendy Wu Monthly" if is_monthly else "Wendy Wu QBR",
         "client_display_name": client_display_name,
         "client_slug": client_slug,
+        "report_mode": report_mode,
         "period_label": resolved_period,
         "quarter_short": quarter_short,
         "generated_at": generated_at_value,
         "reference_deck_url": reference_deck_url,
         "has_reference_pptx": has_reference_pptx,
-        "target_slide_count": 39 if include_central_asia_slide else 38,
+        "target_slide_count": _count_slide_mapping_rows(slide_mapping_text) if is_monthly else 39 if include_central_asia_slide else 38,
         "uk_central_asia_mongolia_slide": include_central_asia_slide,
         "other_top_campaigns_slide": include_other_top_campaigns_slide,
         "files": files_manifest,
@@ -294,16 +319,24 @@ def parse_source_sections(report_text: str) -> list[SourceSection]:
 
 def extract_period_label(report_text: str) -> str:
     match = PERIOD_RE.search(report_text)
+    if match:
+        return match.group(0).strip()
+    match = MONTHLY_PERIOD_RE.search(report_text)
     return match.group(0).strip() if match else "Unknown period"
 
 
 def extract_quarter_short(period_label: str) -> str:
     match = QUARTER_SHORT_RE.search(period_label)
+    if match:
+        return match.group(0).strip()
+    match = MONTH_SHORT_RE.search(period_label)
     return match.group(0).strip() if match else period_label
 
 
 def extract_headline_kpis(report_text: str) -> dict[str, str]:
     overall_section = extract_section_text(report_text, "Overall Quarter Summary")
+    if not overall_section:
+        overall_section = extract_section_text(report_text, "Overall Month Summary")
     values = {key: "n/a" for key in ("cost", "sales_leads", "cpl", "cvr")}
     key_map = {
         "Cost": "cost",
@@ -365,8 +398,8 @@ def build_source_section_index(
     extra = extra_sections if extra_sections is not None else find_extra_source_sections(sections)
 
     report_title = next((section.raw_title for section in sections if section.title == "Report title"), None)
-    performance_other = _find_section(sections, "Other Summary")
-    destination_other = _find_section(sections, "Other Summary + YoY")
+    performance_other = _find_section(sections, "Other Summary") or _find_section(sections, "Other Month Summary")
+    destination_other = _find_section(sections, "Other Summary + YoY") or _find_section(sections, "Other Month Summary + YoY")
 
     output = [
         "SOURCE_SECTION_INDEX.txt",
@@ -486,7 +519,7 @@ def apply_central_asia_slide_instructions(text: str) -> str:
 def should_include_central_asia_slide(client_slug: str, source_sections: list[SourceSection]) -> bool:
     if client_slug != "wendy_wu_uk":
         return False
-    return any(section.title == "Central Asia & Mongolia Summary + YoY" for section in source_sections)
+    return any(section.title in {"Central Asia & Mongolia Summary + YoY", "Central Asia & Mongolia Month Summary + YoY"} for section in source_sections)
 
 
 def should_include_other_top_campaigns_slide(source_sections: list[SourceSection]) -> bool:
@@ -505,6 +538,182 @@ def expected_source_sections(
         for title in reversed(CENTRAL_ASIA_SECTION_TITLES):
             sections.insert(insert_at, title)
     return tuple(sections)
+
+
+def expected_monthly_source_sections(source_sections: list[SourceSection]) -> tuple[str, ...]:
+    return tuple(section.title for section in source_sections)
+
+
+def build_monthly_readme_text(variables: Mapping[str, str]) -> str:
+    return render_template(
+        """
+{{client_display_name}} {{quarter_short}} Monthly Report Deck Handoff
+
+Goal
+Transform the Streamlit output in this upload pack into a polished monthly PPC report deck using the Wendy Wu QBR visual style, but only the monthly/YTD sections present in report.txt.
+
+Files in this pack
+- report.txt: Source of truth for all {{period_label}} values, MoM/YoY card comparisons, YTD tables, YTD charts, bullets, and period labels.
+- {{streamlit_pptx_filename}}: Streamlit-generated PowerPoint. Use it to understand structure and chart coverage.
+- reference_deck_exported_from_google_slides.pptx: QBR visual reference, if included. Use it for styling only; do not force missing QBR trends or auction slides into this monthly deck.
+- original_streamlit_prompt.txt: Original prompt used by Streamlit. Background only.
+- SLIDE_MAPPING.csv: Monthly source-section execution map.
+- SOURCE_SECTION_INDEX.txt: Index of report.txt sections and line numbers.
+- QA_CHECKLIST.txt: Required checks before returning the completed deck.
+- CHART_QA_ADDENDUM_FOR_CLAUDE.txt: Required chart rendering and visual QA rules. Use this for every chart slide.
+- PACKAGE_MANIFEST.json: Package metadata.
+
+Monthly rules
+- KPI cards show the selected month only.
+- KPI cards must include both MoM and YoY where report.txt provides them.
+- Tables and charts show YTD through the selected month.
+- Include campaign type and destination breakdown sections from report.txt.
+- Do not add Google Trends, Auction Insights, or Recommendations slides unless those sections are present in report.txt.
+- Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
+
+Recommended workflow
+1. Read report.txt and use SLIDE_MAPPING.csv as the execution map.
+2. Use the Streamlit PPTX to understand source coverage.
+3. Use the reference deck only for visual style.
+4. Generate chart PNGs from report.txt data where needed.
+5. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide and inspect full-slide screenshots or thumbnails.
+6. Run QA_CHECKLIST.txt before returning the finished deck.
+""".strip(),
+        variables,
+    )
+
+
+def build_monthly_claude_prompt_text(variables: Mapping[str, str]) -> str:
+    return render_template(
+        """
+You are preparing a {{client_display_name}} {{quarter_short}} monthly PPC report deck.
+
+I am uploading:
+- report.txt
+- {{streamlit_pptx_filename}}
+- reference_deck_exported_from_google_slides.pptx, if included
+- original_streamlit_prompt.txt
+- SLIDE_MAPPING.csv
+- SOURCE_SECTION_INDEX.txt
+- QA_CHECKLIST.txt
+- CHART_QA_ADDENDUM_FOR_CLAUDE.txt
+- PACKAGE_MANIFEST.json
+
+Task
+Create a monthly report deck populated with {{period_label}} {{client_display_name}} data from report.txt.
+
+Source priority
+1. report.txt is the source of truth for all numbers, tables, bullets, dates, MoM, YoY, and YTD values.
+2. SLIDE_MAPPING.csv defines the monthly source sections to cover.
+3. {{streamlit_pptx_filename}} shows the intermediate Streamlit structure and charts.
+4. The reference deck, if included, defines style only. Do not force QBR-only Trends, Auction Insights, or Recommendation sections into the monthly deck.
+5. original_streamlit_prompt.txt is background only.
+
+Hard requirements
+- KPI cards show the selected month only.
+- KPI cards must show MoM and YoY where report.txt provides them.
+- Tables and charts show YTD through the selected month.
+- Include every campaign type and destination section present in report.txt.
+- Use "{{client_display_name}}" where the market/client name appears.
+- Preserve the Wendy Wu/Summon visual system: dark backgrounds, red accents, KPI cards, tables, footers, typography, chart placement, and spacing.
+- Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping.
+- Run QA_CHECKLIST.txt before returning.
+
+Output
+Return the finished Google Slides deck URL if you edited Google Slides directly. If you used the PPTX bridge, return the finished PPTX only and note that it should be imported into Google Slides.
+""".strip(),
+        variables,
+    )
+
+
+def build_monthly_qa_checklist_text(variables: Mapping[str, str]) -> str:
+    return render_template(
+        """
+Required QA before delivery
+
+Deck identity
+- Final deck is a monthly {{client_display_name}} PPC report for {{period_label}}.
+- Client/market naming is {{client_display_name}}.
+- No stale QBR-only Google Trends, Auction Insights, or Recommendations slides were added unless report.txt includes those sections.
+
+Data integrity
+- KPI values match report.txt Key Metrics rows exactly.
+- MoM and YoY values match report.txt exactly.
+- KPI cards use selected-month values only.
+- Tables and charts use YTD data through the selected month.
+- Campaign Type YTD Mix includes all campaign type rows from report.txt.
+- Destination sections include all destination rows present in report.txt.
+- Source "Other Summary" in the Performance section is not accidentally used for destination Other slides.
+
+Visual fidelity
+- Typography, colors, red accents, dark footer, page structure, and KPI card styling match the Wendy Wu reference style.
+- Text does not overflow or wrap awkwardly in title/footer bands.
+- Tables fit within slide bounds and remain readable.
+- Every chart slide has been checked against CHART_QA_ADDENDUM_FOR_CLAUDE.txt.
+- No chart labels, value annotations, legends, or axis labels are clipped or overlapping.
+- Chart images are placed with fit/contain behavior and are not stretched non-proportionally.
+- No objects overlap unintentionally.
+
+Final response
+- If the output is native Google Slides, return the new Google Slides URL only.
+- If the output is PPTX, return the finished PPTX and state it is ready to import into Google Slides.
+""".strip(),
+        variables,
+    )
+
+
+def build_monthly_slide_mapping_text(source_sections: list[SourceSection], variables: Mapping[str, str]) -> str:
+    output_buffer = StringIO()
+    fieldnames = ["target_slide", "reference_title", "source_section_or_action", "required_action"]
+    writer = DictWriter(output_buffer, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+
+    slide_number = 1
+    for section in source_sections:
+        if section.title == "Report title":
+            writer.writerow(
+                {
+                    "target_slide": str(slide_number),
+                    "reference_title": "Title",
+                    "source_section_or_action": section.raw_title or "Report title",
+                    "required_action": (
+                        "Update title, client, period, and headline KPI cards from report.txt. "
+                        "Use selected-month values for cards and preserve MoM/YoY labels where provided."
+                    ),
+                }
+            )
+            slide_number += 1
+            continue
+
+        writer.writerow(
+            {
+                "target_slide": str(slide_number),
+                "reference_title": section.title,
+                "source_section_or_action": section.title,
+                "required_action": _monthly_required_action(section.title),
+            }
+        )
+        slide_number += 1
+
+    return render_template(output_buffer.getvalue(), variables)
+
+
+def _monthly_required_action(section_title: str) -> str:
+    upper_title = section_title.upper()
+    if upper_title == section_title:
+        return "Keep as a divider or section header. Update client, period, and footer styling."
+    if "Summary" in section_title:
+        return (
+            "Update KPI cards from selected-month Key Metrics. Include MoM and YoY values exactly as shown. "
+            "Use YTD table values for supporting tables and preserve bullets from report.txt."
+        )
+    if "YTD Trend" in section_title:
+        return "Create or replace the YTD monthly trend chart from this section. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
+    if "YTD Mix" in section_title or "Campaign Mix" in section_title:
+        return "Update the YTD campaign mix table and visual using this section. Preserve all rows and totals from report.txt."
+    if "Top 10 campaigns" in section_title:
+        return "Update the ranked Other destination campaign charts and tables from this section."
+    return "Update slide content from this source section and preserve report.txt values exactly."
 
 
 def render_template(template: str, variables: Mapping[str, str]) -> str:
@@ -542,6 +751,10 @@ def _format_generated_at(value: datetime | None) -> str:
     return generated_at.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _count_slide_mapping_rows(slide_mapping_text: str) -> int:
+    return len(list(DictReader(StringIO(slide_mapping_text))))
+
+
 def _find_first_report_title(lines: list[str]) -> tuple[int, str] | None:
     for index, line in enumerate(lines, start=1):
         stripped = line.strip()
@@ -575,15 +788,15 @@ def _section_matches_expected(expected: str, section: SourceSection) -> bool:
 def _display_section_title(section: SourceSection, sections: list[SourceSection]) -> str:
     if section.title == "Report title" and section.raw_title:
         return f"Report title - {section.raw_title}"
-    if section.title == "Other Summary":
+    if section.title in {"Other Summary", "Other Month Summary"}:
         return "Other Summary (Performance/channel Other)"
-    if section.title == "Other Summary + YoY":
+    if section.title in {"Other Summary + YoY", "Other Month Summary + YoY"}:
         return "Other Summary + YoY (Destination Other)"
-    if section.title == "Other Monthly Trend":
-        destination_other = _find_section(sections, "Other Summary + YoY")
+    if section.title in {"Other Monthly Trend", "Other YTD Trend"}:
+        destination_other = _find_section(sections, "Other Summary + YoY") or _find_section(sections, "Other Month Summary + YoY")
         if destination_other and section.line > destination_other.line:
-            return "Other Monthly Trend (Destination Other)"
-        return "Other Monthly Trend (Performance/channel Other)"
+            return f"{section.title} (Destination Other)"
+        return f"{section.title} (Performance/channel Other)"
     return section.title
 
 

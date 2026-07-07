@@ -9,18 +9,19 @@ def generate_overall_bullets(overall_scope: Dict, mix_df: pd.DataFrame) -> List[
     monthly = overall_scope["monthly"]
     total = overall_scope["total"]
     yoy = overall_scope["yoy"]
+    period_word = _period_word(overall_scope)
 
     bullets = [
         _build_monthly_activity_bullet(monthly),
         (
-            f"Quarter total: {int(total['Sales Leads']):,} leads from {fmt_currency(total['Cost'])} spend "
+            f"{period_word.title()} total: {int(total['Sales Leads']):,} leads from {fmt_currency(total['Cost'])} spend "
             f"at a blended CPL of {fmt_currency(total['CPL'])}."
         ),
     ]
 
     if yoy.get("Sales Leads") is not None and yoy.get("Cost") is not None:
         bullets.append(
-            f"YoY vs same quarter last year: leads {fmt_delta(yoy['Sales Leads'])} and spend {fmt_delta(yoy['Cost'])}."
+            f"YoY vs same {period_word} last year: leads {fmt_delta(yoy['Sales Leads'])} and spend {fmt_delta(yoy['Cost'])}."
         )
 
     if not mix_df.empty:
@@ -36,18 +37,19 @@ def generate_scope_bullets(scope_name: str, scope_data: Dict) -> List[str]:
     monthly = scope_data["monthly"]
     total = scope_data["total"]
     yoy = scope_data["yoy"]
+    period_word = _period_word(scope_data)
 
     bullets = [
         (
             f"{scope_name} generated {int(total['Sales Leads']):,} leads from {fmt_currency(total['Cost'])} "
-            f"with a quarter CPL of {fmt_currency(total['CPL'])}."
+            f"with a {period_word} CPL of {fmt_currency(total['CPL'])}."
         ),
         _build_monthly_activity_bullet(monthly),
     ]
 
     if yoy.get("Sales Leads") is not None and yoy.get("Cost") is not None:
         bullets.append(
-            f"YoY vs same quarter last year: leads {fmt_delta(yoy['Sales Leads'])}, spend {fmt_delta(yoy['Cost'])}."
+            f"YoY vs same {period_word} last year: leads {fmt_delta(yoy['Sales Leads'])}, spend {fmt_delta(yoy['Cost'])}."
         )
     else:
         bullets.append("YoY comparison is unavailable due to missing or zero baseline in prior year data.")
@@ -187,22 +189,22 @@ def _build_monthly_activity_bullet(monthly_df: pd.DataFrame) -> str:
 
     active_month_names = active_months["Month"].tolist()
     if len(active_months) == 1:
-        return f"Only {active_month_names[0]} recorded activity in this quarter subset, so month-on-month comparison is limited."
+        return f"Only {active_month_names[0]} recorded activity in this period subset, so month-on-month comparison is limited."
 
     cpl_months = active_months[active_months["Sales Leads"] > 0].copy()
     cvr_months = active_months[active_months["Clicks"] > 0].copy()
 
     if cpl_months.empty or cvr_months.empty:
         if len(active_months) == 2:
-            return f"Only {active_month_names[0]} and {active_month_names[1]} recorded activity in this quarter subset."
-        return f"Active months in this quarter subset were {', '.join(active_month_names)}."
+            return f"Only {active_month_names[0]} and {active_month_names[1]} recorded activity in this period subset."
+        return f"Active months in this period subset were {', '.join(active_month_names)}."
 
     best_cpl = cpl_months.loc[cpl_months["CPL"].idxmin()]
     worst_cpl = cpl_months.loc[cpl_months["CPL"].idxmax()]
 
     if len(active_months) == 2:
         return (
-            f"Only {active_month_names[0]} and {active_month_names[1]} recorded activity in this quarter subset; "
+            f"Only {active_month_names[0]} and {active_month_names[1]} recorded activity in this period subset; "
             f"{best_cpl['Month']} was more efficient at {fmt_currency(best_cpl['CPL'])} CPL, while "
             f"{worst_cpl['Month']} was higher at {fmt_currency(worst_cpl['CPL'])}."
         )
@@ -211,3 +213,7 @@ def _build_monthly_activity_bullet(monthly_df: pd.DataFrame) -> str:
         f"Best efficiency was in {best_cpl['Month']} ({fmt_currency(best_cpl['CPL'])} CPL), "
         f"while {worst_cpl['Month']} was highest at {fmt_currency(worst_cpl['CPL'])}."
     )
+
+
+def _period_word(scope_data: Dict) -> str:
+    return "month" if scope_data.get("report_mode") == "monthly" else "quarter"

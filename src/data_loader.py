@@ -56,6 +56,37 @@ class QuarterInfo:
         return QuarterInfo(year=self.year - 1, quarter=self.quarter)
 
 
+@dataclass(frozen=True)
+class MonthInfo:
+    year: int
+    month: int
+
+    @property
+    def start(self) -> pd.Timestamp:
+        return pd.Timestamp(self.year, self.month, 1)
+
+    @property
+    def end(self) -> pd.Timestamp:
+        return self.start + pd.offsets.MonthEnd(0)
+
+    @property
+    def month_starts(self) -> List[pd.Timestamp]:
+        return [pd.Timestamp(self.year, month, 1) for month in range(1, self.month + 1)]
+
+    @property
+    def label(self) -> str:
+        return self.start.strftime("%b %Y")
+
+    @property
+    def prior_year_same_quarter(self) -> "MonthInfo":
+        return MonthInfo(year=self.year - 1, month=self.month)
+
+    @property
+    def previous_month(self) -> "MonthInfo":
+        previous = self.start - pd.DateOffset(months=1)
+        return MonthInfo(year=int(previous.year), month=int(previous.month))
+
+
 def load_csv(csv_path: str | Path) -> pd.DataFrame:
     path = Path(csv_path)
     if not path.exists():
@@ -120,6 +151,21 @@ def detect_latest_complete_quarter(df: pd.DataFrame) -> QuarterInfo:
         )
 
     return selected_quarter
+
+
+def detect_latest_complete_month(df: pd.DataFrame, today: pd.Timestamp | None = None) -> MonthInfo:
+    if df.empty:
+        raise ValueError("Cannot detect month on empty dataframe.")
+
+    current_day = pd.Timestamp(today).normalize() if today is not None else pd.Timestamp.today().normalize()
+    latest_full_month = current_day.replace(day=1) - pd.DateOffset(months=1)
+    available_months = sorted(pd.Timestamp(month) for month in df["month_start"].dropna().unique())
+    eligible_months = [month for month in available_months if month <= latest_full_month]
+    if not eligible_months:
+        raise ValueError("No complete month exists in the input CSV.")
+
+    selected = eligible_months[-1]
+    return MonthInfo(year=int(selected.year), month=int(selected.month))
 
 
 def quarter_has_all_months(df: pd.DataFrame, year: int, quarter: int) -> bool:

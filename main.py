@@ -29,9 +29,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
     parser.add_argument(
         "--report-mode",
-        choices=["quarterly", "annual"],
+        choices=["quarterly", "monthly", "annual"],
         default="quarterly",
-        help="Wightlink-only mode selector. Defaults to quarterly.",
+        help="Report mode selector. Wightlink supports quarterly/annual; Wendy Wu UK/Australia support quarterly/monthly.",
     )
     parser.add_argument(
         "--output",
@@ -111,6 +111,7 @@ def run_report(
         auction_csv=auction_csv,
         trends_dir=trends_dir,
         other_campaigns_dir=other_campaigns_dir,
+        report_mode=report_mode,
     )
     return str(report_path)
 
@@ -185,6 +186,7 @@ def run_text_report(
         auction_csv=auction_csv,
         trends_dir=trends_dir,
         other_campaigns_dir=other_campaigns_dir,
+        report_mode=report_mode,
     )
     return str(report_path)
 

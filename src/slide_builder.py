@@ -401,18 +401,24 @@ class SlideBuilder:
             value_run.font.bold = True
             value_run.font.color.rgb = self.text_primary
 
-            yoy_box = slide.shapes.add_textbox(
-                Inches(card_left + 0.14),
-                Inches(card_top + card_height - 0.44),
-                Inches(card_width - 0.28),
-                Inches(0.24),
-            ).text_frame
-            yoy_para = yoy_box.paragraphs[0]
-            yoy_run = yoy_para.add_run()
-            yoy_run.text = f"YoY: {kpi.get('yoy_label', 'n/a')}"
-            yoy_run.font.size = Pt(10)
-            yoy_run.font.bold = True
-            yoy_run.font.color.rgb = self._resolve_yoy_color(str(kpi.get("key", "")), kpi.get("yoy"))
+            comparison_lines = []
+            if "mom_label" in kpi:
+                comparison_lines.append(("MoM", kpi.get("mom_label", "n/a"), kpi.get("mom")))
+            comparison_lines.append(("YoY", kpi.get("yoy_label", "n/a"), kpi.get("yoy")))
+            first_line_top = card_top + card_height - (0.61 if len(comparison_lines) > 1 else 0.44)
+            for line_index, (label, value, raw_value) in enumerate(comparison_lines):
+                comparison_box = slide.shapes.add_textbox(
+                    Inches(card_left + 0.14),
+                    Inches(first_line_top + line_index * 0.24),
+                    Inches(card_width - 0.28),
+                    Inches(0.22),
+                ).text_frame
+                comparison_para = comparison_box.paragraphs[0]
+                comparison_run = comparison_para.add_run()
+                comparison_run.text = f"{label}: {value}"
+                comparison_run.font.size = Pt(9 if len(comparison_lines) > 1 else 10)
+                comparison_run.font.bold = True
+                comparison_run.font.color.rgb = self._resolve_yoy_color(str(kpi.get("key", "")), raw_value)
 
     def _replace_text_placeholder(self, slide, placeholder: str, value: str) -> bool:
         for shape in slide.shapes:

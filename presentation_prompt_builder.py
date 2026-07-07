@@ -813,8 +813,83 @@ PROMPTS = {
 }
 
 
-def build_presentation_prompt(client_id: str) -> str:
-    base_prompt = PROMPTS.get(client_id)
+MONTHLY_WENDY_WU_PROMPTS = {
+    "wendy_wu": dedent(
+        """
+        You are a data-to-presentation engine.
+
+        I am uploading:
+        - `report.txt` = the source of truth for content
+        - the current generated `.pptx` = the structural reference
+        - an example layout file = visual inspiration only
+
+        Your job is to convert this Wendy Wu Tours monthly PPC report into a polished presentation.
+
+        CRITICAL RULES
+        - preserve ALL sections from `report.txt`
+        - preserve ALL numbers exactly
+        - preserve ALL tables exactly
+        - preserve ALL bullet wording exactly unless only tiny grammar cleanup is needed
+        - create a slide for EVERY monthly/YTD section in the report
+        - do not create Google Trends or Auction Insights slides unless those sections exist in `report.txt`
+
+        MONTHLY STRUCTURE
+        - KPI cards show the selected month only.
+        - Every card must show MoM and YoY when present in `report.txt`.
+        - Tables and charts show YTD through the selected month.
+        - Campaign type and destination sections follow the same repeated pattern as the QBR report.
+        - UK destination grouping must include Central Asia & Mongolia when it exists in the report.
+        - Destination Other follows the configured Other definition from the report.
+
+        CHART RULES
+        - every time series -> line chart or combined monthly bar/line chart
+        - every distribution -> pie, donut, or bar chart
+        - all month labels must be `Jan`, `Feb`, `Mar` style labels
+        - include `£` on cost and CPL values where applicable
+        - no missing charts for data sections
+        """
+    ).strip(),
+    "wendy_wu_australia": dedent(
+        """
+        You are a data-to-presentation engine.
+
+        I am uploading:
+        - `report.txt` = the source of truth for content
+        - the current generated `.pptx` = the structural reference
+        - an example layout file = visual inspiration only
+
+        Your job is to convert this Wendy Wu Tours Australia monthly PPC report into a polished presentation.
+
+        CRITICAL RULES
+        - preserve ALL sections from `report.txt`
+        - preserve ALL numbers exactly
+        - preserve ALL tables exactly
+        - preserve ALL bullet wording exactly unless only tiny grammar cleanup is needed
+        - create a slide for EVERY monthly/YTD section in the report
+        - do not create Google Trends or Auction Insights slides unless those sections exist in `report.txt`
+
+        MONTHLY STRUCTURE
+        - KPI cards show the selected month only.
+        - Every card must show MoM and YoY when present in `report.txt`.
+        - Tables and charts show YTD through the selected month.
+        - Campaign type and destination sections follow the same repeated pattern as the QBR report.
+        - Australia destination grouping follows the existing Australia QBR destination rules.
+        - Destination Other follows the configured Other definition from the report.
+
+        CHART RULES
+        - every time series -> line chart or combined monthly bar/line chart
+        - every distribution -> pie, donut, or bar chart
+        - all month labels must be `Jan`, `Feb`, `Mar` style labels
+        - include `£` on cost and CPL values where applicable
+        - no missing charts for data sections
+        """
+    ).strip(),
+}
+
+
+def build_presentation_prompt(client_id: str, report_mode: str = "quarterly") -> str:
+    prompt_map = MONTHLY_WENDY_WU_PROMPTS if report_mode == "monthly" else PROMPTS
+    base_prompt = prompt_map.get(client_id)
     if not base_prompt:
         raise ValueError(f"Unsupported client for presentation prompt: {client_id}")
     return f"{base_prompt}\n\n{DESIGN_PROMPT}\n"

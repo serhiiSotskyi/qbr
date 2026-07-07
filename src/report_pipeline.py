@@ -6,7 +6,7 @@ from .auction_loader import load_auction_csv
 from .auction_metrics import summarize_auction_insights
 from .chart_builder import ChartBuilder
 from .config_loader import ConfigLoader
-from .data_loader import detect_latest_complete_quarter, load_csv
+from .data_loader import MonthInfo, QuarterInfo, detect_latest_complete_month, detect_latest_complete_quarter, load_csv
 from .metrics import format_summary_table, prepare_report_data, validate_report_data
 from .narrative_generator import (
     generate_auction_bullets,
@@ -41,29 +41,34 @@ class ReportPipeline:
         auction_csv: str | Path | None = None,
         trends_dir: str | Path | None = None,
         other_campaigns_dir: str | Path | None = None,
+        report_mode: str = "quarterly",
     ) -> Path:
         client_config = self.config_loader.get_client_config(client_id)
         template_path = self.config_loader.get_template_path(self.project_root, client_config)
 
         df = load_csv(input_csv)
-        quarter = detect_latest_complete_quarter(df)
+        use_monthly = report_mode == "monthly" and client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}
+        quarter = detect_latest_complete_month(df) if use_monthly else detect_latest_complete_quarter(df)
         report = prepare_report_data(
             df,
             quarter,
             campaign_order=self.config_loader.get_campaign_types(client_config),
             destination_order=self.config_loader.get_destinations(client_config),
             destination_other_config=client_config.get("destination_other"),
+            report_mode="monthly" if use_monthly else "quarterly",
         )
         validate_report_data(report)
 
         output_path = Path(output_pptx) if output_pptx else self.output_root / f"{client_config['id']}_{quarter.label}.pptx"
-        subtitle = f"{quarter.label} ({quarter.start.strftime('%b')} - {quarter.end.strftime('%b %Y')})"
+        subtitle = _format_period_subtitle(quarter, "monthly" if use_monthly else "quarterly")
         client_name = self.config_loader.get_client_name(client_config)
         report_title = self.config_loader.get_report_title(client_config)
+        if use_monthly:
+            report_title = report_title.replace("Quarterly", "Monthly")
         agency_name = self.config_loader.get_agency_name(client_config)
         chart_styles = self.config_loader.get_chart_styles(client_config)
 
-        chart_builder = ChartBuilder(self.charts_root / f"{client_config['id']}/{quarter.year}_Q{quarter.quarter}", chart_styles=chart_styles)
+        chart_builder = ChartBuilder(self.charts_root / f"{client_config['id']}/{_period_chart_dir(quarter, use_monthly)}", chart_styles=chart_styles)
         builder = SlideBuilder(template_path, chart_styles=chart_styles)
         other_campaigns_summary = self._load_other_campaigns_summary(client_config, other_campaigns_dir)
 
@@ -72,18 +77,18 @@ class ReportPipeline:
         builder.add_title_slide(title_text, subtitle_text)
 
         if self.config_loader.is_slide_enabled("include_performance", client_config):
-            self._build_performance_section(builder, chart_builder, report, subtitle, client_config, other_campaigns_summary)
+            self._build_performance_section(builder, chart_builder, report, subtitle, client_config, other_campaigns_summary, report_mode="monthly" if use_monthly else "quarterly")
 
-        trends_summary = self._load_trends_summary(client_config, quarter, trends_dir)
-        if self.config_loader.is_slide_enabled("include_trends", client_config) and trends_summary:
+        trends_summary = None if use_monthly else self._load_trends_summary(client_config, quarter, trends_dir)
+        if not use_monthly and self.config_loader.is_slide_enabled("include_trends", client_config) and trends_summary:
             self._build_trends_section(builder, chart_builder, trends_summary, subtitle, client_config)
 
-        auction_summary = self._load_auction_summary(client_config, auction_csv)
-        if self.config_loader.is_slide_enabled("include_auction_insights", client_config) and auction_summary:
+        auction_summary = None if use_monthly else self._load_auction_summary(client_config, auction_csv)
+        if not use_monthly and self.config_loader.is_slide_enabled("include_auction_insights", client_config) and auction_summary:
             self._build_auction_section(builder, auction_summary, subtitle, client_config)
 
-        recommendations = generate_recommendations(report, trends_summary=trends_summary, auction_summary=auction_summary)
-        if self.config_loader.is_slide_enabled("include_recommendations", client_config) and recommendations:
+        recommendations = [] if use_monthly else generate_recommendations(report, trends_summary=trends_summary, auction_summary=auction_summary)
+        if not use_monthly and self.config_loader.is_slide_enabled("include_recommendations", client_config) and recommendations:
             builder.add_divider_slide("Recommendations")
             builder.add_recommendations_slide(
                 title="Recommendations / Next Steps",
@@ -102,15 +107,19 @@ class ReportPipeline:
         subtitle: str,
         client_config: dict,
         other_campaigns_summary: dict | None = None,
+        report_mode: str = "quarterly",
     ) -> None:
         builder.add_divider_slide("Performance")
         use_kpi_cards = _use_kpi_summary_cards(client_config)
+        is_monthly = report_mode == "monthly"
+        summary_word = "Month" if is_monthly else "Quarter"
+        trend_word = "YTD" if is_monthly else "Monthly"
 
         if self.config_loader.is_slide_enabled("overview", client_config):
             overall_charts = chart_builder.build_scope_trend_charts("overall", report["overall"]["monthly"])
             if use_kpi_cards:
                 builder.add_summary_cards_slide(
-                    title="Overall Quarter Summary",
+                    title=f"Overall {summary_word} Summary",
                     subtitle=subtitle,
                     kpis=report["overall"]["kpis"],
                     bullets=generate_overall_bullets(report["overall"], report["mix_overall"]),
@@ -118,14 +127,14 @@ class ReportPipeline:
             else:
                 overall_table = format_summary_table(report["overall"]["monthly"], report["include_revenue"])
                 builder.add_table_slide(
-                    title="Overall Quarter Summary",
+                    title=f"Overall {summary_word} Summary",
                     subtitle=subtitle,
                     table_df=overall_table,
                     bullets=generate_scope_bullets("Overall", report["overall"]),
                 )
 
             builder.add_trend_slide(
-                title="Overall Performance Trend",
+                title=f"Overall {trend_word} Trend" if is_monthly else "Overall Performance Trend",
                 subtitle=subtitle,
                 cpl_cvr_chart_path=overall_charts["cpl_cvr"],
                 cost_leads_chart_path=overall_charts["cost_leads"],
@@ -136,7 +145,7 @@ class ReportPipeline:
         if self.config_loader.is_slide_enabled("campaign_mix", client_config):
             mix_charts = chart_builder.build_mix_charts("overall", report["mix_overall"])
             builder.add_mix_slide(
-                title="Campaign Type Mix",
+                title="Campaign Type YTD Mix" if is_monthly else "Campaign Type Mix",
                 subtitle=subtitle,
                 cost_mix_chart_path=mix_charts["cost_share"],
                 leads_mix_chart_path=mix_charts["leads_share"],
@@ -149,7 +158,7 @@ class ReportPipeline:
                 summary_bullets = generate_scope_bullets(campaign, scope)
                 if use_kpi_cards:
                     builder.add_summary_cards_slide(
-                        title=f"{campaign} Summary",
+                        title=f"{campaign} {summary_word} Summary" if is_monthly else f"{campaign} Summary",
                         subtitle=subtitle,
                         kpis=scope["kpis"],
                         bullets=summary_bullets,
@@ -157,7 +166,7 @@ class ReportPipeline:
                 else:
                     table_df = format_summary_table(scope["monthly"], report["include_revenue"])
                     builder.add_table_slide(
-                        title=f"{campaign} Summary",
+                        title=f"{campaign} {summary_word} Summary" if is_monthly else f"{campaign} Summary",
                         subtitle=subtitle,
                         table_df=table_df,
                         bullets=summary_bullets,
@@ -167,7 +176,7 @@ class ReportPipeline:
                     f"campaign_{_slug(campaign)}", scope["monthly"]
                 )
                 builder.add_trend_slide(
-                    title=f"{campaign} Monthly Trend",
+                    title=f"{campaign} {trend_word} Trend",
                     subtitle=subtitle,
                     cpl_cvr_chart_path=scope_charts["cpl_cvr"],
                     cost_leads_chart_path=scope_charts["cost_leads"],
@@ -181,7 +190,7 @@ class ReportPipeline:
                 summary_bullets = generate_scope_bullets(destination, scope)
                 if use_kpi_cards:
                     builder.add_summary_cards_slide(
-                        title=f"{destination} Summary + YoY",
+                        title=f"{destination} {summary_word} Summary + YoY" if is_monthly else f"{destination} Summary + YoY",
                         subtitle=subtitle,
                         kpis=scope["kpis"],
                         bullets=summary_bullets,
@@ -189,7 +198,7 @@ class ReportPipeline:
                 else:
                     table_df = format_summary_table(scope["monthly"], report["include_revenue"])
                     builder.add_table_slide(
-                        title=f"{destination} Summary + YoY",
+                        title=f"{destination} {summary_word} Summary + YoY" if is_monthly else f"{destination} Summary + YoY",
                         subtitle=subtitle,
                         table_df=table_df,
                         bullets=summary_bullets,
@@ -199,7 +208,7 @@ class ReportPipeline:
                     f"destination_{_slug(destination)}", scope["monthly"]
                 )
                 builder.add_trend_slide(
-                    title=f"{destination} Monthly Trend",
+                    title=f"{destination} {trend_word} Trend",
                     subtitle=subtitle,
                     cpl_cvr_chart_path=scope_charts["cpl_cvr"],
                     cost_leads_chart_path=scope_charts["cost_leads"],
@@ -210,7 +219,7 @@ class ReportPipeline:
                 mix_df = report["dest_mix"][destination]
                 mix_charts = chart_builder.build_mix_charts(f"destination_{_slug(destination)}", mix_df)
                 builder.add_mix_slide(
-                    title=f"{destination} Campaign Mix",
+                    title=f"{destination} Campaign YTD Mix" if is_monthly else f"{destination} Campaign Mix",
                     subtitle=subtitle,
                     cost_mix_chart_path=mix_charts["cost_share"],
                     leads_mix_chart_path=mix_charts["leads_share"],
@@ -344,3 +353,15 @@ def _slug(value: str) -> str:
 
 def _use_kpi_summary_cards(client_config: dict) -> bool:
     return client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}
+
+
+def _format_period_subtitle(period: QuarterInfo | MonthInfo, report_mode: str) -> str:
+    if report_mode == "monthly" and isinstance(period, MonthInfo):
+        return f"{period.label} (YTD Jan - {period.start.strftime('%b %Y')})"
+    return f"{period.label} ({period.start.strftime('%b')} - {period.end.strftime('%b %Y')})"
+
+
+def _period_chart_dir(period: QuarterInfo | MonthInfo, is_monthly: bool) -> str:
+    if is_monthly and isinstance(period, MonthInfo):
+        return f"{period.year}_{period.month:02d}_monthly"
+    return f"{period.year}_Q{period.quarter}"

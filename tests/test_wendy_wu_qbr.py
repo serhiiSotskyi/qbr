@@ -10,7 +10,7 @@ from pptx import Presentation
 
 from src.chart_builder import ChartBuilder
 from src.config_loader import ConfigLoader
-from src.data_loader import detect_latest_complete_quarter, load_csv
+from src.data_loader import detect_latest_complete_month, detect_latest_complete_quarter, load_csv
 from src.metrics import prepare_report_data, validate_report_data
 from src.report_pipeline import ReportPipeline
 from utils.text_report import generate_text_report
@@ -273,6 +273,56 @@ class WendyWuQbrTests(unittest.TestCase):
             self.assertIn("Central Asia & Mongolia Monthly Trend", titles)
             self.assertIn("Central Asia & Mongolia Campaign Mix", titles)
 
+    def test_monthly_report_uses_latest_full_month_cards_and_ytd_tables(self) -> None:
+        csv_path = _write_monthly_fixture()
+        client_config = CONFIG_LOADER.get_client_config("wendy_wu")
+        df = load_csv(csv_path)
+        month = detect_latest_complete_month(df, today=pd.Timestamp("2026-07-07"))
+        self.assertEqual((month.year, month.month), (2026, 6))
+
+        report = prepare_report_data(
+            df,
+            month,
+            campaign_order=CONFIG_LOADER.get_campaign_types(client_config),
+            destination_order=CONFIG_LOADER.get_destinations(client_config),
+            destination_other_config=client_config.get("destination_other"),
+            report_mode="monthly",
+        )
+        validate_report_data(report)
+
+        june_df = df[(df["year"] == 2026) & (df["month"] == 6)].copy()
+        ytd_df = df[(df["year"] == 2026) & (df["month"] <= 6)].copy()
+        self.assertAlmostEqual(report["overall"]["total"]["Cost"], float(june_df["cost"].sum()))
+        total_row = report["overall"]["monthly"][report["overall"]["monthly"]["Month"] == "Total"].iloc[0]
+        self.assertAlmostEqual(total_row["Cost"], float(ytd_df["cost"].sum()))
+        self.assertEqual(report["overall"]["monthly"]["Month"].tolist(), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Total"])
+
+        kpis = {kpi["key"]: kpi for kpi in report["overall"]["kpis"]}
+        self.assertIn("mom_label", kpis["Cost"])
+        self.assertIn("yoy_label", kpis["Cost"])
+
+    def test_monthly_pptx_uses_performance_only_sections(self) -> None:
+        csv_path = _write_monthly_fixture()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "wendy_wu_monthly.pptx"
+            pipeline = ReportPipeline(project_root=ROOT)
+            pipeline.charts_root = Path(tmpdir) / "charts"
+            generated_path = pipeline.run(
+                input_csv=csv_path,
+                output_pptx=output_path,
+                client_id="wendy_wu",
+                report_mode="monthly",
+            )
+
+            titles = _pptx_text(generated_path)
+            self.assertIn("Overall Month Summary", titles)
+            self.assertIn("Campaign Type YTD Mix", titles)
+            self.assertIn("China Month Summary + YoY", titles)
+            self.assertIn("China YTD Trend", titles)
+            self.assertNotIn("Google Trends", titles)
+            self.assertNotIn("Auction Insights", titles)
+            self.assertNotIn("Recommendations", titles)
+
 
 def _prepare_report(client_id: str, csv_path: Path):
     client_config = CONFIG_LOADER.get_client_config(client_id)
@@ -343,6 +393,46 @@ def _write_central_asia_fixture() -> Path:
                 },
             ]
         )
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+        pd.DataFrame(rows).to_csv(tmp.name, index=False)
+        return Path(tmp.name)
+
+
+def _write_monthly_fixture() -> Path:
+    rows = []
+    for year in (2025, 2026):
+        for month in range(1, 8):
+            rows.extend(
+                [
+                    {
+                        "Date": f"01/{month:02d}/{year}",
+                        "Campaign Type": "Brand",
+                        "Destination": "China",
+                        "Impressions": 1000 + month,
+                        "Clicks": 100 + month,
+                        "Cost": 100 + month * (2 if year == 2026 else 1),
+                        "Sales Leads": 10 + month,
+                    },
+                    {
+                        "Date": f"01/{month:02d}/{year}",
+                        "Campaign Type": "Generic",
+                        "Destination": "Central Asia & Mongolia",
+                        "Impressions": 800 + month,
+                        "Clicks": 80 + month,
+                        "Cost": 80 + month * (3 if year == 2026 else 1),
+                        "Sales Leads": 8 + month,
+                    },
+                    {
+                        "Date": f"01/{month:02d}/{year}",
+                        "Campaign Type": "Generic",
+                        "Destination": "Other",
+                        "Impressions": 600 + month,
+                        "Clicks": 60 + month,
+                        "Cost": 60 + month,
+                        "Sales Leads": 6 + month,
+                    },
+                ]
+            )
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
         pd.DataFrame(rows).to_csv(tmp.name, index=False)
         return Path(tmp.name)
