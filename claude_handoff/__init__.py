@@ -12,6 +12,7 @@ from .wightlink_package_builder import (
     DEFAULT_REFERENCE_PPTX_PATH as DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
     build_wightlink_claude_handoff_package,
     is_wightlink_qbr,
+    is_wightlink_report,
 )
 from .olympic_package_builder import (
     DEFAULT_REFERENCE_PPTX_PATH as DEFAULT_OLYMPIC_REFERENCE_PPTX_PATH,
@@ -32,6 +33,7 @@ __all__ = [
     "is_wendy_wu_qbr",
     "is_wendy_wu_report",
     "is_wightlink_qbr",
+    "is_wightlink_report",
     "resolve_wendy_wu_client_display_name",
     "resolve_wendy_wu_handoff_slug",
 ]

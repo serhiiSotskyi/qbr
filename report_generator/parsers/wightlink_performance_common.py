@@ -89,6 +89,37 @@ class QuarterWindow:
 
 
 @dataclass(frozen=True)
+class MonthWindow:
+    year: int
+    month: int
+
+    @property
+    def start(self) -> pd.Timestamp:
+        return pd.Timestamp(self.year, self.month, 1)
+
+    @property
+    def end(self) -> pd.Timestamp:
+        return self.start + pd.offsets.MonthEnd(0)
+
+    @property
+    def label(self) -> str:
+        return self.start.strftime("%b %Y")
+
+    @property
+    def prior_year(self) -> "MonthWindow":
+        return MonthWindow(self.year - 1, self.month)
+
+    @property
+    def previous_month(self) -> "MonthWindow":
+        previous = self.start - pd.DateOffset(months=1)
+        return MonthWindow(int(previous.year), int(previous.month))
+
+    @property
+    def quarter(self) -> QuarterWindow:
+        return QuarterWindow(self.year, int((self.month - 1) // 3) + 1)
+
+
+@dataclass(frozen=True)
 class AnnualWindow:
     year: int
 
@@ -320,6 +351,21 @@ def detect_latest_complete_quarter(df: pd.DataFrame) -> QuarterWindow:
     return complete[-1]
 
 
+def detect_latest_complete_month(df: pd.DataFrame, today: pd.Timestamp | None = None) -> MonthWindow:
+    if df.empty:
+        raise ValueError("Cannot detect month on empty dataframe.")
+
+    current_day = pd.Timestamp(today).normalize() if today is not None else pd.Timestamp.today().normalize()
+    latest_full_month = current_day.replace(day=1) - pd.DateOffset(months=1)
+    available_months = sorted(pd.Timestamp(month) for month in df["month_start"].dropna().unique())
+    eligible_months = [month for month in available_months if month <= latest_full_month]
+    if not eligible_months:
+        raise ValueError("No complete month exists in the Wightlink performance CSV.")
+
+    selected = eligible_months[-1]
+    return MonthWindow(year=int(selected.year), month=int(selected.month))
+
+
 def detect_latest_two_complete_years(df: pd.DataFrame) -> tuple[AnnualWindow, AnnualWindow]:
     monthly_by_year = (
         df.groupby("year")["month_start"]
@@ -360,6 +406,14 @@ def detect_latest_two_complete_financial_years(df: pd.DataFrame, start_month: in
 
 def filter_quarter(df: pd.DataFrame, quarter: QuarterWindow) -> pd.DataFrame:
     return df[(df["year"] == quarter.year) & (df["quarter"] == quarter.quarter)].copy()
+
+
+def filter_month(df: pd.DataFrame, month: MonthWindow) -> pd.DataFrame:
+    return df[(df["year"] == month.year) & (df["month_start"] == month.start)].copy()
+
+
+def filter_ytd(df: pd.DataFrame, month: MonthWindow) -> pd.DataFrame:
+    return df[(df["date"] >= pd.Timestamp(month.year, 1, 1)) & (df["date"] <= month.end)].copy()
 
 
 def filter_year(df: pd.DataFrame, year_window: AnnualWindow) -> pd.DataFrame:

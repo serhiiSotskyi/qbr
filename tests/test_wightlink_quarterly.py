@@ -7,9 +7,11 @@ from pathlib import Path
 import pandas as pd
 
 from report_generator.parsers.wightlink_auction_parser import parse_wightlink_auction_csv
+from report_generator.parsers.wightlink_monthly_performance_parser import parse_wightlink_monthly_performance_csv
 from report_generator.parsers.wightlink_performance_parser import parse_wightlink_performance_csv
 from report_generator.parsers.wightlink_plan_parser import parse_wightlink_plan_workbook
 from report_generator.parsers.wightlink_ytd_parser import derive_ytd_windows, parse_ytd_trend_inputs
+from report_generator.pipelines.wightlink_monthly_pipeline import generate_wightlink_monthly_report
 from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
 
 
@@ -259,6 +261,54 @@ class WightlinkQuarterlyTests(unittest.TestCase):
         self.assertIn("Q2 2026", first_row)
         self.assertIn("Change", first_row)
 
+    def test_monthly_pipeline_builds_performance_only_monthly_deck(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            csv_path = _write_monthly_performance_csv(root / "monthly_performance.csv")
+
+            parsed = parse_wightlink_monthly_performance_csv(csv_path)
+            self.assertEqual(parsed["month"].label, "Jun 2026")
+
+            result = generate_wightlink_monthly_report(
+                csv_path,
+                root / "wightlink_monthly.pptx",
+                plan_workbook=PACK_V2 / "wightlink_plan_2026_27_middle_scenario.csv",
+            )
+
+        titles = [slide.get("section_title") for slide in result["slides"]]
+        for expected in [
+            "Cover",
+            "Performance",
+            "All Performance Month Summary",
+            "All Performance YTD Purchases and Revenue",
+            "Brand Month Summary",
+            "Brand YTD Purchases and Revenue",
+            "Generics Month Summary",
+            "Generics YTD Purchases and Revenue",
+            "PMax Month Summary",
+            "PMax YTD Purchases and Revenue",
+            "Other Month Summary",
+            "Other YTD Purchases and Revenue",
+            "Ferry & Routes",
+            "Ferry Month Summary",
+            "Routes Month Summary",
+        ]:
+            self.assertIn(expected, titles)
+
+        self.assertFalse(any("Google Trends" in str(title) or "Auction Insights" in str(title) for title in titles))
+        self.assertEqual(result["json"]["report_type"], "monthly")
+        self.assertIn("Wightlink Monthly PPC Report", result["text"])
+        self.assertIn("MoM:", result["text"])
+        self.assertIn("YoY:", result["text"])
+        self.assertIn("Plan:", result["text"])
+
+        overall_summary = next(slide for slide in result["slides"] if slide.get("section_title") == "All Performance Month Summary")
+        for kpi in overall_summary["kpis"]:
+            context = " ".join(kpi["context"])
+            self.assertIn("MoM:", context, kpi["label"])
+            self.assertIn("YoY:", context, kpi["label"])
+            self.assertIn("Plan:", context, kpi["label"])
+
 
 def _write_performance_csv(path: Path, include_data_type: bool) -> Path:
     rows = []
@@ -268,6 +318,51 @@ def _write_performance_csv(path: Path, include_data_type: bool) -> Path:
     frame = pd.DataFrame(rows)
     frame.to_csv(path, index=False)
     return path
+
+
+def _write_monthly_performance_csv(path: Path) -> Path:
+    rows = []
+    for month in (6,):
+        rows.extend(_monthly_rows(2025, month))
+    for month in range(1, 7):
+        rows.extend(_monthly_rows(2026, month))
+    pd.DataFrame(rows).to_csv(path, index=False)
+    return path
+
+
+def _monthly_rows(year: int, month: int) -> list[dict[str, object]]:
+    year_factor = 1.0 if year == 2025 else 1.18
+    month_factor = 1 + month / 20
+    day = f"15 {pd.Timestamp(year, month, 1).strftime('%b %Y')}"
+    base_rows = [
+        ("Brand", "Ferry", 900, 95000, 1400, 36000, 8200),
+        ("Generic", "Routes", 620, 71000, 1200, 31000, 7600),
+        ("PMax", "Ferry", 180, 24000, 900, 18000, 2500),
+        ("Other", "Routes", 70, 8200, 300, 5200, 900),
+    ]
+    rows = []
+    for campaign_type, data_type, purchases, revenue, cost, impressions, clicks in base_rows:
+        scaled_purchases = purchases * year_factor * month_factor
+        scaled_revenue = revenue * year_factor * month_factor
+        scaled_cost = cost * year_factor * month_factor
+        scaled_impressions = impressions * year_factor * month_factor
+        scaled_clicks = clicks * year_factor * month_factor
+        rows.append(
+            {
+                "Date": day,
+                "Campaign Type": campaign_type,
+                "Data Type": data_type,
+                "Purchases": scaled_purchases,
+                "Purchase Revenue": scaled_revenue,
+                "Cost": scaled_cost,
+                "Impressions": scaled_impressions,
+                "Clicks": scaled_clicks,
+                "CPA": scaled_cost / scaled_purchases,
+                "ROAS": scaled_revenue / scaled_cost,
+                "AOV": scaled_revenue / scaled_purchases,
+            }
+        )
+    return rows
 
 
 def _month_rows(year: int, month: int, include_data_type: bool) -> list[dict[str, object]]:

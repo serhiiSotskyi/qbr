@@ -493,7 +493,12 @@ def _build_monthly_purchases_revenue_bullets(scope: dict[str, Any]) -> list[str]
     ]
 
 
-def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_section: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def _build_kpis(
+    scope: dict[str, Any],
+    prior_scope: dict[str, Any] | None,
+    plan_section: dict[str, Any] | None = None,
+    previous_scope: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     metrics = [
         ("cost", "Cost", _format_plan_currency),
         ("purchases", "Purchases", _format_number),
@@ -504,13 +509,18 @@ def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_
     ]
     current_totals = scope.get("totals", {})
     prior_totals = prior_scope.get("totals", {}) if prior_scope else {}
+    previous_totals = previous_scope.get("totals", {}) if previous_scope else {}
     plan_summary = plan_section.get("summary", {}) if plan_section else {}
 
     kpis = []
     for key, label, formatter in metrics:
         current_value = current_totals.get(key)
         yoy = _pct_change(current_value, prior_totals.get(key)) if prior_totals else None
-        context_items = [{"label": "YoY", "text": f"YoY: {_format_delta(yoy)}", "value": yoy}]
+        context_items = []
+        mom = _pct_change(current_value, previous_totals.get(key)) if previous_totals else None
+        if previous_totals:
+            context_items.append({"label": "MoM", "text": f"MoM: {_format_delta(mom)}", "value": mom})
+        context_items.append({"label": "YoY", "text": f"YoY: {_format_delta(yoy)}", "value": yoy})
         plan_delta = None
         if key == "cost":
             plan_delta = plan_summary.get("spend_variance_pct")
@@ -531,6 +541,8 @@ def _build_kpis(scope: dict[str, Any], prior_scope: dict[str, Any] | None, plan_
             "label": label,
             "value": formatter(current_value),
             "value_raw": current_value,
+            "mom": mom,
+            "mom_label": _format_delta(mom),
             "yoy": yoy,
             "yoy_label": _format_delta(yoy),
             "context": [item["text"] for item in context_items],

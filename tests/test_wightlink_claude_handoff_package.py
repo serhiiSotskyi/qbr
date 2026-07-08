@@ -10,6 +10,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from claude_handoff import DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH, build_wightlink_claude_handoff_package
+from report_generator.pipelines.wightlink_monthly_pipeline import generate_wightlink_monthly_report
 from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
 
 
@@ -164,6 +165,67 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
         source_index = package.read("SOURCE_SECTION_INDEX.txt").decode("utf-8")
         self.assertIn("Brand Monthly Breakdown YTD", source_index)
         self.assertIn("Auction Insights - Red Funnel Quarter", source_index)
+
+    def test_monthly_handoff_package_excludes_qbr_sources_and_marks_monthly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            result = generate_wightlink_monthly_report(
+                SAMPLE_V2_INPUTS / "performance_daily_over_year_sample.csv",
+                root / "wightlink_monthly.pptx",
+                plan_workbook=SAMPLE_V2_INPUTS / "wightlink_plan_2026_27_middle_scenario.csv",
+            )
+
+            handoff_bytes, manifest = build_wightlink_claude_handoff_package(
+                report_text=result["text"],
+                prompt_text="monthly prompt",
+                generated_pptx=root / "wightlink_monthly.pptx",
+                performance_csv=SAMPLE_V2_INPUTS / "performance_daily_over_year_sample.csv",
+                plan_book_csv=SAMPLE_V2_INPUTS / "wightlink_plan_2026_27_middle_scenario.csv",
+                reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
+                generated_at=GENERATED_AT,
+                report_mode="monthly",
+            )
+            package = ZipFile(BytesIO(handoff_bytes))
+
+        names = set(package.namelist())
+        self.assertIn("wightlink_monthly_streamlit_output.pptx", names)
+        self.assertIn("wightlink_qbr_visual_reference_only.pptx", names)
+        self.assertIn("source_data/performance.csv", names)
+        self.assertIn("source_data/wightlink_plan.csv", names)
+        self.assertNotIn("wightlink_streamlit_output.pptx", names)
+        self.assertNotIn("reference_deck_exported_from_google_slides.pptx", names)
+        self.assertNotIn("UPDATED_SLIDE_MAPPING_WIGHTLINK_QBR_V2_TEMPLATE.csv", names)
+        self.assertNotIn("GOOGLE_TRENDS_YTD_COMPARISON_RULES.txt", names)
+        self.assertNotIn("AUCTION_INSIGHTS_REDFUNNEL_QUARTER_RULES.txt", names)
+        self.assertFalse(any(name.startswith("source_data/google_trends") for name in names))
+        self.assertFalse(any("auction" in name.lower() for name in names))
+
+        self.assertEqual(manifest["report_family"], "Wightlink PPC Monthly")
+        self.assertEqual(manifest["report_mode"], "monthly")
+        self.assertEqual(manifest["period_label"], "Jun 2026 (YTD Jan - Jun 2026)")
+        self.assertEqual(manifest["target_output_slide_count"], manifest["streamlit_slide_count"])
+        self.assertEqual(manifest["reference_pptx_filename"], "wightlink_qbr_visual_reference_only.pptx")
+        self.assertEqual(manifest["trend_queries"], [])
+        self.assertIn("Google Trends", manifest["excluded_qbr_sections"])
+        self.assertEqual(manifest["placeholder_sections"], [])
+        self.assertIn("ROAS", manifest["plan_comparison"]["metrics_available"])
+
+        for filename in ("README_FOR_CLAUDE.txt", "CLAUDE_PROMPT.txt", "QA_CHECKLIST.txt"):
+            content = package.read(filename).decode("utf-8")
+            self.assertIn("monthly", content.lower())
+            self.assertIn("CHART_QA_ADDENDUM_FOR_CLAUDE.txt", content)
+            self.assertIn("Google Trends", content)
+
+        chart_qa = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
+        self.assertIn("Monthly Chart QA Addendum", chart_qa)
+        self.assertIn("YTD purchases and revenue chart slides", chart_qa)
+        self.assertNotIn("Auction Insights", chart_qa)
+
+        slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
+        self.assertIn("All Performance Month Summary", slide_mapping)
+        self.assertIn("PMax YTD Purchases and Revenue", slide_mapping)
+        self.assertNotIn("Auction Insights", slide_mapping)
+        self.assertNotIn("Google Trends", slide_mapping)
 
 
 def _build_sample_handoff() -> tuple[ZipFile, dict]:

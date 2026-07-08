@@ -536,12 +536,12 @@ class WightlinkPptxBuilder:
             context_items = list(kpi.get("context_items", []))
             if not context_items:
                 context_items = [{"text": line, "value": kpi.get("yoy")} for line in (list(kpi.get("context", [])) or [f"YoY: {kpi.get('yoy_label', '--')}"])]
-            context_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + card_height - Inches(0.55), card_width - Inches(0.32), Inches(0.36)).text_frame
+            context_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + card_height - Inches(0.72), card_width - Inches(0.32), Inches(0.58)).text_frame
             context_frame.clear()
-            for line_index, item in enumerate(context_items[:2]):
+            for line_index, item in enumerate(context_items[:3]):
                 para = context_frame.paragraphs[0] if line_index == 0 else context_frame.add_paragraph()
                 para.text = str(item.get("text", ""))
-                para.font.size = Pt(9)
+                para.font.size = Pt(8.2)
                 para.font.bold = True
                 para.font.color.rgb = self._resolve_delta_color(str(kpi.get("key", "")), item.get("value"))
 

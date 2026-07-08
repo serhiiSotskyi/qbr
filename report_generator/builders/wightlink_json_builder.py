@@ -5,10 +5,16 @@ from pathlib import Path
 from typing import Any
 
 
-def build_wightlink_json_payload(client_id: str, period_label: str, date_range: dict[str, str], slides: list[dict[str, Any]]) -> dict[str, Any]:
+def build_wightlink_json_payload(
+    client_id: str,
+    period_label: str,
+    date_range: dict[str, str],
+    slides: list[dict[str, Any]],
+    report_type: str = "qbr",
+) -> dict[str, Any]:
     return {
         "client_id": client_id,
-        "report_type": "qbr",
+        "report_type": report_type,
         "period": period_label,
         "date_range": date_range,
         "slides": slides,

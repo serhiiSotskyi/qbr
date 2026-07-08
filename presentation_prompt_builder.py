@@ -887,11 +887,54 @@ MONTHLY_WENDY_WU_PROMPTS = {
 }
 
 
+MONTHLY_WIGHTLINK_PROMPT = dedent(
+    """
+    You are a data-to-presentation engine.
+
+    I am uploading:
+    - `report.txt` = the source of truth for content
+    - the current generated `.pptx` = the structural reference
+    - an example layout file = visual inspiration only
+
+    Your job is to convert this Wightlink monthly PPC report into a polished presentation.
+
+    CRITICAL RULES
+    - preserve ALL sections from `report.txt`
+    - preserve ALL numbers exactly
+    - preserve ALL tables exactly where provided
+    - preserve ALL bullet wording exactly unless only tiny grammar cleanup is needed
+    - create a slide for EVERY monthly/YTD section in the report
+    - do not create Google Trends or Auction Insights slides
+    - do not copy the quarterly QBR structure
+
+    MONTHLY STRUCTURE
+    - KPI cards show the selected month only.
+    - Every card must show MoM, YoY, and Plan when present in `report.txt`.
+    - Plan comparisons are selected-month actuals versus selected-month plan.
+    - Tables and charts show YTD through the selected month.
+    - Include All Performance, Brand, Generics, PMax, and Other when data exists.
+    - Include Ferry and Routes when `data_type` exists in the source data.
+
+    CHART RULES
+    - use one YTD purchases and purchase revenue chart per performance scope
+    - all month labels must be readable
+    - include `£` on cost, revenue, CPA, and AOV values where applicable
+    - no missing charts for data sections
+    """
+).strip()
+
+
+MONTHLY_PROMPTS = {
+    **MONTHLY_WENDY_WU_PROMPTS,
+    "wightlink": MONTHLY_WIGHTLINK_PROMPT,
+}
+
+
 def build_presentation_prompt(client_id: str, report_mode: str = "quarterly") -> str:
-    prompt_map = MONTHLY_WENDY_WU_PROMPTS if report_mode == "monthly" else PROMPTS
+    prompt_map = MONTHLY_PROMPTS if report_mode == "monthly" else PROMPTS
     base_prompt = prompt_map.get(client_id)
     if not base_prompt:
         raise ValueError(f"Unsupported client for presentation prompt: {client_id}")
-    if report_mode == "monthly" and client_id in MONTHLY_WENDY_WU_PROMPTS:
+    if report_mode == "monthly" and client_id in MONTHLY_PROMPTS:
         return f"{base_prompt}\n"
     return f"{base_prompt}\n\n{DESIGN_PROMPT}\n"

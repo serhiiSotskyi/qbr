@@ -8,6 +8,7 @@ import pandas as pd
 
 from report_generator.pipelines.olympic_pipeline import generate_olympic_report
 from report_generator.pipelines.wightlink_annual_pipeline import generate_wightlink_annual_report
+from report_generator.pipelines.wightlink_monthly_pipeline import generate_wightlink_monthly_report
 from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
 from src.config_loader import ConfigLoader
 from src.report_pipeline import ReportPipeline
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         "--report-mode",
         choices=["quarterly", "monthly", "annual"],
         default="quarterly",
-        help="Report mode selector. Wightlink supports quarterly/annual; Wendy Wu UK/Australia support quarterly/monthly.",
+        help="Report mode selector. Wightlink supports quarterly/monthly/annual; Wendy Wu UK/Australia support quarterly/monthly.",
     )
     parser.add_argument(
         "--output",
@@ -76,7 +77,10 @@ def run_report(
         return str(result["pptx_path"])
 
     if client_id == "wightlink":
-        default_name = "wightlink_annual.pptx" if report_mode == "annual" else "wightlink_qbr.pptx"
+        default_name = {
+            "annual": "wightlink_annual.pptx",
+            "monthly": "wightlink_monthly.pptx",
+        }.get(report_mode, "wightlink_qbr.pptx")
         resolved_output = project_root / output_path if output_path else project_root / "output" / default_name
         if report_mode == "annual":
             result = generate_wightlink_annual_report(
@@ -85,6 +89,13 @@ def run_report(
                 manual_inputs=manual_inputs,
                 trends_dir=trends_dir,
                 auction_csv=auction_csv,
+            )
+        elif report_mode == "monthly":
+            result = generate_wightlink_monthly_report(
+                performance_csv=performance_csv,
+                output_path=resolved_output,
+                manual_inputs=manual_inputs,
+                plan_workbook=plan_workbook,
             )
         else:
             result = generate_wightlink_report(
@@ -151,7 +162,10 @@ def run_text_report(
         return str(result["text_path"])
 
     if client_id == "wightlink":
-        default_name = "wightlink_annual.txt" if report_mode == "annual" else "wightlink_qbr.txt"
+        default_name = {
+            "annual": "wightlink_annual.txt",
+            "monthly": "wightlink_monthly.txt",
+        }.get(report_mode, "wightlink_qbr.txt")
         resolved_output = project_root / output_path if output_path else project_root / "reports" / default_name
         if report_mode == "annual":
             result = generate_wightlink_annual_report(
@@ -160,6 +174,13 @@ def run_text_report(
                 manual_inputs=manual_inputs,
                 trends_dir=trends_dir,
                 auction_csv=auction_csv,
+            )
+        elif report_mode == "monthly":
+            result = generate_wightlink_monthly_report(
+                performance_csv=performance_csv,
+                output_path=resolved_output,
+                manual_inputs=manual_inputs,
+                plan_workbook=plan_workbook,
             )
         else:
             result = generate_wightlink_report(

@@ -15,7 +15,7 @@ from claude_handoff import (
     build_olympic_holidays_claude_handoff_package,
     build_wightlink_claude_handoff_package,
     is_olympic_holidays_report,
-    is_wightlink_qbr,
+    is_wightlink_report,
     resolve_wendy_wu_client_display_name,
     resolve_wendy_wu_handoff_slug,
 )
@@ -195,6 +195,7 @@ def create_wightlink_claude_handoff_bundle(
     red_funnel_auction_csv_path: str | Path | None,
     red_funnel_prior_auction_csv_path: str | Path | None,
     plan_book_path: str | Path | None,
+    report_mode: str = "quarterly",
 ) -> tuple[Path, dict]:
     trend_csv_files = sorted(Path(trends_dir).glob("*.csv")) if trends_dir else []
     trend_ytd_current_files = sorted(Path(trends_ytd_current_dir).glob("*.csv")) if trends_ytd_current_dir else []
@@ -212,8 +213,10 @@ def create_wightlink_claude_handoff_bundle(
         red_funnel_prior_auction_csv=red_funnel_prior_auction_csv_path,
         plan_book_csv=plan_book_path,
         reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
+        report_mode=report_mode,
     )
-    handoff_path = request_dir / "wightlink_claude_handoff_package.zip"
+    mode_suffix = "_monthly" if report_mode == "monthly" else ""
+    handoff_path = request_dir / f"wightlink{mode_suffix}_claude_handoff_package.zip"
     handoff_path.write_bytes(handoff_bytes)
     return handoff_path, manifest
 
@@ -283,15 +286,15 @@ def main() -> None:
     client_id = selected_client["id"]
     report_mode = "quarterly"
     if client_id == "wightlink":
-        report_mode = st.selectbox("Wightlink report mode", ["quarterly", "annual"], index=0)
+        report_mode = st.selectbox("Wightlink report mode", ["quarterly", "monthly", "annual"], index=0)
     elif client_id in WENDY_WU_CLIENT_IDS:
         report_mode = st.selectbox("Wendy Wu report mode", ["quarterly", "monthly"], index=0)
 
     st.subheader("File Uploads")
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
-    is_wendy_monthly = client_id in WENDY_WU_CLIENT_IDS and report_mode == "monthly"
-    auction_file = None if is_wendy_monthly else st.file_uploader("Auction CSV", type=["csv"])
-    trends_files = [] if is_wendy_monthly else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
+    is_monthly_performance_only = report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
+    auction_file = None if is_monthly_performance_only else st.file_uploader("Auction CSV", type=["csv"])
+    trends_files = [] if is_monthly_performance_only else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
     plan_workbook_file = None
     wightlink_trends_current_ytd_files = []
     wightlink_trends_previous_ytd_files = []
@@ -420,7 +423,7 @@ def main() -> None:
                     client_name=selected_client["name"],
                     report_mode=report_mode,
                 )
-            elif is_wightlink_qbr(client_id, report_mode):
+            elif is_wightlink_report(client_id, report_mode):
                 claude_handoff_path, claude_handoff_manifest = create_wightlink_claude_handoff_bundle(
                     pptx_path=generated_pptx,
                     report_txt_path=generated_txt,
@@ -434,6 +437,7 @@ def main() -> None:
                     red_funnel_auction_csv_path=red_funnel_auction_path,
                     red_funnel_prior_auction_csv_path=red_funnel_prior_auction_path,
                     plan_book_path=plan_workbook_path,
+                    report_mode=report_mode,
                 )
             elif is_olympic_holidays_report(client_id, report_mode):
                 claude_handoff_path, claude_handoff_manifest = create_olympic_holidays_claude_handoff_bundle(
