@@ -175,7 +175,8 @@ def create_claude_handoff_bundle(
         report_mode=report_mode,
         reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
     )
-    handoff_path = request_dir / f"{client_slug}_claude_handoff_package.zip"
+    mode_suffix = "_monthly" if report_mode == "monthly" else ""
+    handoff_path = request_dir / f"{client_slug}{mode_suffix}_claude_handoff_package.zip"
     handoff_path.write_bytes(handoff_bytes)
     return handoff_path, manifest
 
@@ -459,7 +460,7 @@ def main() -> None:
                 st.session_state.generated_bundle["claude_handoff_manifest"] = claude_handoff_manifest
             st.session_state.generated_bundle["notion_save_key"] = notion_save_key(st.session_state.generated_bundle)
             st.session_state.notion_save_status = None
-            st.success("Files generated successfully.")
+            st.success(f"{report_mode.title()} files generated successfully.")
         except Exception as exc:
             st.session_state.generated_bundle = None
             st.error(str(exc))
@@ -470,6 +471,7 @@ def main() -> None:
         st.write(
             {
                 "client": bundle["client_id"],
+                "report_mode": bundle["report_mode"],
                 "pptx": bundle["pptx_path"],
                 "report_txt": bundle["report_txt_path"],
                 "prompt_txt": bundle["prompt_txt_path"],
@@ -489,14 +491,18 @@ def main() -> None:
             )
 
         if bundle.get("claude_handoff_path"):
+            handoff_label = "Download Monthly Claude Handoff Package" if bundle.get("report_mode") == "monthly" else "Download Claude Handoff Package"
             with open(bundle["claude_handoff_path"], "rb") as handle:
                 st.download_button(
-                    label="Download Claude Handoff Package",
+                    label=handoff_label,
                     data=handle,
                     file_name=Path(bundle["claude_handoff_path"]).name,
                     mime="application/zip",
                 )
-            st.caption("Use the Claude handoff zip for the final Google Slides deck. The Streamlit PPTX inside it is an intermediate source, not the final client deck.")
+            if bundle.get("report_mode") == "monthly":
+                st.caption("This is a monthly Claude handoff package. Use SLIDE_MAPPING.csv as the monthly structure; any QBR reference deck inside is visual style only.")
+            else:
+                st.caption("Use the Claude handoff zip for the final Google Slides deck. The Streamlit PPTX inside it is an intermediate source, not the final client deck.")
 
         notion_status = st.session_state.get("notion_save_status")
         if notion_status:

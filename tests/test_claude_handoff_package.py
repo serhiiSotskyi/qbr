@@ -152,11 +152,17 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
             generated_at=GENERATED_AT,
         )
         package = ZipFile(BytesIO(handoff_bytes))
+        names = set(package.namelist())
 
         self.assertEqual(manifest["report_family"], "Wendy Wu Monthly")
         self.assertEqual(manifest["report_mode"], "monthly")
         self.assertEqual(manifest["period_label"], "Jun 2026 (YTD Jan - Jun 2026)")
         self.assertEqual(manifest["quarter_short"], "Jun 2026")
+        self.assertEqual(manifest["reference_pptx_filename"], "qbr_visual_reference_only.pptx")
+        self.assertIn("qbr_visual_reference_only.pptx", names)
+        self.assertNotIn("reference_deck_exported_from_google_slides.pptx", names)
+        self.assertIn("Testing", manifest["excluded_qbr_sections"])
+        self.assertIn("Other Updates", manifest["excluded_qbr_sections"])
         self.assertFalse(any("GOOGLE TRENDS" in warning for warning in manifest["warnings"]))
         self.assertFalse(any("AUCTION INSIGHTS" in warning for warning in manifest["warnings"]))
 
@@ -166,6 +172,16 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
         self.assertIn("China Month Summary + YoY", slide_mapping)
         self.assertNotIn("Google Trends", slide_mapping)
         self.assertNotIn("Auction Insights", slide_mapping)
+
+        readme = package.read("README_FOR_CLAUDE.txt").decode("utf-8")
+        self.assertIn(f"{manifest['target_slide_count']}-slide monthly", readme)
+        self.assertIn("Do not copy its slide order or QBR-only sections", readme)
+
+        chart_qa = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
+        self.assertIn("Monthly Chart QA Addendum", chart_qa)
+        self.assertIn("Slide 4: Overall YTD Trend", chart_qa)
+        self.assertNotIn("Google Trends chart slides", chart_qa)
+        self.assertNotIn("Auction Insights: 29", chart_qa)
         self.assert_package_references_chart_qa(package)
 
     def assert_package_references_chart_qa(self, package: ZipFile) -> None:

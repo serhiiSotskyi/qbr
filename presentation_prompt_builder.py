@@ -837,7 +837,7 @@ MONTHLY_WENDY_WU_PROMPTS = {
         - KPI cards show the selected month only.
         - Every card must show MoM and YoY when present in `report.txt`.
         - Tables and charts show YTD through the selected month.
-        - Campaign type and destination sections follow the same repeated pattern as the QBR report.
+        - Campaign type and destination sections follow the same repeated monthly/YTD pattern as the Streamlit output.
         - UK destination grouping must include Central Asia & Mongolia when it exists in the report.
         - Destination Other follows the configured Other definition from the report.
 
@@ -872,7 +872,7 @@ MONTHLY_WENDY_WU_PROMPTS = {
         - KPI cards show the selected month only.
         - Every card must show MoM and YoY when present in `report.txt`.
         - Tables and charts show YTD through the selected month.
-        - Campaign type and destination sections follow the same repeated pattern as the QBR report.
+        - Campaign type and destination sections follow the same repeated monthly/YTD pattern as the Streamlit output.
         - Australia destination grouping follows the existing Australia QBR destination rules.
         - Destination Other follows the configured Other definition from the report.
 
@@ -892,4 +892,6 @@ def build_presentation_prompt(client_id: str, report_mode: str = "quarterly") ->
     base_prompt = prompt_map.get(client_id)
     if not base_prompt:
         raise ValueError(f"Unsupported client for presentation prompt: {client_id}")
+    if report_mode == "monthly" and client_id in MONTHLY_WENDY_WU_PROMPTS:
+        return f"{base_prompt}\n"
     return f"{base_prompt}\n\n{DESIGN_PROMPT}\n"

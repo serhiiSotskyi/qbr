@@ -156,6 +156,8 @@ def build_claude_handoff_package(
         extra_sections = find_extra_source_sections(source_sections, expected_sections)
 
     streamlit_pptx_filename = f"{client_slug}_streamlit_output.pptx"
+    reference_pptx_filename = "qbr_visual_reference_only.pptx" if is_monthly else "reference_deck_exported_from_google_slides.pptx"
+    monthly_target_slide_count = len(source_sections)
     generated_pptx_bytes = _read_payload(generated_pptx)
     reference_pptx_bytes = _read_optional_payload(reference_pptx)
     has_reference_pptx = reference_pptx_bytes is not None
@@ -167,7 +169,7 @@ def build_claude_handoff_package(
         warnings.append(f"Extra source sections found: {', '.join(extra_sections)}")
     if not has_reference_pptx:
         warnings.append(
-            "reference_deck_exported_from_google_slides.pptx is not included; attach/export the reference deck before asking Claude for full-fidelity deck completion."
+            f"{reference_pptx_filename} is not included; attach/export the visual reference before asking Claude for full-fidelity deck completion."
         )
 
     variables = {
@@ -177,8 +179,10 @@ def build_claude_handoff_package(
         "period_label": resolved_period,
         "quarter_short": quarter_short,
         "reference_deck_url": reference_deck_url,
+        "reference_pptx_filename": reference_pptx_filename,
         "streamlit_pptx_filename": streamlit_pptx_filename,
         "has_reference_pptx": str(has_reference_pptx).lower(),
+        "target_slide_count": str(monthly_target_slide_count if is_monthly else 39 if include_central_asia_slide else 38),
         "headline_sales_leads": headline_kpis["sales_leads"],
         "headline_cost": headline_kpis["cost"],
         "headline_cpl": headline_kpis["cpl"],
@@ -190,16 +194,17 @@ def build_claude_handoff_package(
         claude_prompt_text = build_monthly_claude_prompt_text(variables)
         slide_mapping_text = build_monthly_slide_mapping_text(source_sections, variables)
         qa_checklist_text = build_monthly_qa_checklist_text(variables)
+        chart_qa_text = build_monthly_chart_qa_addendum_text(source_sections, variables)
     else:
         readme_text = render_asset_template("README_FOR_CLAUDE_TEMPLATE.txt", variables)
         claude_prompt_text = render_asset_template("CLAUDE_PROMPT_TEMPLATE.txt", variables)
         slide_mapping_text = build_slide_mapping_text(variables, include_central_asia_slide, include_other_top_campaigns_slide)
         qa_checklist_text = render_asset_template("QA_CHECKLIST_TEMPLATE.txt", variables)
+        chart_qa_text = read_asset_text("CHART_QA_ADDENDUM_FOR_CLAUDE.txt")
     if include_central_asia_slide and not is_monthly:
         readme_text = apply_central_asia_slide_instructions(readme_text)
         claude_prompt_text = apply_central_asia_slide_instructions(claude_prompt_text)
         qa_checklist_text = apply_central_asia_slide_instructions(qa_checklist_text)
-    chart_qa_text = read_asset_text("CHART_QA_ADDENDUM_FOR_CLAUDE.txt")
     source_index_text = build_source_section_index(
         report_text=report_text,
         client_display_name=client_display_name,
@@ -212,8 +217,8 @@ def build_claude_handoff_package(
     if not has_reference_pptx:
         reference_note = (
             "\n\nReference deck availability note\n"
-            "- reference_deck_exported_from_google_slides.pptx is not included in this package.\n"
-            "- Export or attach the Google Slides reference deck before asking Claude to complete the deck with full visual fidelity.\n"
+            f"- {reference_pptx_filename} is not included in this package.\n"
+            "- Export or attach the visual reference before asking Claude to complete the deck with full visual fidelity.\n"
         )
         readme_text += reference_note
         claude_prompt_text += reference_note
@@ -224,8 +229,12 @@ def build_claude_handoff_package(
         {"name": "original_streamlit_prompt.txt", "role": "original Streamlit prompt for background only", "required": True},
         {"name": streamlit_pptx_filename, "role": "Streamlit-generated PPTX intermediate source", "required": True},
         {
-            "name": "reference_deck_exported_from_google_slides.pptx",
-            "role": "PPTX export of the Google Slides visual reference deck",
+            "name": reference_pptx_filename,
+            "role": (
+                "QBR deck export for visual style only; do not use for monthly slide order or section coverage"
+                if is_monthly
+                else "PPTX export of the Google Slides visual reference deck"
+            ),
             "required": False,
         },
         {"name": "README_FOR_CLAUDE.txt", "role": "operator README", "required": True},
@@ -246,7 +255,7 @@ def build_claude_handoff_package(
     ]
     if not has_reference_pptx:
         files_manifest = [
-            item for item in files_manifest if item["name"] != "reference_deck_exported_from_google_slides.pptx"
+            item for item in files_manifest if item["name"] != reference_pptx_filename
         ]
 
     manifest = {
@@ -260,9 +269,15 @@ def build_claude_handoff_package(
         "generated_at": generated_at_value,
         "reference_deck_url": reference_deck_url,
         "has_reference_pptx": has_reference_pptx,
+        "reference_pptx_filename": reference_pptx_filename if has_reference_pptx else None,
         "target_slide_count": _count_slide_mapping_rows(slide_mapping_text) if is_monthly else 39 if include_central_asia_slide else 38,
         "uk_central_asia_mongolia_slide": include_central_asia_slide,
         "other_top_campaigns_slide": include_other_top_campaigns_slide,
+        "excluded_qbr_sections": (
+            ["Google Trends", "Auction Insights", "Testing", "Other Updates", "Next Steps", "Thank You"]
+            if is_monthly
+            else []
+        ),
         "files": files_manifest,
         "headline_kpis": headline_kpis,
         "source_sections": [
@@ -278,7 +293,7 @@ def build_claude_handoff_package(
         archive.writestr("original_streamlit_prompt.txt", prompt_text)
         archive.writestr(streamlit_pptx_filename, generated_pptx_bytes)
         if reference_pptx_bytes is not None:
-            archive.writestr("reference_deck_exported_from_google_slides.pptx", reference_pptx_bytes)
+            archive.writestr(reference_pptx_filename, reference_pptx_bytes)
         archive.writestr("README_FOR_CLAUDE.txt", readme_text)
         archive.writestr("CLAUDE_PROMPT.txt", claude_prompt_text)
         archive.writestr("SLIDE_MAPPING.csv", slide_mapping_text)
@@ -550,13 +565,13 @@ def build_monthly_readme_text(variables: Mapping[str, str]) -> str:
 {{client_display_name}} {{quarter_short}} Monthly Report Deck Handoff
 
 Goal
-Transform the Streamlit output in this upload pack into a polished monthly PPC report deck using the Wendy Wu QBR visual style, but only the monthly/YTD sections present in report.txt.
+Transform the Streamlit output in this upload pack into a polished {{target_slide_count}}-slide monthly PPC report deck. The monthly structure is defined only by SLIDE_MAPPING.csv and report.txt.
 
 Files in this pack
 - report.txt: Source of truth for all {{period_label}} values, MoM/YoY card comparisons, YTD tables, YTD charts, bullets, and period labels.
 - {{streamlit_pptx_filename}}: Streamlit-generated PowerPoint. Use it to understand structure and chart coverage.
-- reference_deck_exported_from_google_slides.pptx: QBR visual reference, if included. Use it for styling only; do not force missing QBR trends or auction slides into this monthly deck.
-- original_streamlit_prompt.txt: Original prompt used by Streamlit. Background only.
+- {{reference_pptx_filename}}: QBR deck export for visual style only, if included. It is not the monthly slide map. Do not copy its slide order or QBR-only sections.
+- original_streamlit_prompt.txt: Monthly Streamlit prompt for background only. SLIDE_MAPPING.csv and this README override it if anything conflicts.
 - SLIDE_MAPPING.csv: Monthly source-section execution map.
 - SOURCE_SECTION_INDEX.txt: Index of report.txt sections and line numbers.
 - QA_CHECKLIST.txt: Required checks before returning the completed deck.
@@ -564,17 +579,20 @@ Files in this pack
 - PACKAGE_MANIFEST.json: Package metadata.
 
 Monthly rules
+- Target deck is {{target_slide_count}} slides.
+- Use SLIDE_MAPPING.csv as the only target slide structure.
 - KPI cards show the selected month only.
 - KPI cards must include both MoM and YoY where report.txt provides them.
 - Tables and charts show YTD through the selected month.
 - Include campaign type and destination breakdown sections from report.txt.
-- Do not add Google Trends, Auction Insights, or Recommendations slides unless those sections are present in report.txt.
+- Do not add Google Trends, Auction Insights, Testing, Other Updates, Next Steps, Thank You, or any other QBR-only slides unless those sections are present in SLIDE_MAPPING.csv.
 - Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
+- Remove all old Q1/Q2/quarterly wording from any reused visual reference objects.
 
 Recommended workflow
 1. Read report.txt and use SLIDE_MAPPING.csv as the execution map.
 2. Use the Streamlit PPTX to understand source coverage.
-3. Use the reference deck only for visual style.
+3. Use {{reference_pptx_filename}} only for visual style. Do not use it for structure.
 4. Generate chart PNGs from report.txt data where needed.
 5. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide and inspect full-slide screenshots or thumbnails.
 6. Run QA_CHECKLIST.txt before returning the finished deck.
@@ -591,7 +609,7 @@ You are preparing a {{client_display_name}} {{quarter_short}} monthly PPC report
 I am uploading:
 - report.txt
 - {{streamlit_pptx_filename}}
-- reference_deck_exported_from_google_slides.pptx, if included
+- {{reference_pptx_filename}}, if included
 - original_streamlit_prompt.txt
 - SLIDE_MAPPING.csv
 - SOURCE_SECTION_INDEX.txt
@@ -600,22 +618,26 @@ I am uploading:
 - PACKAGE_MANIFEST.json
 
 Task
-Create a monthly report deck populated with {{period_label}} {{client_display_name}} data from report.txt.
+Create a {{target_slide_count}}-slide monthly report deck populated with {{period_label}} {{client_display_name}} data from report.txt.
 
 Source priority
 1. report.txt is the source of truth for all numbers, tables, bullets, dates, MoM, YoY, and YTD values.
-2. SLIDE_MAPPING.csv defines the monthly source sections to cover.
+2. SLIDE_MAPPING.csv defines the only slide structure to build.
 3. {{streamlit_pptx_filename}} shows the intermediate Streamlit structure and charts.
-4. The reference deck, if included, defines style only. Do not force QBR-only Trends, Auction Insights, or Recommendation sections into the monthly deck.
+4. {{reference_pptx_filename}}, if included, defines visual style only. Do not use its slide order or QBR-only sections.
 5. original_streamlit_prompt.txt is background only.
 
 Hard requirements
+- Build exactly {{target_slide_count}} monthly slides unless SLIDE_MAPPING.csv says otherwise.
+- Do not copy the 38-slide QBR deck structure.
+- Do not add Google Trends, Auction Insights, Testing, Other Updates, Next Steps, Thank You, or any other QBR-only slides unless present in SLIDE_MAPPING.csv.
 - KPI cards show the selected month only.
 - KPI cards must show MoM and YoY where report.txt provides them.
 - Tables and charts show YTD through the selected month.
 - Include every campaign type and destination section present in report.txt.
 - Use "{{client_display_name}}" where the market/client name appears.
 - Preserve the Wendy Wu/Summon visual system: dark backgrounds, red accents, KPI cards, tables, footers, typography, chart placement, and spacing.
+- Remove all old Q1/Q2/quarterly wording from reused style objects.
 - Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping.
 - Run QA_CHECKLIST.txt before returning.
 
@@ -632,9 +654,20 @@ def build_monthly_qa_checklist_text(variables: Mapping[str, str]) -> str:
 Required QA before delivery
 
 Deck identity
-- Final deck is a monthly {{client_display_name}} PPC report for {{period_label}}.
+- Final deck is a {{target_slide_count}}-slide monthly {{client_display_name}} PPC report for {{period_label}}.
 - Client/market naming is {{client_display_name}}.
-- No stale QBR-only Google Trends, Auction Insights, or Recommendations slides were added unless report.txt includes those sections.
+- Final deck follows SLIDE_MAPPING.csv, not the 38-slide QBR reference deck.
+
+Stale content
+- No Google Trends slides remain unless present in SLIDE_MAPPING.csv.
+- No Auction Insights slides remain unless present in SLIDE_MAPPING.csv.
+- No Testing slides remain unless present in SLIDE_MAPPING.csv.
+- No Other Updates slides remain unless present in SLIDE_MAPPING.csv.
+- No Next Steps slides remain unless present in SLIDE_MAPPING.csv.
+- No Thank You slide remains unless present in SLIDE_MAPPING.csv.
+- No Q1/Q2/quarter/quarterly date labels remain.
+- No "Quarterly PPC Performance Report" text remains.
+- No old QBR slide numbers are used for chart QA or section mapping.
 
 Data integrity
 - KPI values match report.txt Key Metrics rows exactly.
@@ -660,6 +693,95 @@ Final response
 """.strip(),
         variables,
     )
+
+
+def build_monthly_chart_qa_addendum_text(source_sections: list[SourceSection], variables: Mapping[str, str]) -> str:
+    trend_sections = [
+        section for section in source_sections if "YTD Trend" in section.title
+    ]
+    mix_sections = [
+        section
+        for section in source_sections
+        if "YTD Mix" in section.title or "Campaign Mix" in section.title
+    ]
+    summary_sections = [
+        section for section in source_sections if "Summary" in section.title
+    ]
+
+    def _format_sections(sections: list[SourceSection]) -> str:
+        if not sections:
+            return "- none"
+        return "\n".join(f"- Slide {section.index}: {section.title}" for section in sections)
+
+    target_slide_count = str(variables.get("target_slide_count", ""))
+    period_label = str(variables.get("period_label", ""))
+    reference_pptx_filename = str(variables.get("reference_pptx_filename", "visual_reference.pptx"))
+
+    return f"""
+Monthly Chart QA Addendum for Claude
+
+Problem to fix
+The monthly deck content can be correct while chart images are too tightly rendered or incorrectly scaled inside the slide slots. This causes labels, value annotations, legends, and axis text to look squashed, clipped, or overlapping.
+
+Target structure
+- This is a {target_slide_count}-slide monthly deck for {period_label}.
+- Use SLIDE_MAPPING.csv for slide numbers.
+- Do not use old quarterly/QBR slide numbers.
+- {reference_pptx_filename} is a visual style reference only, not a structural map.
+
+YTD trend chart slides to inspect
+{_format_sections(trend_sections)}
+
+YTD mix/chart slides to inspect
+{_format_sections(mix_sections)}
+
+Summary slides with KPI cards and supporting tables to inspect
+{_format_sections(summary_sections)}
+
+Chart rendering rules
+- Preserve the intended slide slot size and position from the monthly output or approved visual style.
+- Do not stretch chart images non-proportionally.
+- Use fit/contain placement, not crop/fill placement.
+- Export chart images at high resolution, ideally 2x or 3x the displayed slide size.
+- Leave internal padding inside every exported chart image so labels cannot be cut off after insertion.
+- Add at least 10-15% internal padding around chart labels; use 20-25% right padding for horizontal bar charts with value labels.
+- Avoid chart titles inside the image when the slide already has a title.
+- Keep legends readable but compact; legends should not push charts smaller than the intended chart area.
+- For donut charts, avoid placing labels on tiny slices if they overlap. Use the legend for small categories and label only slices large enough to read cleanly.
+- For bar charts, make sure value labels are not clipped at the right edge. Increase the x-axis maximum or add right margin.
+- For long category names, use compact labels where appropriate, for example "Perf. Max" instead of "Performance Max".
+- Keep the Wendy Wu/Summon monthly color system: black/dark charcoal, red accent, mid grey, light grey.
+- Keep chart frames/borders consistent with the monthly deck style.
+
+Required visual QA
+For every chart slide, create or inspect a full-slide screenshot/thumbnail after the chart replacement. The pass is not complete until each chart passes these checks:
+- No number is clipped.
+- No label overlaps another label, legend, bar, slice, or axis.
+- No chart appears squeezed vertically or horizontally.
+- The chart is centered in its intended slot.
+- The chart has professional whitespace.
+- The chart does not collide with bullets, table text, headers, footers, or logos.
+- The slide still reads as a monthly Wendy Wu report slide.
+
+Special check for Campaign Type YTD Mix
+- Campaign Type YTD Mix must use the YTD rows from report.txt.
+- Include all campaign types present in report.txt.
+- Donut or bar labels must be readable and not overlap.
+- CPL bar chart value labels must be fully visible; no right-edge clipping.
+- The "Demand Gen" label may wrap only if it remains readable and does not crowd the y-axis.
+
+Second-pass instruction
+If a chart cannot be made readable within the existing slot, prioritize legibility while preserving the monthly deck style:
+1. reduce nonessential chart text,
+2. abbreviate category labels,
+3. move or simplify legends,
+4. hide labels for tiny slices,
+5. increase chart image padding,
+6. only then slightly resize the chart within the existing visual bounds.
+
+Final response
+List the slides whose charts were changed and confirm that screenshots/thumbnails were checked after the fix.
+""".strip()
 
 
 def build_monthly_slide_mapping_text(source_sections: list[SourceSection], variables: Mapping[str, str]) -> str:
