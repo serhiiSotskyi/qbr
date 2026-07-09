@@ -478,7 +478,8 @@ def build_slide_mapping_text(
         ),
         "required_action": (
             "UK-only inserted destination slide. Update KPI blocks, YoY values, commentary bullets, monthly trend visual, "
-            "and campaign mix table using Central Asia & Mongolia data from report.txt. Preserve the destination slide style."
+            "and campaign mix table using Central Asia & Mongolia data from report.txt. Preserve inline YoY in the "
+            "Cost and Sales Leads table cells and preserve the destination slide style."
         ),
     }
 
@@ -490,7 +491,8 @@ def build_slide_mapping_text(
                 "source_section_or_action": "Other (Destination) Top 10 campaigns",
                 "required_action": (
                     "Update the two ranked campaign charts from the Other top-campaign source section. "
-                    "Use the campaign-level Other definition from report.txt: exclude Brand, Japan, China, India, and SE Asia terms."
+                    "Use the campaign-level Other definition from report.txt: exclude Brand, Japan, China, India, SE Asia, "
+                    "Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia terms."
                 ),
             }
         if include_central_asia_slide and slide_number == 26:

@@ -91,17 +91,20 @@ def generate_trend_bullets(summary: Dict, label: str) -> List[str]:
     classification = summary.get("classification", "flat")
     seasonality_summary = summary.get("seasonality_summary")
     peak_months = summary.get("peak_months", [])
+    comparison_period = summary.get("comparison_period", "quarter")
+    period_label = "YTD" if comparison_period == "ytd" else "current period"
 
     if yoy_change is not None and previous_avg is not None:
         direction = "increased" if yoy_change >= 0 else "declined"
         bullets.append(
-            f"{label} demand has {direction} year on year, with average interest at {current_avg:.1f} versus {previous_avg:.1f} last year."
+            f"{label} {period_label} demand has {direction} year on year, with average interest at {current_avg:.1f} versus {previous_avg:.1f} last year."
         )
     else:
-        bullets.append(f"{label} trend data is available for the current period, but a prior-year baseline is not available.")
+        bullets.append(f"{label} trend data is available for the {period_label}, but a prior-year baseline is not available.")
 
     if peak_months:
-        bullets.append(f"Peak interest in the quarter fell in {', '.join(peak_months)}.")
+        peak_label = "YTD period" if comparison_period == "ytd" else "quarter"
+        bullets.append(f"Peak interest in the {peak_label} fell in {', '.join(peak_months)}.")
 
     bullets.append(f"The broader trend pattern looks {classification}.")
     if seasonality_summary:

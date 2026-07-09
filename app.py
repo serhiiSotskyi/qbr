@@ -66,8 +66,8 @@ def build_request_inputs(
     trends_files,
     plan_workbook_file=None,
     other_campaign_files=None,
-    wightlink_trends_current_ytd_files=None,
-    wightlink_trends_previous_ytd_files=None,
+    trends_current_ytd_files=None,
+    trends_previous_ytd_files=None,
     red_funnel_auction_file=None,
     red_funnel_prior_auction_file=None,
 ) -> tuple[Path, str, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
@@ -102,18 +102,18 @@ def build_request_inputs(
         other_campaigns_dir = str(other_campaigns_path)
 
     trends_ytd_current_dir = None
-    if wightlink_trends_current_ytd_files:
+    if trends_current_ytd_files:
         trends_ytd_current_path = request_dir / "trends_ytd_current"
         trends_ytd_current_path.mkdir(parents=True, exist_ok=True)
-        for trend_file in wightlink_trends_current_ytd_files:
+        for trend_file in trends_current_ytd_files:
             save_uploaded_file(trend_file, trends_ytd_current_path / trend_file.name)
         trends_ytd_current_dir = str(trends_ytd_current_path)
 
     trends_ytd_previous_dir = None
-    if wightlink_trends_previous_ytd_files:
+    if trends_previous_ytd_files:
         trends_ytd_previous_path = request_dir / "trends_ytd_previous"
         trends_ytd_previous_path.mkdir(parents=True, exist_ok=True)
-        for trend_file in wightlink_trends_previous_ytd_files:
+        for trend_file in trends_previous_ytd_files:
             save_uploaded_file(trend_file, trends_ytd_previous_path / trend_file.name)
         trends_ytd_previous_dir = str(trends_ytd_previous_path)
 
@@ -294,10 +294,15 @@ def main() -> None:
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
     is_monthly_performance_only = report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
     auction_file = None if is_monthly_performance_only else st.file_uploader("Auction CSV", type=["csv"])
-    trends_files = [] if is_monthly_performance_only else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
+    use_wendy_uk_ytd_trends = client_id == "wendy_wu" and report_mode == "quarterly"
+    trends_files = (
+        []
+        if is_monthly_performance_only or use_wendy_uk_ytd_trends
+        else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
+    )
     plan_workbook_file = None
-    wightlink_trends_current_ytd_files = []
-    wightlink_trends_previous_ytd_files = []
+    trends_current_ytd_files = []
+    trends_previous_ytd_files = []
     red_funnel_auction_file = None
     red_funnel_prior_auction_file = None
     if client_id == "wightlink":
@@ -307,13 +312,13 @@ def main() -> None:
             help="Use the 2026/27 Middle Scenario Plan export. The app reads the first PPC Middle Plan Scenario table only.",
         )
         if report_mode == "quarterly":
-            wightlink_trends_current_ytd_files = st.file_uploader(
+            trends_current_ytd_files = st.file_uploader(
                 "Wightlink current YTD Google Trends CSVs",
                 type=["csv"],
                 accept_multiple_files=True,
                 help="Upload current YTD files for Wightlink Ferries, Isle of Wight Ferry, and Isle of Wight Holidays.",
             )
-            wightlink_trends_previous_ytd_files = st.file_uploader(
+            trends_previous_ytd_files = st.file_uploader(
                 "Wightlink previous YTD Google Trends CSVs",
                 type=["csv"],
                 accept_multiple_files=True,
@@ -329,6 +334,19 @@ def main() -> None:
                 type=["csv"],
                 help="Same-quarter-prior-year Auction Insights export, e.g. Q2 2025 for a Q2 2026 report. Used for Red Funnel YoY comparison.",
             )
+    elif use_wendy_uk_ytd_trends:
+        trends_current_ytd_files = st.file_uploader(
+            "Wendy Wu UK current YTD Google Trends CSVs",
+            type=["csv"],
+            accept_multiple_files=True,
+            help="Upload current-year YTD Google Trends exports for Brand, Japan, and China terms.",
+        )
+        trends_previous_ytd_files = st.file_uploader(
+            "Wendy Wu UK previous YTD Google Trends CSVs",
+            type=["csv"],
+            accept_multiple_files=True,
+            help="Upload matching prior-year YTD Google Trends exports for the same Brand, Japan, and China terms.",
+        )
     other_campaign_files = []
     if client_id == "wendy_wu":
         other_campaign_files = st.file_uploader(
@@ -363,8 +381,8 @@ def main() -> None:
             trends_files,
             plan_workbook_file,
             other_campaign_files,
-            wightlink_trends_current_ytd_files,
-            wightlink_trends_previous_ytd_files,
+            trends_current_ytd_files,
+            trends_previous_ytd_files,
             red_funnel_auction_file,
             red_funnel_prior_auction_file,
         )

@@ -19,6 +19,8 @@ DEFAULT_OTHER_EXCLUDE_TERMS = (
     "thailand",
     "malaysia",
     "borneo",
+    "central asia",
+    "mongolia",
 )
 
 CAMPAIGN_COLUMN_ALIASES = {"campaign", "campaignname"}

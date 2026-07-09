@@ -594,6 +594,7 @@ PROMPTS = {
         - Japan
         - SE Asia
         - India
+        - Central Asia & Mongolia
         - Other
 
         For EACH destination block present in the report create 3 slides:
@@ -612,13 +613,15 @@ PROMPTS = {
 
         Slide C: `[Geo] Campaign Mix`
         - preserve the campaign mix table exactly
+        - keep inline YoY values in the Cost and Sales Leads columns, e.g. `£14,021.32 (+26%)` and `120 (+114%)`
         - create visuals for spend share, lead share, and CPL comparison
 
         TYPE 5 — GOOGLE TRENDS
         For each trends section present:
         - create a demand trend slide
         - preserve bullets exactly
-        - visualize trend values
+        - visualize current YTD versus previous YTD on the same chart when both series are present
+        - treat separately uploaded Google Trends files as normalized index comparisons, not exact search-volume deltas
 
         TYPE 6 — AUCTION INSIGHTS
         Create:
@@ -648,6 +651,8 @@ PROMPTS = {
         - preserve all repeated section patterns consistently
         - if a destination exists in the report, it must get the full 3-slide treatment
         - if a channel exists in the report, it must get the full 2-slide treatment
+        - UK destination grouping must include Central Asia & Mongolia and must not roll Central Asia or Mongolia into Other
+        - Other top campaigns must come from the uploaded Google/MS campaign exports and must exclude Brand, Japan, China, India, SE Asia, Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia
         - do not skip `Other` just because it is small
         - keep all YoY bullets exactly
         """

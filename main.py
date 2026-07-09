@@ -24,8 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--red-funnel-auction-csv", help="Path to Wightlink quarter-only Red Funnel Auction Insights CSV export.")
     parser.add_argument("--red-funnel-prior-auction-csv", help="Path to Wightlink same-quarter-prior-year Red Funnel Auction Insights CSV export.")
     parser.add_argument("--trends-dir", help="Directory containing Google Trends CSV exports.")
-    parser.add_argument("--trends-ytd-current-dir", help="Directory containing Wightlink current YTD Google Trends CSV exports.")
-    parser.add_argument("--trends-ytd-previous-dir", help="Directory containing Wightlink previous YTD Google Trends CSV exports.")
+    parser.add_argument("--trends-ytd-current-dir", help="Directory containing current YTD Google Trends CSV exports.")
+    parser.add_argument("--trends-ytd-previous-dir", help="Directory containing previous YTD Google Trends CSV exports.")
     parser.add_argument("--other-campaigns-dir", help="Directory containing Wendy Wu UK Google/MS campaign CSV exports for Other top-campaign slides.")
     parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
     parser.add_argument(
@@ -121,6 +121,8 @@ def run_report(
         client_id=client_id,
         auction_csv=auction_csv,
         trends_dir=trends_dir,
+        trends_ytd_current_dir=trends_ytd_current_dir,
+        trends_ytd_previous_dir=trends_ytd_previous_dir,
         other_campaigns_dir=other_campaigns_dir,
         report_mode=report_mode,
     )
@@ -206,6 +208,8 @@ def run_text_report(
         client_id=client_id,
         auction_csv=auction_csv,
         trends_dir=trends_dir,
+        trends_ytd_current_dir=trends_ytd_current_dir,
+        trends_ytd_previous_dir=trends_ytd_previous_dir,
         other_campaigns_dir=other_campaigns_dir,
         report_mode=report_mode,
     )

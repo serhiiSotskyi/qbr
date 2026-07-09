@@ -25,7 +25,20 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
 
             summary = load_other_campaign_summary(
                 root,
-                exclude_terms=["brand", "japan", "china", "india", "se asia", "vietnam", "cambodia", "thailand", "malaysia", "borneo"],
+                exclude_terms=[
+                    "brand",
+                    "japan",
+                    "china",
+                    "india",
+                    "se asia",
+                    "vietnam",
+                    "cambodia",
+                    "thailand",
+                    "malaysia",
+                    "borneo",
+                    "central asia",
+                    "mongolia",
+                ],
             )
 
         self.assertIsNotNone(summary)
@@ -35,8 +48,8 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
 
         top_click_names = summary["top_clicks"]["Campaign"].tolist()
         top_conversion_names = summary["top_conversions"]["Campaign"].tolist()
-        self.assertIn("Mongolia", top_click_names)
-        self.assertIn("Central Asia", top_conversion_names)
+        self.assertNotIn("Mongolia", top_click_names)
+        self.assertNotIn("Central Asia", top_conversion_names)
         self.assertIn("South Korea", top_conversion_names)
 
         other_raw_campaigns = " ".join(summary["other_campaign_rows"]["Raw Campaign"].tolist()).lower()
@@ -44,6 +57,8 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
         self.assertNotIn("japan", other_raw_campaigns)
         self.assertNotIn("vietnam", other_raw_campaigns)
         self.assertNotIn("china", other_raw_campaigns)
+        self.assertNotIn("central asia", other_raw_campaigns)
+        self.assertNotIn("mongolia", other_raw_campaigns)
 
     def test_wendy_wu_pipeline_adds_other_top_campaigns_slide_from_uploads(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -78,8 +93,9 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
         self.assertIn("Other (Destination) Top 10 campaigns", pptx_text)
         self.assertIn("Other (Destination) Top 10 campaigns", report_text)
         self.assertIn("Top 10 by Clicks", report_text)
-        self.assertIn("Mongolia", report_text)
-        self.assertIn("Central Asia", report_text)
+        self.assertIn("South Korea", report_text)
+        self.assertNotIn("Mongolia", report_text)
+        self.assertNotIn("Central Asia", report_text)
         self.assertNotIn("UK - Brand - Core", report_text)
         self.assertNotIn("UK - Generic - Vietnam", report_text)
 
@@ -90,7 +106,20 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
 
             summary = load_other_campaign_summary(
                 root,
-                exclude_terms=["brand", "japan", "china", "india", "se asia", "vietnam", "cambodia", "thailand", "malaysia", "borneo"],
+                exclude_terms=[
+                    "brand",
+                    "japan",
+                    "china",
+                    "india",
+                    "se asia",
+                    "vietnam",
+                    "cambodia",
+                    "thailand",
+                    "malaysia",
+                    "borneo",
+                    "central asia",
+                    "mongolia",
+                ],
             )
 
         self.assertIsNone(summary)
@@ -107,7 +136,8 @@ def _write_ms_campaign_export(path: Path) -> None:
         ["3", "Enabled", "UK - Generic - Vietnam - General", "Search", "SE Asia; Vietnam", "80", "800", "80.00", "8"],
         ["4", "Enabled", "UK - Generic - Mongolia", "Search", "Asia; Other", "300", "3000", "120.00", "12"],
         ["5", "Enabled", "UK - Generic - Central Asia - General", "Search", "Central Asia; Other", "220", "2200", "110.00", "30"],
-        ["Overall total", "-", "-", "-", "-", "790", "7900", "410.00", "79"],
+        ["6", "Enabled", "UK - Generic - South Korea - General", "Search", "Asia; Other", "260", "2600", "115.00", "24"],
+        ["Overall total", "-", "-", "-", "-", "1050", "10500", "525.00", "103"],
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         csv.writer(handle).writerows(rows)

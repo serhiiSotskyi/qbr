@@ -31,7 +31,11 @@ Non-negotiable target mode
 Specific folding rules
 - Performance "Other Summary" and "Other Monthly Trend" should not create extra channel slides. Their values are represented in Campaign Type Mix as the "Other" row.
 - Destination campaign mix sections such as "China Campaign Mix", "Japan Campaign Mix", etc. should be folded into the matching destination summary slides.
+- Destination campaign mix tables must preserve inline YoY values in the Cost and Sales Leads columns when report.txt includes them.
+- For UK reports, Central Asia & Mongolia is a core destination. Do not roll Central Asia or Mongolia into destination Other.
 - Destination "Other Summary + YoY", "Other Monthly Trend", and "Other Campaign Mix" should populate the reference deck's destination Other area.
+- "Other (Destination) Top 10 campaigns" should be used only when the report includes uploaded Google/MS campaign export data; the Other definition excludes Brand, Japan, China, India, SE Asia, Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia.
+- Google Trends slides should show current YTD versus previous YTD when both series are present. Treat separate Google Trends exports as normalized index comparisons, not exact search-volume deltas.
 - "Recommendations / Next Steps" should populate the reference deck's Next Steps slides.
 - Testing and Other Updates should be manual placeholders unless report.txt contains those sections.
 

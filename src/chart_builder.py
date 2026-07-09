@@ -40,7 +40,14 @@ class ChartBuilder:
         leads_path = self._plot_mix_pie(scope_key, mix_df, value_col="Sales Leads", suffix="leads_share")
         return {"cost_share": cost_path, "leads_share": leads_path}
 
-    def build_trends_chart(self, scope_key: str, comparison_df: pd.DataFrame, title: str) -> Path:
+    def build_trends_chart(
+        self,
+        scope_key: str,
+        comparison_df: pd.DataFrame,
+        title: str,
+        current_label: str = "Current period",
+        prior_label: str = "Prior year",
+    ) -> Path:
         out_path = self.charts_dir / f"{scope_key}_trend.png"
         if comparison_df.empty:
             return self._plot_empty_state(out_path, "No trend data")
@@ -52,7 +59,7 @@ class ChartBuilder:
             marker="o",
             linewidth=2.5,
             color=self.colors.get("trend_current", "#0E7490"),
-            label="Current period",
+            label=current_label,
         )
 
         if "prior_value" in comparison_df.columns and comparison_df["prior_value"].notna().any():
@@ -63,7 +70,7 @@ class ChartBuilder:
                 linewidth=2,
                 linestyle="--",
                 color=self.colors.get("trend_prior", "#94A3B8"),
-                label="Prior year",
+                label=prior_label,
             )
 
         ax.set_title(title, fontsize=self.title_size)

@@ -40,6 +40,8 @@ class ReportPipeline:
         client_id: str | None = None,
         auction_csv: str | Path | None = None,
         trends_dir: str | Path | None = None,
+        trends_ytd_current_dir: str | Path | None = None,
+        trends_ytd_previous_dir: str | Path | None = None,
         other_campaigns_dir: str | Path | None = None,
         report_mode: str = "quarterly",
     ) -> Path:
@@ -54,6 +56,7 @@ class ReportPipeline:
             quarter,
             campaign_order=self.config_loader.get_campaign_types(client_config),
             destination_order=self.config_loader.get_destinations(client_config),
+            destination_aliases=client_config.get("destination_aliases"),
             destination_other_config=client_config.get("destination_other"),
             report_mode="monthly" if use_monthly else "quarterly",
         )
@@ -79,7 +82,17 @@ class ReportPipeline:
         if self.config_loader.is_slide_enabled("include_performance", client_config):
             self._build_performance_section(builder, chart_builder, report, subtitle, client_config, other_campaigns_summary, report_mode="monthly" if use_monthly else "quarterly")
 
-        trends_summary = None if use_monthly else self._load_trends_summary(client_config, quarter, trends_dir)
+        trends_summary = (
+            None
+            if use_monthly
+            else self._load_trends_summary(
+                client_config,
+                quarter,
+                trends_dir,
+                trends_ytd_current_dir=trends_ytd_current_dir,
+                trends_ytd_previous_dir=trends_ytd_previous_dir,
+            )
+        )
         if not use_monthly and self.config_loader.is_slide_enabled("include_trends", client_config) and trends_summary:
             self._build_trends_section(builder, chart_builder, trends_summary, subtitle, client_config)
 
@@ -256,6 +269,8 @@ class ReportPipeline:
                 "brand",
                 brand_summary["comparison"],
                 title="Brand Search Interest",
+                current_label=brand_summary.get("current_series_label", "Current period"),
+                prior_label=brand_summary.get("prior_series_label", "Prior year"),
             )
             builder.add_single_chart_slide(
                 title=f"{self.config_loader.get_client_name(client_config)} Terms Are Growing",
@@ -270,6 +285,8 @@ class ReportPipeline:
                 f"trend_{_slug(destination_summary['name'])}",
                 destination_summary["comparison"],
                 title=f"{destination_summary['name']} Search Interest",
+                current_label=destination_summary.get("current_series_label", "Current period"),
+                prior_label=destination_summary.get("prior_series_label", "Prior year"),
             )
             builder.add_single_chart_slide(
                 title=f"{destination_summary['name']} Demand Trend",
@@ -289,19 +306,34 @@ class ReportPipeline:
             source_note=self.config_loader.get_source_note("auction_insights", client_config),
         )
 
-    def _load_trends_summary(self, client_config: dict, quarter, trends_dir: str | Path | None) -> dict | None:
+    def _load_trends_summary(
+        self,
+        client_config: dict,
+        quarter,
+        trends_dir: str | Path | None,
+        *,
+        trends_ytd_current_dir: str | Path | None = None,
+        trends_ytd_previous_dir: str | Path | None = None,
+    ) -> dict | None:
         brand_config = client_config.get("brand_trends", {})
         destination_config = client_config.get("destination_trends", {})
         trend_aliases = client_config.get("trend_aliases", {})
         if not brand_config.get("enabled") and not destination_config.get("enabled"):
             return None
-        if not trends_dir:
+        use_ytd = client_config.get("id") == "wendy_wu"
+        current_trends_dir = trends_ytd_current_dir if use_ytd and trends_ytd_current_dir else trends_dir
+        if not current_trends_dir:
             return None
 
-        loader = TrendsLoader(trends_dir)
+        loader = TrendsLoader(current_trends_dir)
         trends_df = loader.load_from_directory()
         if trends_df.empty:
             return None
+        previous_trends_df = None
+        if use_ytd and trends_ytd_previous_dir:
+            previous_trends_df = TrendsLoader(trends_ytd_previous_dir).load_from_directory()
+            if previous_trends_df.empty:
+                previous_trends_df = None
 
         summary = summarize_trends(
             trends_df=trends_df,
@@ -309,6 +341,8 @@ class ReportPipeline:
             brand_terms=brand_config.get("terms", []) if brand_config.get("enabled") else [],
             destination_configs=destination_config.get("destinations", []) if destination_config.get("enabled") else [],
             trend_aliases=trend_aliases,
+            comparison_period="ytd" if use_ytd else "quarter",
+            previous_trends_df=previous_trends_df,
         )
         if not summary.get("brand") and not summary.get("destinations"):
             print("No matching trend terms found. Check config or CSV column names.")

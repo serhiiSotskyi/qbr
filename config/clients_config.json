@@ -21,6 +21,14 @@
         "India",
         "Central Asia & Mongolia"
       ],
+      "destination_aliases": {
+        "Central Asia & Mongolia": [
+          "Central Asia",
+          "Mongolia",
+          "Central Asia and Mongolia",
+          "Central Asia & Mongolia"
+        ]
+      },
       "brand_trends": {
         "enabled": true,
         "terms": [
@@ -81,7 +89,9 @@
           "cambodia",
           "thailand",
           "malaysia",
-          "borneo"
+          "borneo",
+          "central asia",
+          "mongolia"
         ]
       },
       "auction_insights": {

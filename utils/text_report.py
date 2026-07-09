@@ -288,6 +288,8 @@ class TextReportPipeline:
         client_id: str | None = None,
         auction_csv: str | Path | None = None,
         trends_dir: str | Path | None = None,
+        trends_ytd_current_dir: str | Path | None = None,
+        trends_ytd_previous_dir: str | Path | None = None,
         other_campaigns_dir: str | Path | None = None,
         report_mode: str = "quarterly",
     ) -> Path:
@@ -300,6 +302,7 @@ class TextReportPipeline:
             quarter,
             campaign_order=self.config_loader.get_campaign_types(client_config),
             destination_order=self.config_loader.get_destinations(client_config),
+            destination_aliases=client_config.get("destination_aliases"),
             destination_other_config=client_config.get("destination_other"),
             report_mode="monthly" if use_monthly else "quarterly",
         )
@@ -312,7 +315,19 @@ class TextReportPipeline:
             report_title = report_title.replace("Quarterly", "Monthly")
         agency_name = self.config_loader.get_agency_name(client_config)
 
-        trends_summary = None if use_monthly else _load_trends_summary(self.project_root, self.config_loader, client_config, quarter, trends_dir)
+        trends_summary = (
+            None
+            if use_monthly
+            else _load_trends_summary(
+                self.project_root,
+                self.config_loader,
+                client_config,
+                quarter,
+                trends_dir,
+                trends_ytd_current_dir=trends_ytd_current_dir,
+                trends_ytd_previous_dir=trends_ytd_previous_dir,
+            )
+        )
         auction_summary = None if use_monthly else _load_auction_summary(self.config_loader, client_config, auction_csv)
         other_campaigns_summary = _load_other_campaigns_summary(client_config, other_campaigns_dir)
         recommendations = [] if use_monthly else generate_recommendations(report, trends_summary=trends_summary, auction_summary=auction_summary)
@@ -514,19 +529,30 @@ def _load_trends_summary(
     client_config: dict,
     quarter,
     trends_dir: str | Path | None,
+    *,
+    trends_ytd_current_dir: str | Path | None = None,
+    trends_ytd_previous_dir: str | Path | None = None,
 ) -> dict | None:
     brand_config = client_config.get("brand_trends", {})
     destination_config = client_config.get("destination_trends", {})
     trend_aliases = client_config.get("trend_aliases", {})
     if not brand_config.get("enabled") and not destination_config.get("enabled"):
         return None
-    if not trends_dir:
+    use_ytd = client_config.get("id") == "wendy_wu"
+    current_trends_dir = trends_ytd_current_dir if use_ytd and trends_ytd_current_dir else trends_dir
+    if not current_trends_dir:
         return None
 
-    loader = TrendsLoader(project_root / trends_dir if not Path(trends_dir).is_absolute() else trends_dir)
+    loader = TrendsLoader(project_root / current_trends_dir if not Path(current_trends_dir).is_absolute() else current_trends_dir)
     trends_df = loader.load_from_directory()
     if trends_df.empty:
         return None
+    previous_trends_df = None
+    if use_ytd and trends_ytd_previous_dir:
+        previous_path = project_root / trends_ytd_previous_dir if not Path(trends_ytd_previous_dir).is_absolute() else trends_ytd_previous_dir
+        previous_trends_df = TrendsLoader(previous_path).load_from_directory()
+        if previous_trends_df.empty:
+            previous_trends_df = None
 
     summary = summarize_trends(
         trends_df=trends_df,
@@ -534,6 +560,8 @@ def _load_trends_summary(
         brand_terms=brand_config.get("terms", []) if brand_config.get("enabled") else [],
         destination_configs=destination_config.get("destinations", []) if destination_config.get("enabled") else [],
         trend_aliases=trend_aliases,
+        comparison_period="ytd" if use_ytd else "quarter",
+        previous_trends_df=previous_trends_df,
     )
     if not summary.get("brand") and not summary.get("destinations"):
         return None
@@ -576,8 +604,14 @@ def _format_mix_table(mix_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["Campaign Type", "Cost", "Sales Leads", "Cost Share", "Lead Share", "CPL"])
 
     formatted = mix_df.copy()
-    formatted["Cost"] = formatted["Cost"].map(lambda value: f"£{value:,.2f}")
-    formatted["Sales Leads"] = formatted["Sales Leads"].map(lambda value: f"{int(round(value)):,}")
+    formatted["Cost"] = [
+        f"£{value:,.2f}{_fmt_inline_yoy(yoy)}"
+        for value, yoy in zip(formatted["Cost"], formatted.get("Cost YoY", pd.Series([None] * len(formatted))))
+    ]
+    formatted["Sales Leads"] = [
+        f"{int(round(value)):,}{_fmt_inline_yoy(yoy)}"
+        for value, yoy in zip(formatted["Sales Leads"], formatted.get("Sales Leads YoY", pd.Series([None] * len(formatted))))
+    ]
     formatted["Cost Share"] = formatted["Cost Share"].map(_fmt_percent)
     formatted["Lead Share"] = formatted["Lead Share"].map(_fmt_percent)
     formatted["CPL"] = formatted["CPL"].map(lambda value: f"£{value:,.2f}" if pd.notna(value) else "n/a")
@@ -604,6 +638,12 @@ def _fmt_percent(value: float | None) -> str:
     if value is None or pd.isna(value):
         return "n/a"
     return f"{value * 100:.2f}%"
+
+
+def _fmt_inline_yoy(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    return f" ({value * 100:+.0f}%)"
 
 
 def _use_kpi_summary_cards(client_config: dict) -> bool:

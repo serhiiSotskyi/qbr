@@ -15,39 +15,40 @@ def build_trend_summary(
     terms: Iterable[str],
     quarter: QuarterInfo,
     trend_aliases: Dict[str, List[str]] | None = None,
+    comparison_period: str = "quarter",
+    previous_trends_df: pd.DataFrame | None = None,
 ) -> Dict | None:
-    matched = TrendsLoader.match_terms(trends_df, terms, trend_aliases=trend_aliases)
-    if matched.empty:
+    matched_current = TrendsLoader.match_terms(trends_df, terms, trend_aliases=trend_aliases)
+    if matched_current.empty:
         return None
 
-    monthly = (
-        matched.groupby("month_start", as_index=False)["value"]
-        .mean()
-        .sort_values("month_start")
-        .reset_index(drop=True)
+    matched_prior = (
+        TrendsLoader.match_terms(previous_trends_df, terms, trend_aliases=trend_aliases)
+        if previous_trends_df is not None
+        else matched_current
     )
+
+    monthly = _monthly_average(matched_current)
+    prior_monthly = _monthly_average(matched_prior)
     if monthly.empty:
         return None
 
-    current_mask = (monthly["month_start"] >= quarter.start) & (monthly["month_start"] <= quarter.end)
-    prior_mask = (
-        (monthly["month_start"] >= quarter.prior_year_same_quarter.start)
-        & (monthly["month_start"] <= quarter.prior_year_same_quarter.end)
-    )
-    current_df = monthly[current_mask].copy()
-    prior_df = monthly[prior_mask].copy()
+    current_start, current_end, prior_start, prior_end = _comparison_windows(quarter, comparison_period)
+    current_df = monthly[(monthly["month_start"] >= current_start) & (monthly["month_start"] <= current_end)].copy()
+    prior_df = prior_monthly[(prior_monthly["month_start"] >= prior_start) & (prior_monthly["month_start"] <= prior_end)].copy()
     if current_df.empty:
         return None
 
+    current_lookup = current_df.set_index("month_start")["value"].to_dict()
     prior_lookup = prior_df.assign(month_num=prior_df["month_start"].dt.month).set_index("month_num")["value"].to_dict()
     comparison_rows: List[Dict] = []
-    for _, row in current_df.iterrows():
-        month_num = int(row["month_start"].month)
+    for month_start in pd.date_range(current_start, current_end, freq="MS"):
+        month_num = int(month_start.month)
         comparison_rows.append(
             {
-                "month_start": row["month_start"],
-                "month_label": row["month_start"].strftime("%b"),
-                "current_value": float(row["value"]),
+                "month_start": month_start,
+                "month_label": month_start.strftime("%b"),
+                "current_value": _to_float_or_none(current_lookup.get(month_start)),
                 "prior_value": _to_float_or_none(prior_lookup.get(month_num)),
             }
         )
@@ -60,6 +61,7 @@ def build_trend_summary(
     peak_value = current_df["value"].max()
     peak_months = current_df[current_df["value"] == peak_value]["month_start"].dt.strftime("%b").tolist()
     classification = classify_trend(monthly)
+    period_label = "YTD" if comparison_period == "ytd" else "quarter"
 
     return {
         "name": name,
@@ -69,11 +71,36 @@ def build_trend_summary(
         "yoy_change": yoy_change,
         "peak_months": peak_months,
         "classification": classification,
-        "seasonality_summary": build_seasonality_summary(classification, peak_months),
+        "seasonality_summary": build_seasonality_summary(classification, peak_months, period_label=period_label),
         "comparison": comparison_df,
         "history": monthly,
-        "term_count": matched["normalized_term"].nunique(),
+        "term_count": matched_current["normalized_term"].nunique(),
+        "comparison_period": comparison_period,
+        "current_series_label": f"{quarter.year} YTD" if comparison_period == "ytd" else f"{quarter.label}",
+        "prior_series_label": f"{quarter.year - 1} YTD" if comparison_period == "ytd" else f"{quarter.prior_year_same_quarter.label}",
     }
+
+
+def _monthly_average(trends_df: pd.DataFrame) -> pd.DataFrame:
+    if trends_df is None or trends_df.empty:
+        return pd.DataFrame(columns=["month_start", "value"])
+    return (
+        trends_df.groupby("month_start", as_index=False)["value"]
+        .mean()
+        .sort_values("month_start")
+        .reset_index(drop=True)
+    )
+
+
+def _comparison_windows(quarter: QuarterInfo, comparison_period: str) -> tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]:
+    if comparison_period == "ytd":
+        return (
+            pd.Timestamp(quarter.year, 1, 1),
+            quarter.end,
+            pd.Timestamp(quarter.year - 1, 1, 1),
+            quarter.prior_year_same_quarter.end,
+        )
+    return quarter.start, quarter.end, quarter.prior_year_same_quarter.start, quarter.prior_year_same_quarter.end
 
 
 def classify_trend(monthly_df: pd.DataFrame) -> str:
@@ -100,11 +127,11 @@ def classify_trend(monthly_df: pd.DataFrame) -> str:
     return "flat"
 
 
-def build_seasonality_summary(classification: str, peak_months: List[str]) -> str:
+def build_seasonality_summary(classification: str, peak_months: List[str], *, period_label: str = "quarter") -> str:
     if classification == "seasonal / spiky" and peak_months:
         return f"Interest is concentrated around {', '.join(peak_months)}."
     if peak_months:
-        return f"Peak interest in the current quarter fell in {', '.join(peak_months)}."
+        return f"Peak interest in the current {period_label} period fell in {', '.join(peak_months)}."
     return "Seasonality is unclear from the available data."
 
 
@@ -114,8 +141,18 @@ def summarize_trends(
     brand_terms: Iterable[str],
     destination_configs: Iterable[Dict],
     trend_aliases: Dict[str, List[str]] | None = None,
+    comparison_period: str = "quarter",
+    previous_trends_df: pd.DataFrame | None = None,
 ) -> Dict[str, object]:
-    brand_summary = build_trend_summary(trends_df, "Brand", brand_terms, quarter, trend_aliases=trend_aliases)
+    brand_summary = build_trend_summary(
+        trends_df,
+        "Brand",
+        brand_terms,
+        quarter,
+        trend_aliases=trend_aliases,
+        comparison_period=comparison_period,
+        previous_trends_df=previous_trends_df,
+    )
 
     destination_summaries: List[Dict] = []
     for destination in destination_configs:
@@ -123,7 +160,15 @@ def summarize_trends(
         terms = destination.get("terms", [])
         if not name or not terms:
             continue
-        summary = build_trend_summary(trends_df, name, terms, quarter, trend_aliases=trend_aliases)
+        summary = build_trend_summary(
+            trends_df,
+            name,
+            terms,
+            quarter,
+            trend_aliases=trend_aliases,
+            comparison_period=comparison_period,
+            previous_trends_df=previous_trends_df,
+        )
         if summary is not None:
             destination_summaries.append(summary)
 

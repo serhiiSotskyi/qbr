@@ -20,6 +20,7 @@ Important disambiguation
 - "Other Summary" in the PERFORMANCE block is channel/campaign-type Other.
 - "Other Summary + YoY" in the destination block is destination Other.
 - "Other (Destination) Top 10 campaigns" is an optional destination Other supporting section generated when Google/MS campaign exports are uploaded.
+- UK "Central Asia & Mongolia" destination sections are expected when those rows exist in source data; Central Asia and Mongolia are not part of destination Other.
 - The handoff must explicitly warn Claude not to use Performance Other data for destination Other slides.
 
 Expected common section order for Wendy Wu QBR
@@ -50,18 +51,21 @@ Expected common section order for Wendy Wu QBR
 25. India Summary + YoY
 26. India Monthly Trend
 27. India Campaign Mix
-28. Other Summary + YoY
-29. Other Monthly Trend
-30. Other Campaign Mix
-31. Other (Destination) Top 10 campaigns (optional)
-32. GOOGLE TRENDS divider
-33. Brand terms trend
-34. Japan Demand Trend
-35. China Demand Trend
-36. AUCTION INSIGHTS divider
-37. Brand coverage is very strong
-38. RECOMMENDATIONS divider
-39. Recommendations / Next Steps
+28. Central Asia & Mongolia Summary + YoY (UK only, when present)
+29. Central Asia & Mongolia Monthly Trend (UK only, when present)
+30. Central Asia & Mongolia Campaign Mix (UK only, when present)
+31. Other Summary + YoY
+32. Other Monthly Trend
+33. Other Campaign Mix
+34. Other (Destination) Top 10 campaigns (optional)
+35. GOOGLE TRENDS divider
+36. Brand terms trend or {{client_display_name}} Terms Are Growing
+37. Japan Demand Trend
+38. China Demand Trend
+39. AUCTION INSIGHTS divider
+40. Brand coverage is very strong
+41. RECOMMENDATIONS divider
+42. Recommendations / Next Steps
 
 Validation checks
 - The generated index should not fail if a future report has an extra section.

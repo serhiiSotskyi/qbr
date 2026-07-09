@@ -15,6 +15,7 @@ Slides to inspect
 - Channel monthly trend slides: 10, 12, 14, 16
 - Destination monthly trend slides: 19, 21, 23, 25
 - Destination summary slides that include campaign mix chart/table: 18, 20, 22, 24, 26, 27
+- UK-only Central Asia & Mongolia destination slide when present in SLIDE_MAPPING.csv
 - Auction Insights: 29
 
 Chart rendering rules
@@ -51,6 +52,11 @@ The result should match the Q1 reference slide proportions:
 - Legends should sit below the donuts with compact font size and enough spacing.
 - CPL bar chart value labels must be fully visible; no right-edge clipping.
 - The "Demand Gen" label may wrap only if it matches the reference quality and does not make the y-axis look crowded.
+
+Special check for Google Trends
+- When report.txt includes current YTD and previous YTD values, both lines must be visible on the same chart.
+- Use red for the current-year YTD line and grey for the previous-year YTD line.
+- Do not write exact search-volume claims when the source files are separate normalized Google Trends exports.
 
 Second-pass instruction
 If a chart cannot be made readable within the existing slot, prioritize legibility while preserving the template:

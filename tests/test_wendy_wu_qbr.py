@@ -13,7 +13,7 @@ from src.config_loader import ConfigLoader
 from src.data_loader import detect_latest_complete_month, detect_latest_complete_quarter, load_csv
 from src.metrics import prepare_report_data, validate_report_data
 from src.report_pipeline import ReportPipeline
-from utils.text_report import generate_text_report
+from utils.text_report import TextReportPipeline, generate_text_report
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,7 +35,8 @@ class WendyWuQbrTests(unittest.TestCase):
         for client_id, csv_path in FIXTURES.items():
             with self.subTest(client_id=client_id):
                 client_config, quarter, report, df = _prepare_report(client_id, csv_path)
-                current_df = df[(df["year"] == quarter.year) & (df["quarter"] == quarter.quarter)].copy()
+                expected_df = _apply_destination_aliases_for_test(df, client_config)
+                current_df = expected_df[(expected_df["year"] == quarter.year) & (expected_df["quarter"] == quarter.quarter)].copy()
 
                 self.assertIn("Other", report["available_destinations"])
                 self.assertNotIn("Brand", report["dest_mix"]["Other"]["Campaign Type"].tolist())
@@ -97,7 +98,8 @@ class WendyWuQbrTests(unittest.TestCase):
         for client_id, csv_path in FIXTURES.items():
             with self.subTest(client_id=client_id):
                 client_config, quarter, report, df = _prepare_report(client_id, csv_path)
-                current_df = df[(df["year"] == quarter.year) & (df["quarter"] == quarter.quarter)].copy()
+                expected_df = _apply_destination_aliases_for_test(df, client_config)
+                current_df = expected_df[(expected_df["year"] == quarter.year) & (expected_df["quarter"] == quarter.quarter)].copy()
 
                 overall_raw_cost = float(current_df["cost"].sum())
                 campaign_cost = sum(scope["total"]["Cost"] for scope in report["campaigns"].values())
@@ -256,6 +258,30 @@ class WendyWuQbrTests(unittest.TestCase):
         self.assertNotIn("Central Asia & Mongolia", australia_report["available_destinations"])
         self.assertAlmostEqual(australia_report["destinations"]["Other"]["total"]["Cost"], 900.0)
 
+    def test_destination_campaign_mix_includes_inline_yoy_for_cost_and_leads(self) -> None:
+        csv_path = _write_central_asia_fixture()
+        client_config, quarter, report, _ = _prepare_report("wendy_wu", csv_path)
+
+        report_text = generate_text_report(
+            report,
+            campaigns=report["available_campaigns"],
+            other_inputs_if_needed={
+                "client_name": client_config["name"],
+                "report_title": client_config["report_title"],
+                "agency_name": client_config["agency"],
+                "subtitle": f"{quarter.label} ({quarter.start.strftime('%b')} - {quarter.end.strftime('%b %Y')})",
+                "client_config": client_config,
+                "config_loader": CONFIG_LOADER,
+                "trends_summary": None,
+                "auction_summary": None,
+                "recommendations": [],
+            },
+        )
+
+        mix_section = _extract_section(report_text, "Central Asia & Mongolia Campaign Mix")
+        self.assertIn("£600.00 (+100%)", mix_section)
+        self.assertIn("60 (+100%)", mix_section)
+
     def test_uk_pptx_adds_central_asia_mongolia_destination_slides(self) -> None:
         csv_path = _write_central_asia_fixture()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -273,6 +299,34 @@ class WendyWuQbrTests(unittest.TestCase):
             self.assertIn("Central Asia & Mongolia Monthly Trend", titles)
             self.assertIn("Central Asia & Mongolia Campaign Mix", titles)
 
+    def test_uk_qbr_text_report_uses_ytd_trend_pair_uploads(self) -> None:
+        csv_path = _write_monthly_fixture()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            current_trends = root / "current_trends"
+            previous_trends = root / "previous_trends"
+            current_trends.mkdir()
+            previous_trends.mkdir()
+            _write_trend_csv(current_trends / "brand_current.csv", "wendy wu tours", 2026, [10, 20, 30, 40, 50, 60])
+            _write_trend_csv(previous_trends / "brand_previous.csv", "wendy wu tours", 2025, [5, 10, 15, 20, 25, 30])
+
+            report_txt = root / "report.txt"
+            TextReportPipeline(project_root=ROOT).run(
+                input_csv=csv_path,
+                output_txt=report_txt,
+                client_id="wendy_wu",
+                trends_ytd_current_dir=current_trends,
+                trends_ytd_previous_dir=previous_trends,
+            )
+
+            report_text = report_txt.read_text(encoding="utf-8")
+
+        self.assertIn("Brand YTD demand has increased", report_text)
+        self.assertIn("Jan", report_text)
+        self.assertIn("Jun", report_text)
+        self.assertIn("60.0", report_text)
+        self.assertIn("30.0", report_text)
+
     def test_monthly_report_uses_latest_full_month_cards_and_ytd_tables(self) -> None:
         csv_path = _write_monthly_fixture()
         client_config = CONFIG_LOADER.get_client_config("wendy_wu")
@@ -285,6 +339,7 @@ class WendyWuQbrTests(unittest.TestCase):
             month,
             campaign_order=CONFIG_LOADER.get_campaign_types(client_config),
             destination_order=CONFIG_LOADER.get_destinations(client_config),
+            destination_aliases=client_config.get("destination_aliases"),
             destination_other_config=client_config.get("destination_other"),
             report_mode="monthly",
         )
@@ -333,10 +388,33 @@ def _prepare_report(client_id: str, csv_path: Path):
         quarter,
         campaign_order=CONFIG_LOADER.get_campaign_types(client_config),
         destination_order=CONFIG_LOADER.get_destinations(client_config),
+        destination_aliases=client_config.get("destination_aliases"),
         destination_other_config=client_config.get("destination_other"),
     )
     validate_report_data(report)
     return client_config, quarter, report, df
+
+
+def _apply_destination_aliases_for_test(df: pd.DataFrame, client_config: dict) -> pd.DataFrame:
+    aliases = client_config.get("destination_aliases") or {}
+    if not aliases:
+        return df.copy()
+
+    lookup = {}
+    for canonical, alias_values in aliases.items():
+        values = [canonical, *(alias_values or [])]
+        for value in values:
+            lookup[_normalize_destination_for_test(value)] = canonical
+
+    expected = df.copy()
+    expected["destination"] = expected["destination"].map(
+        lambda value: lookup.get(_normalize_destination_for_test(value), str(value).strip())
+    )
+    return expected
+
+
+def _normalize_destination_for_test(value: object) -> str:
+    return "".join(ch for ch in str(value).strip().lower() if ch.isalnum())
 
 
 def _extract_section(report_text: str, section_title: str) -> str:
@@ -361,38 +439,43 @@ def _write_single_quarter_fixture() -> Path:
 
 def _write_central_asia_fixture() -> Path:
     rows = []
-    for month, central_cost, other_cost in [(1, 100, 50), (2, 200, 100), (3, 300, 150)]:
-        rows.extend(
-            [
-                {
-                    "Date": f"01/{month:02d}/2026",
-                    "Campaign Type": "Generic",
-                    "Destination": "China",
-                    "Impressions": 1000,
-                    "Clicks": 100,
-                    "Cost": 25,
-                    "Sales Leads": 5,
-                },
-                {
-                    "Date": f"01/{month:02d}/2026",
-                    "Campaign Type": "Generic",
-                    "Destination": "Central Asia & Mongolia",
-                    "Impressions": 2000,
-                    "Clicks": 200,
-                    "Cost": central_cost,
-                    "Sales Leads": 20,
-                },
-                {
-                    "Date": f"01/{month:02d}/2026",
-                    "Campaign Type": "Generic",
-                    "Destination": "Other",
-                    "Impressions": 1500,
-                    "Clicks": 150,
-                    "Cost": other_cost,
-                    "Sales Leads": 10,
-                },
-            ]
-        )
+    for year, factor in [(2025, 0.5), (2026, 1.0)]:
+        for month, central_cost, other_cost, central_destination in [
+            (1, 100, 50, "Central Asia"),
+            (2, 200, 100, "Mongolia"),
+            (3, 300, 150, "Central Asia & Mongolia"),
+        ]:
+            rows.extend(
+                [
+                    {
+                        "Date": f"01/{month:02d}/{year}",
+                        "Campaign Type": "Generic",
+                        "Destination": "China",
+                        "Impressions": 1000,
+                        "Clicks": 100,
+                        "Cost": 25 * factor,
+                        "Sales Leads": 5 * factor,
+                    },
+                    {
+                        "Date": f"01/{month:02d}/{year}",
+                        "Campaign Type": "Generic",
+                        "Destination": central_destination,
+                        "Impressions": 2000,
+                        "Clicks": 200,
+                        "Cost": central_cost * factor,
+                        "Sales Leads": 20 * factor,
+                    },
+                    {
+                        "Date": f"01/{month:02d}/{year}",
+                        "Campaign Type": "Generic",
+                        "Destination": "Other",
+                        "Impressions": 1500,
+                        "Clicks": 150,
+                        "Cost": other_cost * factor,
+                        "Sales Leads": 10 * factor,
+                    },
+                ]
+            )
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
         pd.DataFrame(rows).to_csv(tmp.name, index=False)
         return Path(tmp.name)
@@ -436,6 +519,11 @@ def _write_monthly_fixture() -> Path:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
         pd.DataFrame(rows).to_csv(tmp.name, index=False)
         return Path(tmp.name)
+
+
+def _write_trend_csv(path: Path, term: str, year: int, values: list[int]) -> None:
+    rows = [{"Date": f"{year}-{month:02d}-01", term: value} for month, value in enumerate(values, start=1)]
+    pd.DataFrame(rows).to_csv(path, index=False)
 
 
 def _pptx_text(pptx_path: Path) -> str:

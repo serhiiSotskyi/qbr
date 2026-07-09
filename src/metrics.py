@@ -26,16 +26,18 @@ def prepare_report_data(
     quarter: QuarterInfo | MonthInfo,
     campaign_order: List[str] | None = None,
     destination_order: List[str] | None = None,
+    destination_aliases: Dict[str, List[str]] | None = None,
     destination_other_config: Dict[str, Any] | None = None,
     report_mode: str = "quarterly",
 ) -> Dict:
+    working_df = _apply_destination_aliases(df, destination_aliases)
     include_revenue = "revenue" in df.columns
 
     is_monthly = report_mode == "monthly" or isinstance(quarter, MonthInfo)
-    current_df = _period_filter(df, quarter)
-    prior_df = _period_filter(df, quarter.prior_year_same_quarter)
-    previous_df = _period_filter(df, quarter.previous_month) if is_monthly and isinstance(quarter, MonthInfo) else None
-    table_df = _ytd_filter(df, quarter) if is_monthly else current_df
+    current_df = _period_filter(working_df, quarter)
+    prior_df = _period_filter(working_df, quarter.prior_year_same_quarter)
+    previous_df = _period_filter(working_df, quarter.previous_month) if is_monthly and isinstance(quarter, MonthInfo) else None
+    table_df = _ytd_filter(working_df, quarter) if is_monthly else current_df
     destination_other = destination_other_config or {}
 
     report = {
@@ -181,7 +183,7 @@ def compute_destination_metrics(df: pd.DataFrame, include_revenue: bool = True) 
     return _build_group_metrics(df, "destination", "Destination", include_revenue)
 
 
-def build_mix_table(df_subset: pd.DataFrame, include_revenue: bool) -> pd.DataFrame:
+def build_mix_table(df_subset: pd.DataFrame, include_revenue: bool, prior_df: pd.DataFrame | None = None) -> pd.DataFrame:
     grouped = compute_campaign_type_metrics(df_subset, include_revenue)
     if grouped.empty:
         return pd.DataFrame(columns=["Campaign Type", "Cost", "Sales Leads", "Cost Share", "Lead Share", "CPL"])
@@ -191,6 +193,17 @@ def build_mix_table(df_subset: pd.DataFrame, include_revenue: bool) -> pd.DataFr
     mix = grouped[["Campaign Type", "Cost", "Sales Leads", "CPL"]].copy()
     mix["Cost Share"] = np.where(total_cost > 0, mix["Cost"] / total_cost, np.nan)
     mix["Lead Share"] = np.where(total_leads > 0, mix["Sales Leads"] / total_leads, np.nan)
+    if prior_df is not None:
+        prior_grouped = compute_campaign_type_metrics(prior_df, include_revenue)
+        prior_lookup = (
+            prior_grouped[["Campaign Type", "Cost", "Sales Leads"]]
+            .rename(columns={"Cost": "Prior Cost", "Sales Leads": "Prior Sales Leads"})
+            if not prior_grouped.empty
+            else pd.DataFrame(columns=["Campaign Type", "Prior Cost", "Prior Sales Leads"])
+        )
+        mix = mix.merge(prior_lookup, on="Campaign Type", how="left")
+        mix["Cost YoY"] = mix.apply(lambda row: _pct_change(row["Cost"], row.get("Prior Cost")), axis=1)
+        mix["Sales Leads YoY"] = mix.apply(lambda row: _pct_change(row["Sales Leads"], row.get("Prior Sales Leads")), axis=1)
     return mix.sort_values("Cost", ascending=False).reset_index(drop=True)
 
 
@@ -332,7 +345,11 @@ def _build_destination_scopes(
             trend_df=trend_subset,
             previous_df=previous_subset,
         )
-        dest_mix[destination] = build_mix_table(trend_subset, include_revenue)
+        dest_mix[destination] = build_mix_table(
+            trend_subset,
+            include_revenue,
+            prior_df=prior_subset if not isinstance(quarter, MonthInfo) else None,
+        )
         available_destinations.append(destination)
         _validate_subset_not_global(
             subset_name=f"destination:{destination}",
@@ -384,7 +401,11 @@ def _build_destination_scopes(
             trend_df=other_trend,
             previous_df=other_previous if previous_df is not None else None,
         )
-        dest_mix[other_label] = build_mix_table(other_trend, include_revenue)
+        dest_mix[other_label] = build_mix_table(
+            other_trend,
+            include_revenue,
+            prior_df=other_prior if not isinstance(quarter, MonthInfo) else None,
+        )
         available_destinations.append(other_label)
         _validate_subset_not_global(
             subset_name=f"destination:{other_label}",
@@ -420,6 +441,32 @@ def _select_other_destination_rows(
         current_df[~current_df["destination"].isin(named)].copy(),
         prior_df[~prior_df["destination"].isin(named)].copy(),
     )
+
+
+def _apply_destination_aliases(df: pd.DataFrame, destination_aliases: Dict[str, List[str]] | None) -> pd.DataFrame:
+    if not destination_aliases:
+        return df.copy()
+
+    alias_lookup: dict[str, str] = {}
+    for canonical, aliases in destination_aliases.items():
+        canonical_value = str(canonical).strip()
+        if not canonical_value:
+            continue
+        alias_lookup[_normalize_destination(canonical_value)] = canonical_value
+        for alias in aliases or []:
+            alias_value = str(alias).strip()
+            if alias_value:
+                alias_lookup[_normalize_destination(alias_value)] = canonical_value
+
+    working = df.copy()
+    working["destination"] = working["destination"].map(
+        lambda value: alias_lookup.get(_normalize_destination(value), str(value).strip())
+    )
+    return working
+
+
+def _normalize_destination(value: Any) -> str:
+    return "".join(ch for ch in str(value).strip().lower() if ch.isalnum())
 
 
 def _build_group_metrics(df: pd.DataFrame, group_column: str, label: str, include_revenue: bool) -> pd.DataFrame:
@@ -525,6 +572,15 @@ def _validate_total_alignment(
         actual_value = float(actual_total.get(column, 0.0) or 0.0)
         if not np.isclose(expected_value, actual_value):
             raise ValueError(f"{label} do not match overall {column}: {expected_value} vs {actual_value}")
+
+
+def _pct_change(current: Any, prior: Any) -> float | None:
+    if current is None or prior is None or pd.isna(current) or pd.isna(prior):
+        return None
+    prior_value = float(prior)
+    if prior_value == 0:
+        return None
+    return (float(current) - prior_value) / prior_value
 
 
 def _quarter_filter(df: pd.DataFrame, q: QuarterInfo) -> pd.DataFrame:

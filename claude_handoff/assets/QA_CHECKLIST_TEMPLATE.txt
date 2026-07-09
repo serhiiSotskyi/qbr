@@ -18,9 +18,13 @@ Data integrity
 - All KPI values match report.txt Key Metrics and Total rows exactly.
 - All YoY values match report.txt exactly.
 - All tables match report.txt exactly, including n/a, currency symbols, percentages, and Total rows.
+- Destination campaign mix Cost and Sales Leads cells keep their inline YoY values where report.txt includes them.
 - All chart month labels match the period months in report.txt.
+- Google Trends charts show current YTD and previous YTD together when both series are present in report.txt.
 - Campaign Type Mix includes all campaign type rows from report.txt.
 - Destination summary slides include the campaign mix table for that destination when available.
+- UK Central Asia & Mongolia is treated as a core destination and is not included in destination Other.
+- Other top-campaign slides use only the uploaded campaign export section and exclude Brand, Japan, China, India, SE Asia, Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia.
 - Source "Other Summary" in the Performance section is not accidentally used for destination Other slides.
 
 Manual placeholders

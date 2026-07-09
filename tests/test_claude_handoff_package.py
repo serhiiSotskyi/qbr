@@ -49,6 +49,8 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
         self.assertIn("Do not use Performance Other data for destination Other slides.", source_index)
 
         self.assert_package_references_chart_qa(package)
+        self.assertIn("current YTD versus previous YTD", package.read("CLAUDE_PROMPT.txt").decode("utf-8"))
+        self.assertIn("inline YoY", package.read("QA_CHECKLIST.txt").decode("utf-8"))
         self.assert_no_text_occurrence(package, "Australia")
 
     def test_builds_australia_handoff_package_from_streamlit_fixture(self) -> None:
