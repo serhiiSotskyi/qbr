@@ -479,7 +479,7 @@ def build_slide_mapping_text(
         "required_action": (
             "UK-only inserted destination slide. Update KPI blocks, YoY values, commentary bullets, monthly trend visual, "
             "and campaign mix table using Central Asia & Mongolia data from report.txt. Preserve inline YoY in the "
-            "Cost and Sales Leads table cells and preserve the destination slide style."
+            "Cost, Sales Leads, Cost Share, Lead Share, and CPL table cells and preserve the destination slide style."
         ),
     }
 

@@ -613,7 +613,7 @@ PROMPTS = {
 
         Slide C: `[Geo] Campaign Mix`
         - preserve the campaign mix table exactly
-        - keep inline YoY values in the Cost and Sales Leads columns, e.g. `£14,021.32 (+26%)` and `120 (+114%)`
+        - keep inline YoY values in Cost, Sales Leads, Cost Share, Lead Share, and CPL cells, e.g. `£14,021.32 (+26%)`, `120 (+114%)`, `61.17% (+8%)`, and `£116.84 (-41%)`
         - create visuals for spend share, lead share, and CPL comparison
 
         TYPE 5 — GOOGLE TRENDS
@@ -775,13 +775,15 @@ PROMPTS = {
 
         Slide C: `[Geo] Campaign Mix`
         - preserve the campaign mix table exactly
+        - keep inline YoY values in Cost, Sales Leads, Cost Share, Lead Share, and CPL cells, e.g. `£14,021.32 (+26%)`, `120 (+114%)`, `61.17% (+8%)`, and `£116.84 (-41%)`
         - create visuals for spend share, lead share, and CPL comparison
 
         TYPE 5 — GOOGLE TRENDS
         For each trends section present:
         - create a demand trend slide
         - preserve bullets exactly
-        - visualize trend values
+        - visualize current YTD versus previous YTD on the same chart when both series are present
+        - treat separately uploaded Google Trends files as normalized index comparisons, not exact search-volume deltas
 
         TYPE 6 — AUCTION INSIGHTS
         Create:

@@ -18,7 +18,7 @@ Data integrity
 - All KPI values match report.txt Key Metrics and Total rows exactly.
 - All YoY values match report.txt exactly.
 - All tables match report.txt exactly, including n/a, currency symbols, percentages, and Total rows.
-- Destination campaign mix Cost and Sales Leads cells keep their inline YoY values where report.txt includes them.
+- Destination campaign mix Cost, Sales Leads, Cost Share, Lead Share, and CPL cells keep their inline YoY values where report.txt includes them.
 - All chart month labels match the period months in report.txt.
 - Google Trends charts show current YTD and previous YTD together when both series are present in report.txt.
 - Campaign Type Mix includes all campaign type rows from report.txt.

@@ -258,9 +258,9 @@ class WendyWuQbrTests(unittest.TestCase):
         self.assertNotIn("Central Asia & Mongolia", australia_report["available_destinations"])
         self.assertAlmostEqual(australia_report["destinations"]["Other"]["total"]["Cost"], 900.0)
 
-    def test_destination_campaign_mix_includes_inline_yoy_for_cost_and_leads(self) -> None:
-        csv_path = _write_central_asia_fixture()
-        client_config, quarter, report, _ = _prepare_report("wendy_wu", csv_path)
+    def test_destination_campaign_mix_includes_inline_yoy_for_all_visible_metrics(self) -> None:
+        csv_path = _write_destination_mix_yoy_fixture()
+        client_config, quarter, report, _ = _prepare_report("wendy_wu_australia", csv_path)
 
         report_text = generate_text_report(
             report,
@@ -278,9 +278,12 @@ class WendyWuQbrTests(unittest.TestCase):
             },
         )
 
-        mix_section = _extract_section(report_text, "Central Asia & Mongolia Campaign Mix")
+        mix_section = _extract_section(report_text, "China Campaign Mix")
         self.assertIn("£600.00 (+100%)", mix_section)
         self.assertIn("60 (+100%)", mix_section)
+        self.assertIn("66.67% (+33%)", mix_section)
+        self.assertIn("66.67% (+100%)", mix_section)
+        self.assertIn("£10.00 (+0%)", mix_section)
 
     def test_uk_pptx_adds_central_asia_mongolia_destination_slides(self) -> None:
         csv_path = _write_central_asia_fixture()
@@ -326,6 +329,34 @@ class WendyWuQbrTests(unittest.TestCase):
         self.assertIn("Jun", report_text)
         self.assertIn("60.0", report_text)
         self.assertIn("30.0", report_text)
+
+    def test_australia_qbr_text_report_uses_ytd_trend_pair_uploads(self) -> None:
+        csv_path = _write_monthly_fixture()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            current_trends = root / "current_trends"
+            previous_trends = root / "previous_trends"
+            current_trends.mkdir()
+            previous_trends.mkdir()
+            _write_trend_csv(current_trends / "brand_current.csv", "wendy wu tours", 2026, [12, 18, 24, 30, 36, 42])
+            _write_trend_csv(previous_trends / "brand_previous.csv", "wendy wu tours", 2025, [6, 9, 12, 15, 18, 21])
+
+            report_txt = root / "report.txt"
+            TextReportPipeline(project_root=ROOT).run(
+                input_csv=csv_path,
+                output_txt=report_txt,
+                client_id="wendy_wu_australia",
+                trends_ytd_current_dir=current_trends,
+                trends_ytd_previous_dir=previous_trends,
+            )
+
+            report_text = report_txt.read_text(encoding="utf-8")
+
+        self.assertIn("Brand YTD demand has increased", report_text)
+        self.assertIn("Jan", report_text)
+        self.assertIn("Jun", report_text)
+        self.assertIn("42.0", report_text)
+        self.assertIn("21.0", report_text)
 
     def test_monthly_report_uses_latest_full_month_cards_and_ytd_tables(self) -> None:
         csv_path = _write_monthly_fixture()
@@ -476,6 +507,22 @@ def _write_central_asia_fixture() -> Path:
                     },
                 ]
             )
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+        pd.DataFrame(rows).to_csv(tmp.name, index=False)
+        return Path(tmp.name)
+
+
+def _write_destination_mix_yoy_fixture() -> Path:
+    rows = []
+    for month in (1, 2, 3):
+        rows.extend(
+            [
+                {"Date": f"01/{month:02d}/2025", "Campaign Type": "Generic", "Destination": "China", "Impressions": 1000, "Clicks": 100, "Cost": 100, "Sales Leads": 10},
+                {"Date": f"01/{month:02d}/2025", "Campaign Type": "Demand Gen", "Destination": "China", "Impressions": 1000, "Clicks": 100, "Cost": 100, "Sales Leads": 20},
+                {"Date": f"01/{month:02d}/2026", "Campaign Type": "Generic", "Destination": "China", "Impressions": 1000, "Clicks": 100, "Cost": 200, "Sales Leads": 20},
+                {"Date": f"01/{month:02d}/2026", "Campaign Type": "Demand Gen", "Destination": "China", "Impressions": 1000, "Clicks": 100, "Cost": 100, "Sales Leads": 10},
+            ]
+        )
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
         pd.DataFrame(rows).to_csv(tmp.name, index=False)
         return Path(tmp.name)

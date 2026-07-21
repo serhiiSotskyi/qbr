@@ -538,7 +538,7 @@ def _load_trends_summary(
     trend_aliases = client_config.get("trend_aliases", {})
     if not brand_config.get("enabled") and not destination_config.get("enabled"):
         return None
-    use_ytd = client_config.get("id") == "wendy_wu"
+    use_ytd = client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}
     current_trends_dir = trends_ytd_current_dir if use_ytd and trends_ytd_current_dir else trends_dir
     if not current_trends_dir:
         return None
@@ -614,7 +614,18 @@ def _format_mix_table(mix_df: pd.DataFrame) -> pd.DataFrame:
     ]
     formatted["Cost Share"] = formatted["Cost Share"].map(_fmt_percent)
     formatted["Lead Share"] = formatted["Lead Share"].map(_fmt_percent)
-    formatted["CPL"] = formatted["CPL"].map(lambda value: f"£{value:,.2f}" if pd.notna(value) else "n/a")
+    formatted["Cost Share"] = [
+        f"{value}{_fmt_inline_yoy(yoy)}"
+        for value, yoy in zip(formatted["Cost Share"], formatted.get("Cost Share YoY", pd.Series([None] * len(formatted))))
+    ]
+    formatted["Lead Share"] = [
+        f"{value}{_fmt_inline_yoy(yoy)}"
+        for value, yoy in zip(formatted["Lead Share"], formatted.get("Lead Share YoY", pd.Series([None] * len(formatted))))
+    ]
+    formatted["CPL"] = [
+        f"{f'£{value:,.2f}' if pd.notna(value) else 'n/a'}{_fmt_inline_yoy(yoy)}"
+        for value, yoy in zip(formatted["CPL"], formatted.get("CPL YoY", pd.Series([None] * len(formatted))))
+    ]
     return formatted[["Campaign Type", "Cost", "Sales Leads", "Cost Share", "Lead Share", "CPL"]]
 
 

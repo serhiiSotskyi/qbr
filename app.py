@@ -294,10 +294,10 @@ def main() -> None:
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
     is_monthly_performance_only = report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
     auction_file = None if is_monthly_performance_only else st.file_uploader("Auction CSV", type=["csv"])
-    use_wendy_uk_ytd_trends = client_id == "wendy_wu" and report_mode == "quarterly"
+    use_wendy_wu_ytd_trends = client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly"
     trends_files = (
         []
-        if is_monthly_performance_only or use_wendy_uk_ytd_trends
+        if is_monthly_performance_only or use_wendy_wu_ytd_trends
         else st.file_uploader("Trends CSVs", type=["csv"], accept_multiple_files=True)
     )
     plan_workbook_file = None
@@ -334,18 +334,19 @@ def main() -> None:
                 type=["csv"],
                 help="Same-quarter-prior-year Auction Insights export, e.g. Q2 2025 for a Q2 2026 report. Used for Red Funnel YoY comparison.",
             )
-    elif use_wendy_uk_ytd_trends:
+    elif use_wendy_wu_ytd_trends:
+        market_label = "UK" if client_id == "wendy_wu" else "Australia"
         trends_current_ytd_files = st.file_uploader(
-            "Wendy Wu UK current YTD Google Trends CSVs",
+            f"Wendy Wu {market_label} current YTD Google Trends CSVs",
             type=["csv"],
             accept_multiple_files=True,
-            help="Upload current-year YTD Google Trends exports for Brand, Japan, and China terms.",
+            help="Upload current-year YTD Google Trends exports for the Wendy Wu brand and country/destination trend terms.",
         )
         trends_previous_ytd_files = st.file_uploader(
-            "Wendy Wu UK previous YTD Google Trends CSVs",
+            f"Wendy Wu {market_label} previous YTD Google Trends CSVs",
             type=["csv"],
             accept_multiple_files=True,
-            help="Upload matching prior-year YTD Google Trends exports for the same Brand, Japan, and China terms.",
+            help="Upload matching prior-year YTD Google Trends exports for the same brand and country/destination trend terms.",
         )
     other_campaign_files = []
     if client_id == "wendy_wu":

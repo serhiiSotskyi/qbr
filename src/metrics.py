@@ -195,15 +195,38 @@ def build_mix_table(df_subset: pd.DataFrame, include_revenue: bool, prior_df: pd
     mix["Lead Share"] = np.where(total_leads > 0, mix["Sales Leads"] / total_leads, np.nan)
     if prior_df is not None:
         prior_grouped = compute_campaign_type_metrics(prior_df, include_revenue)
-        prior_lookup = (
-            prior_grouped[["Campaign Type", "Cost", "Sales Leads"]]
-            .rename(columns={"Cost": "Prior Cost", "Sales Leads": "Prior Sales Leads"})
-            if not prior_grouped.empty
-            else pd.DataFrame(columns=["Campaign Type", "Prior Cost", "Prior Sales Leads"])
-        )
+        if not prior_grouped.empty:
+            prior_total_cost = float(prior_grouped["Cost"].sum())
+            prior_total_leads = float(prior_grouped["Sales Leads"].sum())
+            prior_lookup = prior_grouped[["Campaign Type", "Cost", "Sales Leads", "CPL"]].copy()
+            prior_lookup["Cost Share"] = np.where(prior_total_cost > 0, prior_lookup["Cost"] / prior_total_cost, np.nan)
+            prior_lookup["Lead Share"] = np.where(prior_total_leads > 0, prior_lookup["Sales Leads"] / prior_total_leads, np.nan)
+            prior_lookup = prior_lookup.rename(
+                columns={
+                    "Cost": "Prior Cost",
+                    "Sales Leads": "Prior Sales Leads",
+                    "CPL": "Prior CPL",
+                    "Cost Share": "Prior Cost Share",
+                    "Lead Share": "Prior Lead Share",
+                }
+            )
+        else:
+            prior_lookup = pd.DataFrame(
+                columns=[
+                    "Campaign Type",
+                    "Prior Cost",
+                    "Prior Sales Leads",
+                    "Prior CPL",
+                    "Prior Cost Share",
+                    "Prior Lead Share",
+                ]
+            )
         mix = mix.merge(prior_lookup, on="Campaign Type", how="left")
         mix["Cost YoY"] = mix.apply(lambda row: _pct_change(row["Cost"], row.get("Prior Cost")), axis=1)
         mix["Sales Leads YoY"] = mix.apply(lambda row: _pct_change(row["Sales Leads"], row.get("Prior Sales Leads")), axis=1)
+        mix["Cost Share YoY"] = mix.apply(lambda row: _pct_change(row["Cost Share"], row.get("Prior Cost Share")), axis=1)
+        mix["Lead Share YoY"] = mix.apply(lambda row: _pct_change(row["Lead Share"], row.get("Prior Lead Share")), axis=1)
+        mix["CPL YoY"] = mix.apply(lambda row: _pct_change(row["CPL"], row.get("Prior CPL")), axis=1)
     return mix.sort_values("Cost", ascending=False).reset_index(drop=True)
 
 

@@ -320,7 +320,7 @@ class ReportPipeline:
         trend_aliases = client_config.get("trend_aliases", {})
         if not brand_config.get("enabled") and not destination_config.get("enabled"):
             return None
-        use_ytd = client_config.get("id") == "wendy_wu"
+        use_ytd = client_config.get("id") in {"wendy_wu", "wendy_wu_australia"}
         current_trends_dir = trends_ytd_current_dir if use_ytd and trends_ytd_current_dir else trends_dir
         if not current_trends_dir:
             return None

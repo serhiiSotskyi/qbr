@@ -37,7 +37,7 @@ Hard requirements
 - For source inconsistencies, KPI blocks/tables/charts must use the Key Metrics and Total rows as authoritative.
 - Do not add extra slides for extra source sections.
 - Fold destination Campaign Mix sections into the matching destination summary slides.
-- Preserve inline YoY in destination campaign mix Cost and Sales Leads cells when report.txt includes it.
+- Preserve inline YoY in destination campaign mix Cost, Sales Leads, Cost Share, Lead Share, and CPL cells when report.txt includes it.
 - For UK reports, Central Asia & Mongolia is a core destination and must not be merged into destination Other.
 - Google Trends slides should use current YTD versus previous YTD on the same chart when both series are present; separate Google Trends exports are normalized index comparisons.
 - Use Other top-campaign data only from the uploaded Google/MS campaign export source section, excluding Brand, Japan, China, India, SE Asia, Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia.
