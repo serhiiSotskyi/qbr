@@ -23,6 +23,20 @@ DEFAULT_OTHER_EXCLUDE_TERMS = (
     "mongolia",
 )
 
+WENDY_WU_UK_OTHER_EXCLUDE_TERMS = DEFAULT_OTHER_EXCLUDE_TERMS
+WENDY_WU_AUSTRALIA_OTHER_EXCLUDE_TERMS = (
+    "brand",
+    "japan",
+    "china",
+    "india",
+    "se asia",
+    "vietnam",
+    "cambodia",
+    "thailand",
+    "malaysia",
+    "borneo",
+)
+
 CAMPAIGN_COLUMN_ALIASES = {"campaign", "campaignname"}
 LABEL_COLUMN_ALIASES = {"labels", "label"}
 CLICKS_COLUMN_ALIASES = {"clicks"}
@@ -112,6 +126,14 @@ def load_other_campaign_summary(
         "warnings": warnings,
         "top_n": top_n,
     }
+
+
+def get_wendy_wu_other_top_campaigns_config(client_id: str | None) -> dict[str, Any] | None:
+    if client_id == "wendy_wu":
+        return {"enabled": True, "top_n": 10, "exclude_terms": list(WENDY_WU_UK_OTHER_EXCLUDE_TERMS)}
+    if client_id == "wendy_wu_australia":
+        return {"enabled": True, "top_n": 10, "exclude_terms": list(WENDY_WU_AUSTRALIA_OTHER_EXCLUDE_TERMS)}
+    return None
 
 
 def parse_other_campaign_source(source_file: str | Path, *, exclude_terms: Sequence[str]) -> dict[str, Any]:

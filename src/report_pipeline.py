@@ -15,7 +15,7 @@ from .narrative_generator import (
     generate_scope_bullets,
     generate_trend_bullets,
 )
-from .other_campaigns import load_other_campaign_summary
+from .other_campaigns import get_wendy_wu_other_top_campaigns_config, load_other_campaign_summary
 from .recommendation_generator import generate_recommendations
 from .slide_builder import SlideBuilder
 from .trends_loader import TrendsLoader
@@ -366,6 +366,8 @@ class ReportPipeline:
 
     def _load_other_campaigns_summary(self, client_config: dict, other_campaigns_dir: str | Path | None) -> dict | None:
         config = client_config.get("other_top_campaigns", {})
+        if not config.get("enabled") and other_campaigns_dir:
+            config = get_wendy_wu_other_top_campaigns_config(client_config.get("id")) or config
         if not config.get("enabled") or not other_campaigns_dir:
             return None
         return load_other_campaign_summary(

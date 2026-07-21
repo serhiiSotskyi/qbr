@@ -20,6 +20,7 @@ from src.narrative_generator import (
 from src.other_campaigns import (
     describe_other_campaign_filter,
     format_other_top_campaigns_table,
+    get_wendy_wu_other_top_campaigns_config,
     load_other_campaign_summary,
 )
 from src.recommendation_generator import generate_recommendations
@@ -590,6 +591,8 @@ def _load_auction_summary(
 
 def _load_other_campaigns_summary(client_config: dict, other_campaigns_dir: str | Path | None) -> dict | None:
     config = client_config.get("other_top_campaigns", {})
+    if not config.get("enabled") and other_campaigns_dir:
+        config = get_wendy_wu_other_top_campaigns_config(client_config.get("id")) or config
     if not config.get("enabled") or not other_campaigns_dir:
         return None
     return load_other_campaign_summary(

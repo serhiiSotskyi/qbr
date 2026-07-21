@@ -9,7 +9,7 @@ from pptx import Presentation
 
 from src.other_campaigns import load_other_campaign_summary
 from src.report_pipeline import ReportPipeline
-from utils.text_report import TextReportPipeline
+from utils.text_report import TextReportPipeline, _load_other_campaigns_summary as load_text_other_campaigns_summary
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -182,6 +182,30 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
         self.assertNotIn("--", top_campaign_section)
         self.assertNotIn("AUS - Brand", top_campaign_section)
         self.assertNotIn("AUS - Generic - Japan", top_campaign_section)
+
+    def test_wendy_wu_australia_other_campaigns_have_runtime_fallback_when_config_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            other_dir = root / "other_campaigns"
+            other_dir.mkdir()
+            _write_aus_ms_campaign_export(other_dir / "aus_ms_campaigns.csv")
+            _write_aus_google_campaign_export(other_dir / "aus_google_campaigns.csv")
+
+            stale_config = {
+                "id": "wendy_wu_australia",
+                "other_top_campaigns": {"enabled": False, "top_n": 10, "exclude_terms": []},
+            }
+            pptx_summary = ReportPipeline(project_root=ROOT)._load_other_campaigns_summary(stale_config, other_dir)
+            text_summary = TextReportPipeline(project_root=ROOT)
+            report_summary = text_summary.config_loader.get_client_config("wendy_wu_australia")
+            report_summary["other_top_campaigns"] = {"enabled": False, "top_n": 10, "exclude_terms": []}
+            loaded_report_summary = load_text_other_campaigns_summary(report_summary, other_dir)
+
+        for summary in (pptx_summary, loaded_report_summary):
+            self.assertIsNotNone(summary)
+            assert summary is not None
+            self.assertIn("South Korea", summary["top_clicks"]["Campaign"].tolist())
+            self.assertNotIn("Japan", summary["top_clicks"]["Campaign"].tolist())
 
     def test_daily_time_series_without_campaign_names_does_not_create_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
