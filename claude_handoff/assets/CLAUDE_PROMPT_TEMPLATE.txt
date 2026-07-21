@@ -40,7 +40,7 @@ Hard requirements
 - Preserve inline YoY in destination campaign mix Cost, Sales Leads, Cost Share, Lead Share, and CPL cells when report.txt includes it.
 - For UK reports, Central Asia & Mongolia is a core destination and must not be merged into destination Other.
 - Google Trends slides should use current YTD versus previous YTD on the same chart when both series are present; separate Google Trends exports are normalized index comparisons.
-- Use Other top-campaign data only from the uploaded Google/MS campaign export source section, excluding Brand, Japan, China, India, SE Asia, Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia.
+- Use Other top-campaign data only from the uploaded Google/MS campaign export source section. Follow the exact exclusion list stated in the "Other campaign uploads exclude rows containing" line in report.txt.
 - Keep Testing and Other Updates as explicit manual placeholders unless report.txt provides those sections.
 - Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping; inspect full-slide screenshots/thumbnails after chart replacement.
 - Run QA_CHECKLIST.txt before returning.

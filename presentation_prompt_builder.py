@@ -813,6 +813,7 @@ PROMPTS = {
         - preserve the same repeated section logic as the UK Wendy Wu report
         - if a destination exists in the report, it must get the full 3-slide treatment
         - if a channel exists in the report, it must get the full 2-slide treatment
+        - Other top campaigns must come from the uploaded Google/MS campaign exports and must follow the exact exclusion list in report.txt
         - do not skip `Other` just because it is small
         - keep all YoY bullets exactly
         """

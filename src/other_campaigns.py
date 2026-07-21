@@ -32,6 +32,10 @@ CONVERSIONS_COLUMN_ALIASES = {"conv", "conversions", "conversion", "allconv", "a
 DATE_COLUMN_ALIASES = {"date", "day"}
 
 NOISE_CAMPAIGN_PARTS = {
+    "au",
+    "aus",
+    "au new",
+    "australia",
     "uk",
     "generic",
     "brand",
@@ -215,7 +219,8 @@ def _normalize_campaign_rows(
     rows = raw_df.copy()
     rows = rows[rows[campaign_col].notna()].copy()
     rows[campaign_col] = rows[campaign_col].astype(str).str.strip()
-    rows = rows[(rows[campaign_col] != "") & (rows[campaign_col] != "-")].copy()
+    placeholder_campaigns = {"", "-", "--", "—"}
+    rows = rows[~rows[campaign_col].str.strip().isin(placeholder_campaigns)].copy()
     rows = rows[~rows[campaign_col].str.lower().str.contains(r"\btotal\b", regex=True)].copy()
     if rows.empty:
         return _empty_campaign_rows()
@@ -255,7 +260,7 @@ def _normalize_daily_impressions(raw_df: pd.DataFrame, path: Path, *, date_col: 
 
 
 def _display_campaign_name(campaign_name: str, labels: str) -> str:
-    parts = [part.strip() for part in re.split(r"\s+-\s+", str(campaign_name)) if part.strip()]
+    parts = [part.strip() for part in re.split(r"\s+[-–—]\s+", str(campaign_name)) if part.strip()]
     for part in parts:
         if _normalize_label(part) in NOISE_CAMPAIGN_PARTS:
             continue
@@ -272,7 +277,7 @@ def _display_campaign_name(campaign_name: str, labels: str) -> str:
 def _clean_campaign_label(value: str) -> str:
     cleaned = re.sub(r"\([^)]*\)", "", str(value))
     cleaned = re.sub(r"\b(Phrase|Exact|Broad|General|Cities|City|Search)\b", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -–—")
     return cleaned or str(value).strip()
 
 

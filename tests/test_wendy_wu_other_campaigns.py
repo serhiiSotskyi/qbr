@@ -60,6 +60,48 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
         self.assertNotIn("central asia", other_raw_campaigns)
         self.assertNotIn("mongolia", other_raw_campaigns)
 
+    def test_other_campaign_parser_combines_australia_ms_and_google_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _write_aus_ms_campaign_export(root / "aus_ms_campaigns.csv")
+            _write_aus_google_campaign_export(root / "aus_google_campaigns.csv")
+
+            summary = load_other_campaign_summary(
+                root,
+                exclude_terms=[
+                    "brand",
+                    "japan",
+                    "china",
+                    "india",
+                    "se asia",
+                    "vietnam",
+                    "cambodia",
+                    "thailand",
+                    "malaysia",
+                    "borneo",
+                ],
+            )
+
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(summary["source_files"], ["aus_google_campaigns.csv", "aus_ms_campaigns.csv"])
+
+        top_click_names = summary["top_clicks"]["Campaign"].tolist()
+        self.assertIn("South Korea", top_click_names)
+        self.assertIn("Africa", top_click_names)
+        self.assertNotIn("AUS", top_click_names)
+        self.assertNotIn("AU", top_click_names)
+        self.assertNotIn("--", top_click_names)
+
+        top_sources = dict(zip(summary["top_clicks"]["Campaign"], summary["top_clicks"]["Sources"]))
+        self.assertEqual(top_sources["South Korea"], "Google Ads, Microsoft Ads")
+
+        other_raw_campaigns = " ".join(summary["other_campaign_rows"]["Raw Campaign"].tolist()).lower()
+        self.assertNotIn("brand", other_raw_campaigns)
+        self.assertNotIn("japan", other_raw_campaigns)
+        self.assertNotIn("china", other_raw_campaigns)
+        self.assertNotIn("india", other_raw_campaigns)
+
     def test_wendy_wu_pipeline_adds_other_top_campaigns_slide_from_uploads(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -98,6 +140,48 @@ class WendyWuOtherCampaignTests(unittest.TestCase):
         self.assertNotIn("Central Asia", report_text)
         self.assertNotIn("UK - Brand - Core", report_text)
         self.assertNotIn("UK - Generic - Vietnam", report_text)
+
+    def test_wendy_wu_australia_pipeline_adds_joint_other_top_campaigns_slide_from_uploads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            performance_csv = _write_performance_csv(root / "performance.csv")
+            other_dir = root / "other_campaigns"
+            other_dir.mkdir()
+            _write_aus_ms_campaign_export(other_dir / "aus_ms_campaigns.csv")
+            _write_aus_google_campaign_export(other_dir / "aus_google_campaigns.csv")
+            output_pptx = root / "wendy_wu_australia.pptx"
+
+            pipeline = ReportPipeline(project_root=ROOT)
+            pipeline.charts_root = root / "charts"
+            generated_pptx = pipeline.run(
+                input_csv=performance_csv,
+                output_pptx=output_pptx,
+                client_id="wendy_wu_australia",
+                other_campaigns_dir=other_dir,
+            )
+
+            text_pipeline = TextReportPipeline(project_root=ROOT)
+            report_txt = root / "report.txt"
+            text_pipeline.run(
+                input_csv=performance_csv,
+                output_txt=report_txt,
+                client_id="wendy_wu_australia",
+                other_campaigns_dir=other_dir,
+            )
+
+            pptx_text = _pptx_text(generated_pptx)
+            report_text = report_txt.read_text(encoding="utf-8")
+            top_campaign_section = _extract_section(report_text, "Other (Destination) Top 10 campaigns")
+
+        self.assertIn("Other (Destination) Top 10 campaigns", pptx_text)
+        self.assertIn("Other (Destination) Top 10 campaigns", report_text)
+        self.assertIn("Google Ads, Microsoft Ads", top_campaign_section)
+        self.assertIn("South Korea", top_campaign_section)
+        self.assertIn("Africa", top_campaign_section)
+        self.assertNotIn("AUS  Google Ads", top_campaign_section)
+        self.assertNotIn("--", top_campaign_section)
+        self.assertNotIn("AUS - Brand", top_campaign_section)
+        self.assertNotIn("AUS - Generic - Japan", top_campaign_section)
 
     def test_daily_time_series_without_campaign_names_does_not_create_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -159,6 +243,50 @@ def _write_google_time_series_export(path: Path) -> None:
         csv.writer(handle).writerows(rows)
 
 
+def _write_aus_ms_campaign_export(path: Path) -> None:
+    rows = [
+        ["Campaign report (April 01, 2026 - June 30, 2026)"],
+        ["Request Id: test"],
+        [],
+        ["Campaign ID", "Status", "Campaign", "Campaign Type", "Labels", "Clicks", "Impr.", "Spend", "Conv."],
+        ["1", "Enabled", "AUS - Brand - General", "Search", "Brand", "100", "1000", "10.00", "20"],
+        ["2", "Enabled", "AUS - Generic - Japan", "Search", "Japan", "500", "5000", "400.00", "60"],
+        ["3", "Enabled", "AUS - Generic - India", "Search", "Asia; India", "400", "4000", "300.00", "40"],
+        ["4", "Enabled", "AUS - Generic - South Korea", "Search", "Other; South Korea", "250", "2500", "125.00", "12"],
+        ["5", "Enabled", "AUS - Generic - Africa", "Search", "Africa; Other", "300", "3000", "90.00", "15"],
+        ["6", "Enabled", "AUS - Generic - Cruise Tours", "Search", "Cruise Tours; Other", "150", "1500", "80.00", "8"],
+        ["Overall total", "-", "-", "-", "-", "1700", "17000", "1005.00", "155"],
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows(rows)
+
+
+def _write_aus_google_campaign_export(path: Path) -> None:
+    rows = [
+        ["Campaign report"],
+        ["1 April 2026 - 30 June 2026"],
+        [
+            "Campaign status",
+            "Campaign",
+            "Cost",
+            "Impr.",
+            "Clicks",
+            "Conversions",
+            "Avg. CPC",
+            "Cost / conv.",
+        ],
+        ["Enabled", "AUS - Brand - Core", "120.00", "1,200", "120", "21.00", "1.00", "5.71"],
+        ["Enabled", "AUS - Generic - China", "500.00", "5,000", "600", "70.00", "0.83", "7.14"],
+        ["Enabled", "AUS - Generic - South Korea", "220.00", "2,200", "350", "19.00", "0.63", "11.58"],
+        ["Enabled", "AUS - Generic - Africa", "140.00", "1,400", "175", "9.00", "0.80", "15.56"],
+        ["Enabled", "AUS - Generic - Sri Lanka", "95.00", "950", "80", "4.00", "1.19", "23.75"],
+        ["Total: Campaigns", "--", "1075.00", "10,750", "1,325", "123.00", "0.81", "8.74"],
+        ["Total: Account", "", "1075.00", "10,750", "1,325", "123.00", "0.81", "8.74"],
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows(rows)
+
+
 def _write_performance_csv(path: Path) -> Path:
     rows = []
     for month in (4, 5, 6):
@@ -199,3 +327,11 @@ def _pptx_text(pptx_path: Path) -> str:
             if hasattr(shape, "text"):
                 chunks.append(shape.text)
     return "\n".join(chunks)
+
+
+def _extract_section(report_text: str, section_title: str) -> str:
+    start = report_text.find(section_title)
+    if start == -1:
+        return ""
+    next_divider = report_text.find("-" * 40, start + len(section_title))
+    return report_text[start:] if next_divider == -1 else report_text[start:next_divider]

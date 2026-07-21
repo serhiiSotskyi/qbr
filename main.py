@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trends-dir", help="Directory containing Google Trends CSV exports.")
     parser.add_argument("--trends-ytd-current-dir", help="Directory containing current YTD Google Trends CSV exports.")
     parser.add_argument("--trends-ytd-previous-dir", help="Directory containing previous YTD Google Trends CSV exports.")
-    parser.add_argument("--other-campaigns-dir", help="Directory containing Wendy Wu UK Google/MS campaign CSV exports for Other top-campaign slides.")
+    parser.add_argument("--other-campaigns-dir", help="Directory containing Wendy Wu Google/MS campaign CSV exports for Other top-campaign slides.")
     parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
     parser.add_argument(
         "--report-mode",

@@ -24,7 +24,7 @@ Data integrity
 - Campaign Type Mix includes all campaign type rows from report.txt.
 - Destination summary slides include the campaign mix table for that destination when available.
 - UK Central Asia & Mongolia is treated as a core destination and is not included in destination Other.
-- Other top-campaign slides use only the uploaded campaign export section and exclude Brand, Japan, China, India, SE Asia, Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia.
+- Other top-campaign slides use only the uploaded campaign export section and follow the exact exclusion list stated in report.txt.
 - Source "Other Summary" in the Performance section is not accidentally used for destination Other slides.
 
 Manual placeholders

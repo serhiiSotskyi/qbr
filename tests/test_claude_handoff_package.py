@@ -138,7 +138,11 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
 
         slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
         self.assertIn(
-            '27,Other (Destination) Top 10 campaigns,Other (Destination) Top 10 campaigns,"Update the two ranked campaign charts',
+            "27,Other (Destination) Top 10 campaigns,Other (Destination) Top 10 campaigns,Update the two ranked campaign charts",
+            slide_mapping,
+        )
+        self.assertIn(
+            "follow the exact exclusion list stated in the Other campaign uploads note",
             slide_mapping,
         )
 

@@ -349,12 +349,13 @@ def main() -> None:
             help="Upload matching prior-year YTD Google Trends exports for the same brand and country/destination trend terms.",
         )
     other_campaign_files = []
-    if client_id == "wendy_wu":
+    if client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly":
+        market_label = "UK" if client_id == "wendy_wu" else "Australia"
         other_campaign_files = st.file_uploader(
-            "Wendy Wu UK Other campaign exports",
+            f"Wendy Wu {market_label} Other campaign exports",
             type=["csv"],
             accept_multiple_files=True,
-            help="Optional Google Ads and Microsoft Ads campaign exports used to build the Other destination top-10 campaign slide.",
+            help="Upload both Google Ads and Microsoft Ads campaign exports to build the joint Other destination top-10 campaign slide.",
         )
 
     if "generated_bundle" not in st.session_state:

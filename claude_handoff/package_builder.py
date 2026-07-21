@@ -491,8 +491,8 @@ def build_slide_mapping_text(
                 "source_section_or_action": "Other (Destination) Top 10 campaigns",
                 "required_action": (
                     "Update the two ranked campaign charts from the Other top-campaign source section. "
-                    "Use the campaign-level Other definition from report.txt: exclude Brand, Japan, China, India, SE Asia, "
-                    "Vietnam, Cambodia, Thailand, Malaysia/Borneo, Central Asia, and Mongolia terms."
+                    "Use the campaign-level Other definition from report.txt and follow the exact exclusion list stated "
+                    "in the Other campaign uploads note."
                 ),
             }
         if include_central_asia_slide and slide_number == 26:
