@@ -631,7 +631,17 @@ def find_monthly_missing_sections(source_sections: list[WightlinkSourceSection])
 
 def find_monthly_extra_sections(source_sections: list[WightlinkSourceSection]) -> list[str]:
     qbr_only_prefixes = ("Google Trends", "Auction Insights")
-    qbr_only_titles = {"Trends", "Agenda", "Closing", "Thank You", "Testing", "Other Updates", "Next Steps"}
+    qbr_only_titles = {
+        "Trends",
+        "Agenda",
+        "Closing",
+        "Thank You",
+        "Testing",
+        "Other Updates",
+        "Next Steps",
+        "Other Month Summary",
+        "Other YTD Purchases and Revenue",
+    }
     extras = []
     for section in source_sections:
         if section.title in qbr_only_titles or section.title.startswith(qbr_only_prefixes):
@@ -767,8 +777,13 @@ Monthly rules
 - Use SLIDE_MAPPING.csv as the only target slide structure.
 - KPI cards show the selected month only.
 - KPI cards must include MoM, YoY, and Plan where report.txt provides them.
+- Spend/Cost MoM and YoY comparison text is always neutral grey, never red or green.
 - Plan comparisons are selected-month actuals versus selected-month plan.
 - Tables and charts show YTD through the selected month.
+- YTD tables belong on the preceding Month Summary slides.
+- Each YTD Purchases and Revenue slide must contain two YoY charts: Purchases current YTD vs prior-year YTD, and Revenue current YTD vs prior-year YTD.
+- Do not include the old combined Purchases-and-Revenue chart.
+- Do not include monthly campaign Other slides; monthly Wightlink includes All Performance, Brand, Generics, PMax, Ferry, and Routes where available.
 - Do not add Google Trends, Auction Insights, Red Funnel, Testing, Other Updates, Next Steps, Thank You, or other QBR-only slides unless those sections are present in SLIDE_MAPPING.csv.
 - Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
 - Remove all old Q1/Q2/quarterly wording from any reused visual reference objects.
@@ -817,9 +832,14 @@ Hard requirements
 - Do not add Google Trends, Auction Insights, Red Funnel, Testing, Other Updates, Next Steps, Thank You, or other QBR-only slides unless present in SLIDE_MAPPING.csv.
 - KPI cards show the selected month only.
 - KPI cards must show MoM, YoY, and Plan where report.txt provides them.
+- Spend/Cost MoM and YoY comparison text must be neutral grey, never red or green.
 - Plan comparisons are selected-month actuals versus selected-month plan.
 - Tables and charts show YTD through the selected month.
-- Include every Wightlink scope present in report.txt: All Performance, Brand, Generics, PMax, Other, Ferry, and Routes where available.
+- Put YTD tables on the preceding Month Summary slides.
+- Build each YTD Purchases and Revenue slide with two YoY charts: Purchases current YTD vs prior-year YTD, and Revenue current YTD vs prior-year YTD.
+- Do not include the old combined Purchases-and-Revenue chart.
+- Include every Wightlink scope present in report.txt: All Performance, Brand, Generics, PMax, Ferry, and Routes where available.
+- Do not add monthly campaign Other slides.
 - Preserve the Wightlink/Summon visual system: dark title/section slides, Wightlink accent colors, KPI cards, tables, footers, typography, chart placement, and spacing.
 - Remove all old Q1/Q2/quarterly wording from reused style objects.
 - Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping.
@@ -871,6 +891,11 @@ Data integrity
 - KPI cards use selected-month values only.
 - Plan comparisons are selected-month actuals versus selected-month plan.
 - Tables and charts use YTD data through the selected month.
+- Spend/Cost MoM and YoY comparison text is neutral grey, never red or green.
+- YTD tables are on the preceding Month Summary slides.
+- YTD Purchases and Revenue slides contain two YoY charts: Purchases and Revenue.
+- No old combined Purchases-and-Revenue chart remains.
+- No monthly campaign Other slides remain.
 - Every report.txt source section is represented in the deck.
 
 Visual fidelity
@@ -909,7 +934,7 @@ Target structure
 - Do not use old quarterly/QBR slide numbers.
 - {variables['reference_pptx_filename']} is a visual style reference only, not a structural map.
 
-YTD purchases and revenue chart slides to inspect
+YTD purchases and revenue YoY chart slides to inspect
 {_format_sections(chart_sections)}
 
 Summary slides with KPI cards to inspect
@@ -926,6 +951,7 @@ Chart rendering rules
 - Keep legends readable but compact; legends should not push charts smaller than the intended chart area.
 - For bar charts, make sure value labels are not clipped at the top or right edge. Increase the axis maximum or add margin.
 - Keep the Wightlink/Summon monthly color system and chart frame treatment.
+- Each YTD Purchases and Revenue slide must contain two readable charts: Purchases YoY and Revenue YoY.
 
 Required visual QA
 For every chart slide, create or inspect a full-slide screenshot/thumbnail after the chart replacement. The pass is not complete until each chart passes these checks:
@@ -961,9 +987,9 @@ def _monthly_slide_action(title: str) -> str:
     if title == "Performance":
         return "Keep as a divider or section header. Use monthly period labeling."
     if "Month Summary" in title:
-        return "Update selected-month KPI cards from report.txt. Include MoM, YoY, and Plan lines where provided. Preserve bullets exactly."
+        return "Update selected-month KPI cards from report.txt. Include MoM, YoY, and Plan lines where provided, keep Spend/Cost MoM and YoY text neutral grey, and place the YTD table on this slide. Preserve bullets exactly."
     if "YTD Purchases and Revenue" in title:
-        return "Create or replace the YTD purchases and purchase revenue chart from report.txt. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
+        return "Create or replace two YoY charts from report.txt: Purchases current YTD vs prior-year YTD and Revenue current YTD vs prior-year YTD. Do not use the old combined purchases/revenue chart. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
     if title == "Ferry & Routes":
         return "Keep as a divider if Ferry/Routes sections exist in report.txt."
     return "Represent this report.txt section exactly; do not add QBR-only content."

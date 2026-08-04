@@ -174,7 +174,10 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
 
         slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
         self.assertIn("Overall Month Summary", slide_mapping)
-        self.assertIn("Campaign Type YTD Mix", slide_mapping)
+        self.assertIn("Overall YTD CPL vs CVR", slide_mapping)
+        self.assertIn("Overall YTD Leads YoY", slide_mapping)
+        self.assertIn("Overall YTD Revenue YoY", slide_mapping)
+        self.assertNotIn("Campaign Type YTD Mix", slide_mapping)
         self.assertIn("China Month Summary + YoY", slide_mapping)
         self.assertNotIn("Google Trends", slide_mapping)
         self.assertNotIn("Auction Insights", slide_mapping)
@@ -185,7 +188,9 @@ class ClaudeHandoffPackageTests(unittest.TestCase):
 
         chart_qa = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
         self.assertIn("Monthly Chart QA Addendum", chart_qa)
-        self.assertIn("Slide 4: Overall YTD Trend", chart_qa)
+        self.assertIn("Slide 4: Overall YTD CPL vs CVR", chart_qa)
+        self.assertIn("Slide 5: Overall YTD Leads YoY", chart_qa)
+        self.assertIn("Slide 6: Overall YTD Revenue YoY", chart_qa)
         self.assertNotIn("Google Trends chart slides", chart_qa)
         self.assertNotIn("Auction Insights: 29", chart_qa)
         self.assert_package_references_chart_qa(package)
@@ -323,33 +328,42 @@ Jun 2026 (YTD Jan - Jun 2026)
 Key Metrics + MoM + YoY
 Cost £600.00 +20.00% +50.00%
 Sales Leads 60 +20.00% +50.00%
+Revenue £6,000.00 +20.00% +50.00%
 CPL £10.00 +0.00% +0.00%
 CVR 5.00% +0.00% +0.00%
-Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
-  Jan       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-  Feb       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-  Mar       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-  Apr       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-  May       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-  Jun       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-Total       6,000    600 10.00% £1.00   £600.00          60 £10.00 10.00%
+Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR   Revenue
+  Jan       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00% £1,000.00
+  Feb       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00% £1,000.00
+  Mar       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00% £1,000.00
+  Apr       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00% £1,000.00
+  May       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00% £1,000.00
+  Jun       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00% £1,000.00
+Total       6,000    600 10.00% £1.00   £600.00          60 £10.00 10.00% £6,000.00
 
 ----------------------------------------
 
-Overall YTD Trend
+Overall YTD CPL vs CVR
 Jun 2026 (YTD Jan - Jun 2026)
-Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
-  Jan       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-  Jun       1,000    100 10.00% £1.00   £100.00          10 £10.00 10.00%
-Total       6,000    600 10.00% £1.00   £600.00          60 £10.00 10.00%
+Month    CPL    CVR
+  Jan £10.00 10.00%
+  Jun £10.00 10.00%
+Total £10.00 10.00%
 
 ----------------------------------------
 
-Campaign Type YTD Mix
+Overall YTD Leads YoY
 Jun 2026 (YTD Jan - Jun 2026)
-Campaign Type    Cost Sales Leads Cost Share Lead Share    CPL
-        Brand £300.00          30     50.00%     50.00% £10.00
-      Generic £300.00          30     50.00%     50.00% £10.00
+Month Current YTD Leads Prior-year YTD Leads YoY
+  Jan                10                   8 +25.00%
+  Jun                10                   8 +25.00%
+
+----------------------------------------
+
+Overall YTD Revenue YoY
+Jun 2026 (YTD Jan - Jun 2026)
+Month Current YTD Revenue Prior-year YTD Revenue YoY
+  Jan           £1,000.00              £800.00 +25.00%
+  Jun           £1,000.00              £800.00 +25.00%
 
 ----------------------------------------
 
@@ -361,10 +375,24 @@ Sales Leads 30 +20.00% +50.00%
 
 ----------------------------------------
 
-Brand YTD Trend
+Brand YTD CPL vs CVR
 Jun 2026 (YTD Jan - Jun 2026)
 Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
   Jun       1,000    100 10.00% £1.00   £300.00          30 £10.00 10.00%
+
+----------------------------------------
+
+Brand YTD Leads YoY
+Jun 2026 (YTD Jan - Jun 2026)
+Month Current YTD Leads Prior-year YTD Leads YoY
+  Jun                30                  20 +50.00%
+
+----------------------------------------
+
+Brand YTD Revenue YoY
+Jun 2026 (YTD Jan - Jun 2026)
+Month Current YTD Revenue Prior-year YTD Revenue YoY
+  Jun           £3,000.00            £2,000.00 +50.00%
 
 ----------------------------------------
 
@@ -376,15 +404,22 @@ Sales Leads 30 +20.00% +50.00%
 
 ----------------------------------------
 
-China YTD Trend
+China YTD CPL vs CVR
 Jun 2026 (YTD Jan - Jun 2026)
 Month Impressions Clicks   CTR   CPC     Cost Sales Leads    CPL   CVR
   Jun       1,000    100 10.00% £1.00   £300.00          30 £10.00 10.00%
 
 ----------------------------------------
 
-China Campaign YTD Mix
+China YTD Leads YoY
 Jun 2026 (YTD Jan - Jun 2026)
-Campaign Type    Cost Sales Leads Cost Share Lead Share    CPL
-        Brand £300.00          30    100.00%    100.00% £10.00
+Month Current YTD Leads Prior-year YTD Leads YoY
+  Jun                30                  20 +50.00%
+
+----------------------------------------
+
+China YTD Revenue YoY
+Jun 2026 (YTD Jan - Jun 2026)
+Month Current YTD Revenue Prior-year YTD Revenue YoY
+  Jun           £3,000.00            £2,000.00 +50.00%
 """.strip()

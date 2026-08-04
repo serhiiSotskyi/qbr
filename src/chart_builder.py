@@ -10,6 +10,7 @@ import pandas as pd
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 
 class ChartBuilder:
@@ -34,6 +35,37 @@ class ChartBuilder:
         chart1 = self._plot_cpl_cvr(scope_key, monthly_table)
         chart2 = self._plot_cost_leads(scope_key, monthly_table)
         return {"cpl_cvr": chart1, "cost_leads": chart2}
+
+    def build_monthly_scope_trend_charts(
+        self,
+        scope_key: str,
+        monthly_table: pd.DataFrame,
+        prior_monthly_table: pd.DataFrame | None,
+        include_revenue: bool,
+    ) -> Dict[str, Path]:
+        charts = {
+            "cpl_cvr": self._plot_cpl_cvr(scope_key, monthly_table),
+            "leads_yoy": self._plot_yoy_metric(
+                scope_key,
+                monthly_table,
+                prior_monthly_table,
+                metric_col="Sales Leads",
+                title="Leads YoY",
+                suffix="leads_yoy",
+                value_format="number",
+            ),
+        }
+        if include_revenue:
+            charts["revenue_yoy"] = self._plot_yoy_metric(
+                scope_key,
+                monthly_table,
+                prior_monthly_table,
+                metric_col="Revenue",
+                title="Revenue YoY",
+                suffix="revenue_yoy",
+                value_format="currency",
+            )
+        return charts
 
     def build_mix_charts(self, scope_key: str, mix_df: pd.DataFrame) -> Dict[str, Path]:
         cost_path = self._plot_mix_pie(scope_key, mix_df, value_col="Cost", suffix="cost_share")
@@ -116,6 +148,84 @@ class ChartBuilder:
     def _plot_cost_leads(self, scope_key: str, monthly_table: pd.DataFrame) -> Path:
         out_path = self.charts_dir / f"{scope_key}_cost_leads.png"
         fig, ax1, ax2 = self.build_cost_leads_figure(monthly_table)
+
+        plt.tight_layout()
+        fig.savefig(out_path, dpi=180)
+        plt.close(fig)
+        return out_path
+
+    def _plot_yoy_metric(
+        self,
+        scope_key: str,
+        monthly_table: pd.DataFrame,
+        prior_monthly_table: pd.DataFrame | None,
+        *,
+        metric_col: str,
+        title: str,
+        suffix: str,
+        value_format: str,
+    ) -> Path:
+        out_path = self.charts_dir / f"{scope_key}_{suffix}.png"
+        if metric_col not in monthly_table.columns:
+            return self._plot_empty_state(out_path, f"No {metric_col} data")
+
+        current_df = monthly_table[monthly_table["Month"] != "Total"].copy()
+        if current_df.empty:
+            return self._plot_empty_state(out_path, f"No {metric_col} data")
+
+        months = current_df["Month"].tolist()
+        prior_df = pd.DataFrame()
+        if prior_monthly_table is not None and not prior_monthly_table.empty and metric_col in prior_monthly_table.columns:
+            prior_df = prior_monthly_table[prior_monthly_table["Month"] != "Total"].copy()
+            prior_df = prior_df.set_index("Month").reindex(months).reset_index()
+
+        current_values = pd.to_numeric(current_df[metric_col], errors="coerce").fillna(0).tolist()
+        prior_values = (
+            pd.to_numeric(prior_df[metric_col], errors="coerce").fillna(0).tolist()
+            if not prior_df.empty and metric_col in prior_df.columns
+            else [0] * len(months)
+        )
+        x_positions = list(range(len(months)))
+        width = 0.34
+
+        fig, ax = plt.subplots(figsize=self.figure_size)
+        current_bars = ax.bar(
+            [position - width / 2 for position in x_positions],
+            current_values,
+            width=width,
+            color=self.colors.get("trend_current", "#C32026"),
+            label="Current YTD",
+        )
+        prior_bars = ax.bar(
+            [position + width / 2 for position in x_positions],
+            prior_values,
+            width=width,
+            color=self.colors.get("trend_prior", "#8E8E8E"),
+            label="Prior-year YTD",
+        )
+
+        ax.set_title(title, fontsize=self.title_size)
+        ax.set_xlabel("Month", fontsize=self.body_size)
+        ax.set_ylabel(metric_col, fontsize=self.body_size)
+        ax.set_xticks(x_positions, months)
+        ax.tick_params(axis="both", labelsize=self.body_size)
+        ax.grid(axis="y", alpha=0.2)
+        if value_format == "currency":
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: self._format_currency_axis(value)))
+        else:
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.11), ncol=2, fontsize=self.body_size, frameon=False)
+
+        max_value = max([*current_values, *prior_values, 0])
+        ax.set_ylim(top=max_value * 1.18 if max_value > 0 else 1)
+        for bars in (current_bars, prior_bars):
+            labels = [
+                self._format_currency_label(float(bar.get_height()), abbreviated=True)
+                if value_format == "currency" and bar.get_height()
+                else f"{bar.get_height():,.0f}" if bar.get_height() else ""
+                for bar in bars
+            ]
+            ax.bar_label(bars, labels=labels, padding=3, fontsize=self.body_size - 1)
 
         plt.tight_layout()
         fig.savefig(out_path, dpi=180)
@@ -351,3 +461,12 @@ class ChartBuilder:
         if abs(numeric - round(numeric)) < 0.005:
             return f"{int(round(numeric)):,}"
         return f"{numeric:,.1f}"
+
+    @staticmethod
+    def _format_currency_axis(value: float) -> str:
+        absolute = abs(float(value))
+        if absolute >= 1_000_000:
+            return f"£{float(value) / 1_000_000:.1f}m"
+        if absolute >= 1_000:
+            return f"£{float(value) / 1_000:.0f}k"
+        return f"£{float(value):,.0f}"

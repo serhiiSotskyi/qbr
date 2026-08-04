@@ -11,6 +11,7 @@ from report_generator.parsers.wightlink_plan_parser import parse_wightlink_plan_
 from report_generator.pipelines.wightlink_pipeline import (
     _build_kpis,
     _build_monthly_purchases_revenue_bullets,
+    _build_yoy_metric_monthly_rows,
     _direction_text,
     _format_number,
     _format_plan_currency,
@@ -99,6 +100,7 @@ def _build_monthly_slides(
             previous_scope=performance.get("previous_month"),
             prior_scope=performance.get("prior_year"),
             ytd_scope=performance["ytd"],
+            prior_ytd_scope=performance.get("prior_ytd"),
             filename_prefix="all",
             plan_section=plan_section,
         )
@@ -108,7 +110,6 @@ def _build_monthly_slides(
         ("Brand", "Brand"),
         ("Generic", "Generics"),
         ("Performance Max", "PMax"),
-        ("Other", "Other"),
     ]
     for campaign_key, title in campaign_specs:
         ytd_scope = performance["campaigns_ytd"].get(campaign_key)
@@ -128,6 +129,7 @@ def _build_monthly_slides(
                 previous_scope=performance["campaigns_previous_month"].get(campaign_key),
                 prior_scope=performance["campaigns_prior_year"].get(campaign_key),
                 ytd_scope=ytd_scope,
+                prior_ytd_scope=performance["campaigns_prior_ytd"].get(campaign_key),
                 filename_prefix=_slug(title),
                 plan_section=None,
             )
@@ -150,6 +152,7 @@ def _build_monthly_slides(
                 previous_scope=performance["data_types_previous_month"].get(data_type),
                 prior_scope=performance["data_types_prior_year"].get(data_type),
                 ytd_scope=ytd_scope,
+                prior_ytd_scope=performance["data_types_prior_ytd"].get(data_type),
                 filename_prefix=_slug(data_type),
                 plan_section=None,
             )
@@ -172,6 +175,7 @@ def _build_monthly_scope_slides(
     previous_scope: dict[str, Any] | None,
     prior_scope: dict[str, Any] | None,
     ytd_scope: dict[str, Any],
+    prior_ytd_scope: dict[str, Any] | None,
     filename_prefix: str,
     plan_section: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
@@ -183,6 +187,7 @@ def _build_monthly_scope_slides(
             "title": f"{title} Month Summary",
             "subtitle": subtitle,
             "kpis": _build_kpis(current_scope, prior_scope, plan_section, previous_scope),
+            "table": {"rows": ytd_scope.get("table_rows", [])},
             "bullets": _build_month_summary_bullets(month_label, current_scope, previous_scope, prior_scope, plan_section),
             "source_note": "Source: Uploaded performance CSV",
         },
@@ -192,6 +197,7 @@ def _build_monthly_scope_slides(
             title=title,
             subtitle=subtitle,
             ytd_scope=ytd_scope,
+            prior_ytd_scope=prior_ytd_scope,
             filename_prefix=filename_prefix,
         ),
     ]
@@ -204,12 +210,27 @@ def _build_ytd_purchases_revenue_slide(
     title: str,
     subtitle: str,
     ytd_scope: dict[str, Any],
+    prior_ytd_scope: dict[str, Any] | None,
     filename_prefix: str,
 ) -> dict[str, Any]:
-    chart = ppt_builder.build_monthly_purchases_revenue_chart(
-        ytd_scope,
-        f"{filename_prefix}_ytd_purchases_revenue.png",
-        "YTD Purchases and Revenue",
+    purchase_chart = ppt_builder.build_yoy_bar_chart(
+        _build_yoy_metric_monthly_rows(ytd_scope, prior_ytd_scope, "purchases"),
+        f"{filename_prefix}_ytd_purchases_yoy.png",
+        "current_purchases",
+        "prior_purchases",
+        "YTD Purchases YoY",
+        "Current YTD Purchases",
+        "Prior-year YTD Purchases",
+    )
+    revenue_chart = ppt_builder.build_yoy_bar_chart(
+        _build_yoy_metric_monthly_rows(ytd_scope, prior_ytd_scope, "purchase_revenue"),
+        f"{filename_prefix}_ytd_revenue_yoy.png",
+        "current_purchase_revenue",
+        "prior_purchase_revenue",
+        "YTD Revenue YoY",
+        "Current YTD Revenue",
+        "Prior-year YTD Revenue",
+        value_format="currency",
     )
     return {
         "type": "wide_chart_bullets",
@@ -217,11 +238,29 @@ def _build_ytd_purchases_revenue_slide(
         "section_title": f"{title} YTD Purchases and Revenue",
         "title": f"{title} YTD Purchases and Revenue",
         "subtitle": subtitle,
-        "charts": [build_chart_spec("YTD Purchases and Revenue", chart, ["Purchases", "Revenue"], "Bars")],
-        "table": {"rows": ytd_scope.get("table_rows", [])},
-        "bullets": _build_monthly_purchases_revenue_bullets(ytd_scope),
+        "charts": [
+            build_chart_spec("YTD Purchases YoY", purchase_chart, ["Current YTD Purchases", "Prior-year YTD Purchases"], "Bars"),
+            build_chart_spec("YTD Revenue YoY", revenue_chart, ["Current YTD Revenue", "Prior-year YTD Revenue"], "Bars"),
+        ],
+        "bullets": _build_ytd_purchases_revenue_yoy_bullets(ytd_scope, prior_ytd_scope),
         "source_note": "Source: Uploaded performance CSV",
     }
+
+
+def _build_ytd_purchases_revenue_yoy_bullets(ytd_scope: dict[str, Any], prior_ytd_scope: dict[str, Any] | None) -> list[str]:
+    bullets = _build_monthly_purchases_revenue_bullets(ytd_scope)
+    current_totals = ytd_scope.get("totals", {})
+    prior_totals = prior_ytd_scope.get("totals", {}) if prior_ytd_scope and prior_ytd_scope.get("has_data") else {}
+    if prior_totals:
+        purchases_delta = _pct_change(current_totals.get("purchases"), prior_totals.get("purchases"))
+        revenue_delta = _pct_change(current_totals.get("purchase_revenue"), prior_totals.get("purchase_revenue"))
+        if purchases_delta is not None:
+            bullets.append(f"YTD purchases were {_direction_text(purchases_delta)} versus prior-year YTD.")
+        if revenue_delta is not None:
+            bullets.append(f"YTD revenue was {_direction_text(revenue_delta)} versus prior-year YTD.")
+    else:
+        bullets.append("Prior-year YTD baseline was unavailable for the YoY chart.")
+    return bullets[:4]
 
 
 def _build_month_summary_bullets(

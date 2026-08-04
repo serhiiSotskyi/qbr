@@ -389,16 +389,19 @@ def _build_performance_section(
                 bullets=generate_scope_bullets("Overall", overall_scope),
             )
 
-        builder.add_trend_slide(
-            title=f"Overall {trend_word} Trend" if is_monthly else "Overall Performance Trend",
-            subtitle=subtitle,
-            table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
-            bullets=[] if use_kpi_cards else generate_overall_bullets(overall_scope, report["mix_overall"]),
-        )
+        if is_monthly:
+            _add_monthly_split_trend_sections(builder, "Overall", subtitle, overall_scope, report["include_revenue"])
+        else:
+            builder.add_trend_slide(
+                title="Overall Performance Trend",
+                subtitle=subtitle,
+                table_df=format_summary_table(overall_scope["monthly"], report["include_revenue"]),
+                bullets=[] if use_kpi_cards else generate_overall_bullets(overall_scope, report["mix_overall"]),
+            )
 
-    if config_loader.is_slide_enabled("campaign_mix", client_config):
+    if config_loader.is_slide_enabled("campaign_mix", client_config) and not is_monthly:
         builder.add_mix_slide(
-            title="Campaign Type YTD Mix" if is_monthly else "Campaign Type Mix",
+            title="Campaign Type Mix",
             subtitle=subtitle,
             table_df=_format_mix_table(report["mix_overall"]),
             bullets=generate_mix_bullets(report["mix_overall"], "overall"),
@@ -425,12 +428,15 @@ def _build_performance_section(
                     bullets=summary_bullets,
                 )
 
-            builder.add_trend_slide(
-                title=f"{campaign} {trend_word} Trend",
-                subtitle=subtitle,
-                table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
-                bullets=[] if use_kpi_cards else summary_bullets,
-            )
+            if is_monthly:
+                _add_monthly_split_trend_sections(builder, campaign, subtitle, scope, report["include_revenue"])
+            else:
+                builder.add_trend_slide(
+                    title=f"{campaign} {trend_word} Trend",
+                    subtitle=subtitle,
+                    table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
+                    bullets=[] if use_kpi_cards else summary_bullets,
+                )
 
     if config_loader.is_slide_enabled("destination_summary", client_config):
         for destination in report["available_destinations"]:
@@ -452,19 +458,22 @@ def _build_performance_section(
                     bullets=summary_bullets,
                 )
 
-            builder.add_trend_slide(
-                title=f"{destination} {trend_word} Trend",
-                subtitle=subtitle,
-                table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
-                bullets=[] if use_kpi_cards else summary_bullets,
-            )
+            if is_monthly:
+                _add_monthly_split_trend_sections(builder, destination, subtitle, scope, report["include_revenue"])
+            else:
+                builder.add_trend_slide(
+                    title=f"{destination} {trend_word} Trend",
+                    subtitle=subtitle,
+                    table_df=format_summary_table(scope["monthly"], report["include_revenue"]),
+                    bullets=[] if use_kpi_cards else summary_bullets,
+                )
 
-            builder.add_mix_slide(
-                title=f"{destination} Campaign YTD Mix" if is_monthly else f"{destination} Campaign Mix",
-                subtitle=subtitle,
-                table_df=_format_mix_table(report["dest_mix"][destination]),
-                bullets=generate_mix_bullets(report["dest_mix"][destination], destination),
-            )
+                builder.add_mix_slide(
+                    title=f"{destination} Campaign Mix",
+                    subtitle=subtitle,
+                    table_df=_format_mix_table(report["dest_mix"][destination]),
+                    bullets=generate_mix_bullets(report["dest_mix"][destination], destination),
+                )
 
             if destination == "Other" and other_campaigns_summary:
                 builder.add_other_top_campaigns_slide(
@@ -475,6 +484,34 @@ def _build_performance_section(
                     source_files=other_campaigns_summary.get("source_files", []),
                     excluded_terms=other_campaigns_summary.get("excluded_terms", []),
                 )
+
+
+def _add_monthly_split_trend_sections(
+    builder: TextReportBuilder,
+    title_prefix: str,
+    subtitle: str,
+    scope: dict,
+    include_revenue: bool,
+) -> None:
+    builder.add_trend_slide(
+        title=f"{title_prefix} YTD CPL vs CVR",
+        subtitle=subtitle,
+        table_df=_format_cpl_cvr_table(scope.get("monthly", pd.DataFrame())),
+        bullets=_build_cpl_cvr_bullets(scope),
+    )
+    builder.add_trend_slide(
+        title=f"{title_prefix} YTD Leads YoY",
+        subtitle=subtitle,
+        table_df=_format_yoy_metric_table(scope.get("monthly", pd.DataFrame()), scope.get("prior_monthly", pd.DataFrame()), "Sales Leads", "Leads"),
+        bullets=_build_yoy_metric_bullets(scope, "Sales Leads", "leads", _fmt_number),
+    )
+    if include_revenue:
+        builder.add_trend_slide(
+            title=f"{title_prefix} YTD Revenue YoY",
+            subtitle=subtitle,
+            table_df=_format_yoy_metric_table(scope.get("monthly", pd.DataFrame()), scope.get("prior_monthly", pd.DataFrame()), "Revenue", "Revenue"),
+            bullets=_build_yoy_metric_bullets(scope, "Revenue", "revenue", _fmt_currency),
+        )
 
 
 def _build_trends_section(
@@ -602,6 +639,85 @@ def _load_other_campaigns_summary(client_config: dict, other_campaigns_dir: str 
     )
 
 
+def _format_cpl_cvr_table(monthly_df: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(monthly_df, pd.DataFrame) or monthly_df.empty:
+        return pd.DataFrame(columns=["Month", "CPL", "CVR"])
+    columns = [column for column in ["Month", "CPL", "CVR"] if column in monthly_df.columns]
+    formatted = monthly_df[columns].copy()
+    if "CPL" in formatted.columns:
+        formatted["CPL"] = formatted["CPL"].map(_fmt_currency)
+    if "CVR" in formatted.columns:
+        formatted["CVR"] = formatted["CVR"].map(_fmt_percent)
+    return formatted
+
+
+def _format_yoy_metric_table(current_df: pd.DataFrame, prior_df: pd.DataFrame, metric: str, label: str) -> pd.DataFrame:
+    if not isinstance(current_df, pd.DataFrame) or current_df.empty or metric not in current_df.columns:
+        return pd.DataFrame(columns=["Month", f"Current YTD {label}", f"Prior-year YTD {label}", "YoY"])
+
+    current = current_df[current_df["Month"] != "Total"][["Month", metric]].copy()
+    prior = pd.DataFrame(columns=["Month", metric])
+    if isinstance(prior_df, pd.DataFrame) and not prior_df.empty and metric in prior_df.columns:
+        prior = prior_df[prior_df["Month"] != "Total"][["Month", metric]].copy()
+    prior = prior.rename(columns={metric: "Prior"})
+    rows = current.merge(prior, on="Month", how="left")
+    rows["YoY"] = rows.apply(lambda row: _pct_change(row.get(metric), row.get("Prior")), axis=1)
+
+    if metric == "Revenue":
+        rows[metric] = rows[metric].map(_fmt_currency)
+        rows["Prior"] = rows["Prior"].map(_fmt_currency)
+    else:
+        rows[metric] = rows[metric].map(_fmt_number)
+        rows["Prior"] = rows["Prior"].map(_fmt_number)
+    rows["YoY"] = rows["YoY"].map(_fmt_delta)
+    return rows.rename(
+        columns={
+            metric: f"Current YTD {label}",
+            "Prior": f"Prior-year YTD {label}",
+        }
+    )[["Month", f"Current YTD {label}", f"Prior-year YTD {label}", "YoY"]]
+
+
+def _build_cpl_cvr_bullets(scope: dict) -> list[str]:
+    monthly = scope.get("monthly", pd.DataFrame())
+    cpl = _total_metric(monthly, "CPL")
+    cvr = _total_metric(monthly, "CVR")
+    bullets = [
+        f"YTD CPL closed at {_fmt_currency(cpl)}.",
+        f"YTD CVR closed at {_fmt_percent(cvr)}.",
+    ]
+    month_rows = monthly[monthly["Month"] != "Total"].copy() if isinstance(monthly, pd.DataFrame) and "Month" in monthly.columns else pd.DataFrame()
+    if not month_rows.empty and "CPL" in month_rows.columns and month_rows["CPL"].notna().any():
+        best_cpl = month_rows.loc[month_rows["CPL"].idxmin()]
+        bullets.append(f"{best_cpl['Month']} was the strongest YTD month for CPL.")
+    return bullets
+
+
+def _build_yoy_metric_bullets(scope: dict, metric: str, label: str, formatter) -> list[str]:
+    current_value = _total_metric(scope.get("monthly", pd.DataFrame()), metric)
+    prior_value = _total_metric(scope.get("prior_monthly", pd.DataFrame()), metric)
+    delta = _pct_change(current_value, prior_value)
+    if delta is None:
+        return [f"Current YTD {label} total is {formatter(current_value)}; prior-year YTD baseline is unavailable."]
+    direction = "up" if delta >= 0 else "down"
+    return [
+        (
+            f"Current YTD {label} is {formatter(current_value)} versus "
+            f"{formatter(prior_value)} in prior-year YTD ({direction} {abs(delta) * 100:.1f}%)."
+        )
+    ]
+
+
+def _total_metric(table_df: pd.DataFrame, metric: str) -> float | None:
+    if not isinstance(table_df, pd.DataFrame) or table_df.empty or metric not in table_df.columns or "Month" not in table_df.columns:
+        return None
+    total_rows = table_df[table_df["Month"] == "Total"]
+    if total_rows.empty:
+        return None
+    value = total_rows.iloc[0][metric]
+    return None if pd.isna(value) else float(value)
+
+
 def _format_mix_table(mix_df: pd.DataFrame) -> pd.DataFrame:
     if mix_df.empty:
         return pd.DataFrame(columns=["Campaign Type", "Cost", "Sales Leads", "Cost Share", "Lead Share", "CPL"])
@@ -654,10 +770,35 @@ def _fmt_percent(value: float | None) -> str:
     return f"{value * 100:.2f}%"
 
 
+def _fmt_currency(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"£{value:,.2f}"
+
+
+def _fmt_number(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{int(round(value)):,}"
+
+
+def _fmt_delta(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    sign = "+" if value >= 0 else ""
+    return f"{sign}{value * 100:.2f}%"
+
+
 def _fmt_inline_yoy(value: float | None) -> str:
     if value is None or pd.isna(value):
         return ""
     return f" ({value * 100:+.0f}%)"
+
+
+def _pct_change(current: float | None, prior: float | None) -> float | None:
+    if current is None or prior is None or pd.isna(current) or pd.isna(prior) or float(prior) == 0:
+        return None
+    return (float(current) - float(prior)) / float(prior)
 
 
 def _use_kpi_summary_cards(client_config: dict) -> bool:

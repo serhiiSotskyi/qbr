@@ -135,10 +135,18 @@ class SlideBuilder:
         subtitle: str,
         kpis: Sequence[dict],
         bullets: Iterable[str] | None = None,
+        table_df: pd.DataFrame | None = None,
     ) -> None:
         slide = self._new_slide()
         self._add_title(slide, title)
         self._add_subtitle(slide, subtitle)
+        if table_df is not None and not table_df.empty:
+            self._render_kpi_cards(slide, kpis, left=0.65, top=1.32, width=12.0, height=2.35)
+            self._render_table(slide, table_df, Inches(0.45), Inches(3.86), Inches(12.45), Inches(1.78))
+            if bullets:
+                self._add_bullets(slide, bullets, left=0.8, top=5.9, width=11.8, height=0.75)
+            return
+
         self._render_kpi_cards(slide, kpis, left=0.65, top=1.45, width=12.0, height=3.4)
         if bullets:
             self._add_bullets(slide, bullets, left=0.8, top=5.2, width=11.8, height=1.35)
@@ -375,29 +383,30 @@ class SlideBuilder:
             accent.fill.fore_color.rgb = self.accent
             accent.line.color.rgb = self.accent
 
+            compact = card_height < 1.45
             label_box = slide.shapes.add_textbox(
                 Inches(card_left + 0.14),
-                Inches(card_top + 0.16),
+                Inches(card_top + (0.11 if compact else 0.16)),
                 Inches(card_width - 0.28),
                 Inches(0.28),
             ).text_frame
             label_para = label_box.paragraphs[0]
             label_run = label_para.add_run()
             label_run.text = str(kpi.get("label", "Metric"))
-            label_run.font.size = Pt(10)
+            label_run.font.size = Pt(9 if compact else 10)
             label_run.font.bold = True
             label_run.font.color.rgb = self.text_secondary
 
             value_box = slide.shapes.add_textbox(
                 Inches(card_left + 0.14),
-                Inches(card_top + 0.48),
+                Inches(card_top + (0.36 if compact else 0.48)),
                 Inches(card_width - 0.28),
                 Inches(0.42),
             ).text_frame
             value_para = value_box.paragraphs[0]
             value_run = value_para.add_run()
             value_run.text = str(kpi.get("value", "n/a"))
-            value_run.font.size = Pt(20)
+            value_run.font.size = Pt(16 if compact else 20)
             value_run.font.bold = True
             value_run.font.color.rgb = self.text_primary
 
@@ -405,7 +414,9 @@ class SlideBuilder:
             if "mom_label" in kpi:
                 comparison_lines.append(("MoM", kpi.get("mom_label", "n/a"), kpi.get("mom")))
             comparison_lines.append(("YoY", kpi.get("yoy_label", "n/a"), kpi.get("yoy")))
-            first_line_top = card_top + card_height - (0.61 if len(comparison_lines) > 1 else 0.44)
+            first_line_top = card_top + card_height - (
+                0.48 if compact and len(comparison_lines) > 1 else 0.32 if compact else 0.61 if len(comparison_lines) > 1 else 0.44
+            )
             for line_index, (label, value, raw_value) in enumerate(comparison_lines):
                 comparison_box = slide.shapes.add_textbox(
                     Inches(card_left + 0.14),
@@ -540,6 +551,9 @@ class SlideBuilder:
 
     def _resolve_yoy_color(self, metric_key: str, yoy_value) -> RGBColor:
         if yoy_value is None or pd.isna(yoy_value):
+            return self.text_secondary
+
+        if metric_key.strip().lower() in {"cost", "spend"}:
             return self.text_secondary
 
         lower_is_better = {"Cost", "CPC", "CPL"}

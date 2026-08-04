@@ -268,6 +268,7 @@ class WightlinkQuarterlyTests(unittest.TestCase):
 
             parsed = parse_wightlink_monthly_performance_csv(csv_path)
             self.assertEqual(parsed["month"].label, "Jun 2026")
+            self.assertTrue(parsed["prior_ytd"]["has_data"])
 
             result = generate_wightlink_monthly_report(
                 csv_path,
@@ -287,13 +288,13 @@ class WightlinkQuarterlyTests(unittest.TestCase):
             "Generics YTD Purchases and Revenue",
             "PMax Month Summary",
             "PMax YTD Purchases and Revenue",
-            "Other Month Summary",
-            "Other YTD Purchases and Revenue",
             "Ferry & Routes",
             "Ferry Month Summary",
             "Routes Month Summary",
         ]:
             self.assertIn(expected, titles)
+        self.assertNotIn("Other Month Summary", titles)
+        self.assertNotIn("Other YTD Purchases and Revenue", titles)
 
         self.assertFalse(any("Google Trends" in str(title) or "Auction Insights" in str(title) for title in titles))
         self.assertEqual(result["json"]["report_type"], "monthly")
@@ -303,11 +304,15 @@ class WightlinkQuarterlyTests(unittest.TestCase):
         self.assertIn("Plan:", result["text"])
 
         overall_summary = next(slide for slide in result["slides"] if slide.get("section_title") == "All Performance Month Summary")
+        self.assertTrue(overall_summary.get("table", {}).get("rows"))
         for kpi in overall_summary["kpis"]:
             context = " ".join(kpi["context"])
             self.assertIn("MoM:", context, kpi["label"])
             self.assertIn("YoY:", context, kpi["label"])
             self.assertIn("Plan:", context, kpi["label"])
+        overall_ytd = next(slide for slide in result["slides"] if slide.get("section_title") == "All Performance YTD Purchases and Revenue")
+        self.assertEqual([chart["title"] for chart in overall_ytd["charts"]], ["YTD Purchases YoY", "YTD Revenue YoY"])
+        self.assertNotIn("table", overall_ytd)
 
 
 def _write_performance_csv(path: Path, include_data_type: bool) -> Path:

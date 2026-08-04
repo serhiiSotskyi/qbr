@@ -386,6 +386,8 @@ class WendyWuQbrTests(unittest.TestCase):
         kpis = {kpi["key"]: kpi for kpi in report["overall"]["kpis"]}
         self.assertIn("mom_label", kpis["Cost"])
         self.assertIn("yoy_label", kpis["Cost"])
+        self.assertIn("Revenue", kpis)
+        self.assertFalse(report["overall"]["prior_monthly"].empty)
 
     def test_monthly_pptx_uses_performance_only_sections(self) -> None:
         csv_path = _write_monthly_fixture()
@@ -402,9 +404,16 @@ class WendyWuQbrTests(unittest.TestCase):
 
             titles = _pptx_text(generated_path)
             self.assertIn("Overall Month Summary", titles)
-            self.assertIn("Campaign Type YTD Mix", titles)
+            self.assertIn("Overall YTD CPL vs CVR", titles)
+            self.assertIn("Overall YTD Leads YoY", titles)
+            self.assertIn("Overall YTD Revenue YoY", titles)
+            self.assertNotIn("Campaign Type YTD Mix", titles)
             self.assertIn("China Month Summary + YoY", titles)
-            self.assertIn("China YTD Trend", titles)
+            self.assertIn("China YTD CPL vs CVR", titles)
+            self.assertIn("China YTD Leads YoY", titles)
+            self.assertIn("China YTD Revenue YoY", titles)
+            self.assertIn("Central Asia & Mongolia Month Summary + YoY", titles)
+            self.assertNotIn("China Campaign YTD Mix", titles)
             self.assertNotIn("Google Trends", titles)
             self.assertNotIn("Auction Insights", titles)
             self.assertNotIn("Recommendations", titles)
@@ -542,6 +551,7 @@ def _write_monthly_fixture() -> Path:
                         "Clicks": 100 + month,
                         "Cost": 100 + month * (2 if year == 2026 else 1),
                         "Sales Leads": 10 + month,
+                        "Revenue": 1000 + month * (20 if year == 2026 else 10),
                     },
                     {
                         "Date": f"01/{month:02d}/{year}",
@@ -551,6 +561,7 @@ def _write_monthly_fixture() -> Path:
                         "Clicks": 80 + month,
                         "Cost": 80 + month * (3 if year == 2026 else 1),
                         "Sales Leads": 8 + month,
+                        "Revenue": 800 + month * (18 if year == 2026 else 9),
                     },
                     {
                         "Date": f"01/{month:02d}/{year}",
@@ -560,6 +571,7 @@ def _write_monthly_fixture() -> Path:
                         "Clicks": 60 + month,
                         "Cost": 60 + month,
                         "Sales Leads": 6 + month,
+                        "Revenue": 600 + month * (12 if year == 2026 else 6),
                     },
                 ]
             )

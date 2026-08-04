@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
+
 from .auction_loader import load_auction_csv
 from .auction_metrics import summarize_auction_insights
 from .chart_builder import ChartBuilder
@@ -129,13 +131,13 @@ class ReportPipeline:
         trend_word = "YTD" if is_monthly else "Monthly"
 
         if self.config_loader.is_slide_enabled("overview", client_config):
-            overall_charts = chart_builder.build_scope_trend_charts("overall", report["overall"]["monthly"])
             if use_kpi_cards:
                 builder.add_summary_cards_slide(
                     title=f"Overall {summary_word} Summary",
                     subtitle=subtitle,
                     kpis=report["overall"]["kpis"],
                     bullets=generate_overall_bullets(report["overall"], report["mix_overall"]),
+                    table_df=format_summary_table(report["overall"]["monthly"], report["include_revenue"]) if is_monthly else None,
                 )
             else:
                 overall_table = format_summary_table(report["overall"]["monthly"], report["include_revenue"])
@@ -146,19 +148,31 @@ class ReportPipeline:
                     bullets=generate_scope_bullets("Overall", report["overall"]),
                 )
 
-            builder.add_trend_slide(
-                title=f"Overall {trend_word} Trend" if is_monthly else "Overall Performance Trend",
-                subtitle=subtitle,
-                cpl_cvr_chart_path=overall_charts["cpl_cvr"],
-                cost_leads_chart_path=overall_charts["cost_leads"],
-                bullets=[] if use_kpi_cards else generate_overall_bullets(report["overall"], report["mix_overall"]),
-                use_template=not use_kpi_cards,
-            )
+            if is_monthly:
+                self._add_monthly_split_trend_slides(
+                    builder=builder,
+                    chart_builder=chart_builder,
+                    title_prefix="Overall",
+                    subtitle=subtitle,
+                    scope_key="overall",
+                    scope=report["overall"],
+                    include_revenue=report["include_revenue"],
+                )
+            else:
+                overall_charts = chart_builder.build_scope_trend_charts("overall", report["overall"]["monthly"])
+                builder.add_trend_slide(
+                    title="Overall Performance Trend",
+                    subtitle=subtitle,
+                    cpl_cvr_chart_path=overall_charts["cpl_cvr"],
+                    cost_leads_chart_path=overall_charts["cost_leads"],
+                    bullets=[] if use_kpi_cards else generate_overall_bullets(report["overall"], report["mix_overall"]),
+                    use_template=not use_kpi_cards,
+                )
 
-        if self.config_loader.is_slide_enabled("campaign_mix", client_config):
+        if self.config_loader.is_slide_enabled("campaign_mix", client_config) and not is_monthly:
             mix_charts = chart_builder.build_mix_charts("overall", report["mix_overall"])
             builder.add_mix_slide(
-                title="Campaign Type YTD Mix" if is_monthly else "Campaign Type Mix",
+                title="Campaign Type Mix",
                 subtitle=subtitle,
                 cost_mix_chart_path=mix_charts["cost_share"],
                 leads_mix_chart_path=mix_charts["leads_share"],
@@ -175,6 +189,7 @@ class ReportPipeline:
                         subtitle=subtitle,
                         kpis=scope["kpis"],
                         bullets=summary_bullets,
+                        table_df=format_summary_table(scope["monthly"], report["include_revenue"]) if is_monthly else None,
                     )
                 else:
                     table_df = format_summary_table(scope["monthly"], report["include_revenue"])
@@ -185,17 +200,28 @@ class ReportPipeline:
                         bullets=summary_bullets,
                     )
 
-                scope_charts = chart_builder.build_scope_trend_charts(
-                    f"campaign_{_slug(campaign)}", scope["monthly"]
-                )
-                builder.add_trend_slide(
-                    title=f"{campaign} {trend_word} Trend",
-                    subtitle=subtitle,
-                    cpl_cvr_chart_path=scope_charts["cpl_cvr"],
-                    cost_leads_chart_path=scope_charts["cost_leads"],
-                    bullets=[] if use_kpi_cards else summary_bullets,
-                    use_template=not use_kpi_cards,
-                )
+                if is_monthly:
+                    self._add_monthly_split_trend_slides(
+                        builder=builder,
+                        chart_builder=chart_builder,
+                        title_prefix=campaign,
+                        subtitle=subtitle,
+                        scope_key=f"campaign_{_slug(campaign)}",
+                        scope=scope,
+                        include_revenue=report["include_revenue"],
+                    )
+                else:
+                    scope_charts = chart_builder.build_scope_trend_charts(
+                        f"campaign_{_slug(campaign)}", scope["monthly"]
+                    )
+                    builder.add_trend_slide(
+                        title=f"{campaign} {trend_word} Trend",
+                        subtitle=subtitle,
+                        cpl_cvr_chart_path=scope_charts["cpl_cvr"],
+                        cost_leads_chart_path=scope_charts["cost_leads"],
+                        bullets=[] if use_kpi_cards else summary_bullets,
+                        use_template=not use_kpi_cards,
+                    )
 
         if self.config_loader.is_slide_enabled("destination_summary", client_config):
             for destination in report["available_destinations"]:
@@ -207,6 +233,7 @@ class ReportPipeline:
                         subtitle=subtitle,
                         kpis=scope["kpis"],
                         bullets=summary_bullets,
+                        table_df=format_summary_table(scope["monthly"], report["include_revenue"]) if is_monthly else None,
                     )
                 else:
                     table_df = format_summary_table(scope["monthly"], report["include_revenue"])
@@ -217,27 +244,38 @@ class ReportPipeline:
                         bullets=summary_bullets,
                     )
 
-                scope_charts = chart_builder.build_scope_trend_charts(
-                    f"destination_{_slug(destination)}", scope["monthly"]
-                )
-                builder.add_trend_slide(
-                    title=f"{destination} {trend_word} Trend",
-                    subtitle=subtitle,
-                    cpl_cvr_chart_path=scope_charts["cpl_cvr"],
-                    cost_leads_chart_path=scope_charts["cost_leads"],
-                    bullets=[] if use_kpi_cards else summary_bullets,
-                    use_template=not use_kpi_cards,
-                )
+                if is_monthly:
+                    self._add_monthly_split_trend_slides(
+                        builder=builder,
+                        chart_builder=chart_builder,
+                        title_prefix=destination,
+                        subtitle=subtitle,
+                        scope_key=f"destination_{_slug(destination)}",
+                        scope=scope,
+                        include_revenue=report["include_revenue"],
+                    )
+                else:
+                    scope_charts = chart_builder.build_scope_trend_charts(
+                        f"destination_{_slug(destination)}", scope["monthly"]
+                    )
+                    builder.add_trend_slide(
+                        title=f"{destination} {trend_word} Trend",
+                        subtitle=subtitle,
+                        cpl_cvr_chart_path=scope_charts["cpl_cvr"],
+                        cost_leads_chart_path=scope_charts["cost_leads"],
+                        bullets=[] if use_kpi_cards else summary_bullets,
+                        use_template=not use_kpi_cards,
+                    )
 
-                mix_df = report["dest_mix"][destination]
-                mix_charts = chart_builder.build_mix_charts(f"destination_{_slug(destination)}", mix_df)
-                builder.add_mix_slide(
-                    title=f"{destination} Campaign YTD Mix" if is_monthly else f"{destination} Campaign Mix",
-                    subtitle=subtitle,
-                    cost_mix_chart_path=mix_charts["cost_share"],
-                    leads_mix_chart_path=mix_charts["leads_share"],
-                    bullets=generate_mix_bullets(mix_df, destination),
-                )
+                    mix_df = report["dest_mix"][destination]
+                    mix_charts = chart_builder.build_mix_charts(f"destination_{_slug(destination)}", mix_df)
+                    builder.add_mix_slide(
+                        title=f"{destination} Campaign Mix",
+                        subtitle=subtitle,
+                        cost_mix_chart_path=mix_charts["cost_share"],
+                        leads_mix_chart_path=mix_charts["leads_share"],
+                        bullets=generate_mix_bullets(mix_df, destination),
+                    )
 
                 if destination == "Other" and other_campaigns_summary:
                     top_charts = chart_builder.build_other_top_campaign_charts(
@@ -251,6 +289,43 @@ class ReportPipeline:
                         clicks_chart_path=top_charts["top_clicks"],
                         conversions_chart_path=top_charts["top_conversions"],
                     )
+
+    def _add_monthly_split_trend_slides(
+        self,
+        *,
+        builder: SlideBuilder,
+        chart_builder: ChartBuilder,
+        title_prefix: str,
+        subtitle: str,
+        scope_key: str,
+        scope: dict,
+        include_revenue: bool,
+    ) -> None:
+        charts = chart_builder.build_monthly_scope_trend_charts(
+            scope_key,
+            scope["monthly"],
+            scope.get("prior_monthly"),
+            include_revenue,
+        )
+        builder.add_single_chart_slide(
+            title=f"{title_prefix} YTD CPL vs CVR",
+            subtitle=subtitle,
+            chart_path=charts["cpl_cvr"],
+            bullets=_build_cpl_cvr_bullets(scope),
+        )
+        builder.add_single_chart_slide(
+            title=f"{title_prefix} YTD Leads YoY",
+            subtitle=subtitle,
+            chart_path=charts["leads_yoy"],
+            bullets=_build_yoy_metric_bullets(scope, "Sales Leads", "leads", _format_number),
+        )
+        if include_revenue and "revenue_yoy" in charts:
+            builder.add_single_chart_slide(
+                title=f"{title_prefix} YTD Revenue YoY",
+                subtitle=subtitle,
+                chart_path=charts["revenue_yoy"],
+                bullets=_build_yoy_metric_bullets(scope, "Revenue", "revenue", _format_currency),
+            )
 
     def _build_trends_section(
         self,
@@ -385,6 +460,70 @@ def _slug(value: str) -> str:
         .replace("/", "_")
         .replace("-", "_")
     )
+
+
+def _build_cpl_cvr_bullets(scope: dict) -> list[str]:
+    monthly = scope.get("monthly", pd.DataFrame())
+    cpl = _total_metric(monthly, "CPL")
+    cvr = _total_metric(monthly, "CVR")
+    bullets = [
+        f"YTD CPL closed at {_format_currency(cpl)}.",
+        f"YTD CVR closed at {_format_percent(cvr)}.",
+    ]
+    month_rows = monthly[monthly["Month"] != "Total"].copy() if isinstance(monthly, pd.DataFrame) and "Month" in monthly.columns else pd.DataFrame()
+    if not month_rows.empty and "CPL" in month_rows.columns and month_rows["CPL"].notna().any():
+        best_cpl = month_rows.loc[month_rows["CPL"].idxmin()]
+        bullets.append(f"{best_cpl['Month']} was the strongest YTD month for CPL.")
+    return bullets
+
+
+def _build_yoy_metric_bullets(scope: dict, metric: str, label: str, formatter) -> list[str]:
+    current_value = _total_metric(scope.get("monthly", pd.DataFrame()), metric)
+    prior_value = _total_metric(scope.get("prior_monthly", pd.DataFrame()), metric)
+    delta = _pct_change(current_value, prior_value)
+    if delta is None:
+        return [f"Current YTD {label} total is {formatter(current_value)}; prior-year YTD baseline is unavailable."]
+    direction = "up" if delta >= 0 else "down"
+    return [
+        (
+            f"Current YTD {label} is {formatter(current_value)} versus "
+            f"{formatter(prior_value)} in prior-year YTD ({direction} {abs(delta) * 100:.1f}%)."
+        )
+    ]
+
+
+def _total_metric(table_df: pd.DataFrame, metric: str) -> float | None:
+    if not isinstance(table_df, pd.DataFrame) or table_df.empty or metric not in table_df.columns or "Month" not in table_df.columns:
+        return None
+    total_rows = table_df[table_df["Month"] == "Total"]
+    if total_rows.empty:
+        return None
+    value = total_rows.iloc[0][metric]
+    return None if pd.isna(value) else float(value)
+
+
+def _pct_change(current: float | None, prior: float | None) -> float | None:
+    if current is None or prior is None or pd.isna(current) or pd.isna(prior) or float(prior) == 0:
+        return None
+    return (float(current) - float(prior)) / float(prior)
+
+
+def _format_currency(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"£{value:,.2f}"
+
+
+def _format_number(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{int(round(value)):,}"
+
+
+def _format_percent(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{value * 100:.2f}%"
 
 
 def _use_kpi_summary_cards(client_config: dict) -> bool:

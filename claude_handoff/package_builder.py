@@ -570,7 +570,7 @@ Goal
 Transform the Streamlit output in this upload pack into a polished {{target_slide_count}}-slide monthly PPC report deck. The monthly structure is defined only by SLIDE_MAPPING.csv and report.txt.
 
 Files in this pack
-- report.txt: Source of truth for all {{period_label}} values, MoM/YoY card comparisons, YTD tables, YTD charts, bullets, and period labels.
+- report.txt: Source of truth for all {{period_label}} values, MoM/YoY card comparisons, selected-month KPI cards, YTD tables, split YTD charts, bullets, and period labels.
 - {{streamlit_pptx_filename}}: Streamlit-generated PowerPoint. Use it to understand structure and chart coverage.
 - {{reference_pptx_filename}}: QBR deck export for visual style only, if included. It is not the monthly slide map. Do not copy its slide order or QBR-only sections.
 - original_streamlit_prompt.txt: Monthly Streamlit prompt for background only. SLIDE_MAPPING.csv and this README override it if anything conflicts.
@@ -585,8 +585,13 @@ Monthly rules
 - Use SLIDE_MAPPING.csv as the only target slide structure.
 - KPI cards show the selected month only.
 - KPI cards must include both MoM and YoY where report.txt provides them.
+- Summary KPI cards and supporting YTD tables must include Revenue when report.txt provides it.
+- Spend/Cost MoM and YoY comparison text is always neutral grey, never red or green.
 - Tables and charts show YTD through the selected month.
+- YTD trend coverage is split into three slides per scope where revenue exists: CPL vs CVR, Leads YoY, and Revenue YoY.
+- Do not build the old combined Cost vs Leads monthly trend chart.
 - Include campaign type and destination breakdown sections from report.txt.
+- Do not add standalone Campaign Type YTD Mix or destination Campaign YTD Mix slides unless SLIDE_MAPPING.csv explicitly includes them.
 - Do not add Google Trends, Auction Insights, Testing, Other Updates, Next Steps, Thank You, or any other QBR-only slides unless those sections are present in SLIDE_MAPPING.csv.
 - Use report.txt values exactly. Do not recalculate or round differently unless resolving a source inconsistency.
 - Remove all old Q1/Q2/quarterly wording from any reused visual reference objects.
@@ -635,7 +640,11 @@ Hard requirements
 - Do not add Google Trends, Auction Insights, Testing, Other Updates, Next Steps, Thank You, or any other QBR-only slides unless present in SLIDE_MAPPING.csv.
 - KPI cards show the selected month only.
 - KPI cards must show MoM and YoY where report.txt provides them.
+- Summary KPI cards and supporting YTD tables must include Revenue when report.txt provides it.
+- Spend/Cost MoM and YoY comparison text must be neutral grey, never red or green.
 - Tables and charts show YTD through the selected month.
+- Build split YTD chart slides per scope: CPL vs CVR, Leads YoY, and Revenue YoY where report.txt includes revenue.
+- Do not build the old combined Cost vs Leads monthly trend chart.
 - Include every campaign type and destination section present in report.txt.
 - Use "{{client_display_name}}" where the market/client name appears.
 - Preserve the Wendy Wu/Summon visual system: dark backgrounds, red accents, KPI cards, tables, footers, typography, chart placement, and spacing.
@@ -675,8 +684,12 @@ Data integrity
 - KPI values match report.txt Key Metrics rows exactly.
 - MoM and YoY values match report.txt exactly.
 - KPI cards use selected-month values only.
+- Revenue appears in KPI cards and supporting YTD tables wherever report.txt includes Revenue.
+- Spend/Cost MoM and YoY comparison text is neutral grey, never red or green.
 - Tables and charts use YTD data through the selected month.
-- Campaign Type YTD Mix includes all campaign type rows from report.txt.
+- YTD trend coverage is split into CPL vs CVR, Leads YoY, and Revenue YoY slides where revenue is available.
+- No old combined Cost vs Leads monthly YTD chart remains.
+- No standalone Campaign Type YTD Mix or destination Campaign YTD Mix slides remain unless those sections are present in SLIDE_MAPPING.csv.
 - Destination sections include all destination rows present in report.txt.
 - Source "Other Summary" in the Performance section is not accidentally used for destination Other slides.
 
@@ -699,7 +712,9 @@ Final response
 
 def build_monthly_chart_qa_addendum_text(source_sections: list[SourceSection], variables: Mapping[str, str]) -> str:
     trend_sections = [
-        section for section in source_sections if "YTD Trend" in section.title
+        section
+        for section in source_sections
+        if any(label in section.title for label in ("YTD CPL vs CVR", "YTD Leads YoY", "YTD Revenue YoY", "YTD Trend"))
     ]
     mix_sections = [
         section
@@ -731,7 +746,7 @@ Target structure
 - Do not use old quarterly/QBR slide numbers.
 - {reference_pptx_filename} is a visual style reference only, not a structural map.
 
-YTD trend chart slides to inspect
+Split YTD trend chart slides to inspect
 {_format_sections(trend_sections)}
 
 YTD mix/chart slides to inspect
@@ -765,12 +780,11 @@ For every chart slide, create or inspect a full-slide screenshot/thumbnail after
 - The chart does not collide with bullets, table text, headers, footers, or logos.
 - The slide still reads as a monthly Wendy Wu report slide.
 
-Special check for Campaign Type YTD Mix
-- Campaign Type YTD Mix must use the YTD rows from report.txt.
-- Include all campaign types present in report.txt.
-- Donut or bar labels must be readable and not overlap.
-- CPL bar chart value labels must be fully visible; no right-edge clipping.
-- The "Demand Gen" label may wrap only if it remains readable and does not crowd the y-axis.
+Special checks for monthly split charts
+- CPL vs CVR slides must not include spend/cost bars.
+- Leads YoY slides must compare current YTD leads against prior-year YTD leads by month.
+- Revenue YoY slides must compare current YTD revenue against prior-year YTD revenue by month.
+- Do not recreate standalone Campaign Type YTD Mix or destination Campaign YTD Mix slides unless SLIDE_MAPPING.csv explicitly includes them.
 
 Second-pass instruction
 If a chart cannot be made readable within the existing slot, prioritize legibility while preserving the monthly deck style:
@@ -828,13 +842,20 @@ def _monthly_required_action(section_title: str) -> str:
         return "Keep as a divider or section header. Update client, period, and footer styling."
     if "Summary" in section_title:
         return (
-            "Update KPI cards from selected-month Key Metrics. Include MoM and YoY values exactly as shown. "
+            "Update KPI cards from selected-month Key Metrics. Include MoM and YoY values exactly as shown, "
+            "include Revenue when present, and keep Spend/Cost MoM and YoY text neutral grey. "
             "Use YTD table values for supporting tables and preserve bullets from report.txt."
         )
+    if "YTD CPL vs CVR" in section_title:
+        return "Create or replace the YTD CPL vs CVR chart from this section. Do not include spend/cost bars. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
+    if "YTD Leads YoY" in section_title:
+        return "Create or replace the YTD Leads YoY chart comparing current YTD with prior-year YTD by month. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
+    if "YTD Revenue YoY" in section_title:
+        return "Create or replace the YTD Revenue YoY chart comparing current YTD with prior-year YTD by month. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
     if "YTD Trend" in section_title:
-        return "Create or replace the YTD monthly trend chart from this section. Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt."
+        return "Legacy monthly trend section detected. Split it into CPL vs CVR, Leads YoY, and Revenue YoY if the report contains those split sections."
     if "YTD Mix" in section_title or "Campaign Mix" in section_title:
-        return "Update the YTD campaign mix table and visual using this section. Preserve all rows and totals from report.txt."
+        return "Only include this mix slide if SLIDE_MAPPING.csv explicitly contains it; otherwise the current monthly workflow removes standalone mix slides."
     if "Top 10 campaigns" in section_title:
         return "Update the ranked Other destination campaign charts and tables from this section."
     return "Update slide content from this source section and preserve report.txt values exactly."

@@ -189,6 +189,7 @@ class WightlinkPptxBuilder:
         title: str,
         current_label: str,
         prior_label: str,
+        value_format: str = "number",
     ) -> Path:
         output = self.charts_dir / filename
         if not monthly_rows:
@@ -221,13 +222,23 @@ class WightlinkPptxBuilder:
         )
         ax.set_title(title.upper(), fontsize=12, color="#888888", fontweight="bold")
         ax.set_xticks(list(x_positions), labels)
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+        ax.yaxis.set_major_formatter(
+            FuncFormatter(_compact_currency_tick if value_format == "currency" else lambda value, _: f"{value:,.0f}")
+        )
         ax.tick_params(axis="both", labelsize=9, colors="#888888")
         ax.grid(axis="y", alpha=0.22)
         ax.spines[["top", "right", "left"]].set_visible(False)
         ax.legend(fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=2, frameon=False)
         for bars in (current_bars, prior_bars):
-            ax.bar_label(bars, labels=[f"{bar.get_height():,.0f}" if bar.get_height() else "" for bar in bars], padding=3, fontsize=8)
+            ax.bar_label(
+                bars,
+                labels=[
+                    _compact_currency_label(bar.get_height()) if value_format == "currency" and bar.get_height() else f"{bar.get_height():,.0f}" if bar.get_height() else ""
+                    for bar in bars
+                ],
+                padding=3,
+                fontsize=8,
+            )
         plt.tight_layout()
         fig.savefig(output, dpi=180)
         plt.close(fig)
@@ -387,14 +398,22 @@ class WightlinkPptxBuilder:
                 slide.shapes.add_picture(str(charts[1]["path"]), Inches(6.85), Inches(1.35), width=Inches(6.0), height=Inches(3.15))
             self._add_bullets(slide, bullets, Inches(0.8), Inches(4.85), Inches(11.8), Inches(1.65))
         elif slide_type == "kpi_cards_bullets":
-            self._render_kpi_cards(slide, slide_spec.get("kpis", []), Inches(0.65), Inches(1.35), Inches(12.05), Inches(3.45))
-            self._add_bullets(slide, bullets, Inches(0.8), Inches(5.15), Inches(11.8), Inches(1.25), font_size=14)
+            if table_rows:
+                self._render_kpi_cards(slide, slide_spec.get("kpis", []), Inches(0.65), Inches(1.25), Inches(12.05), Inches(2.55))
+                self._render_table(slide, table_rows, Inches(0.45), Inches(4.0), Inches(12.45), Inches(1.5))
+                self._add_bullets(slide, bullets, Inches(0.8), Inches(5.8), Inches(11.8), Inches(0.8), font_size=12)
+            else:
+                self._render_kpi_cards(slide, slide_spec.get("kpis", []), Inches(0.65), Inches(1.35), Inches(12.05), Inches(3.45))
+                self._add_bullets(slide, bullets, Inches(0.8), Inches(5.15), Inches(11.8), Inches(1.25), font_size=14)
         elif slide_type == "single_chart_bullets":
             if charts:
                 slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.6), Inches(1.5), width=Inches(6.7), height=Inches(3.8))
             self._add_bullets(slide, bullets, Inches(7.65), Inches(1.6), Inches(4.6), Inches(3.7))
         elif slide_type == "wide_chart_bullets":
-            if charts:
+            if len(charts) >= 2:
+                slide.shapes.add_picture(str(charts[0]["path"]), Inches(0.55), Inches(1.32), width=Inches(6.05), height=Inches(4.25))
+                slide.shapes.add_picture(str(charts[1]["path"]), Inches(6.75), Inches(1.32), width=Inches(6.05), height=Inches(4.25))
+            elif charts:
                 slide.shapes.add_picture(str(charts[0]["path"]), Inches(1.0), Inches(1.28), width=Inches(11.3), height=Inches(4.55))
             self._add_bullets(slide, bullets, Inches(1.05), Inches(6.0), Inches(11.0), Inches(0.7), font_size=13)
         elif slide_type == "table_bullets":
@@ -519,34 +538,42 @@ class WightlinkPptxBuilder:
             accent.fill.fore_color.rgb = self.accent
             accent.line.color.rgb = self.accent
 
-            label_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + Inches(0.14), card_width - Inches(0.32), Inches(0.28)).text_frame
+            compact = card_height < Inches(1.35)
+            label_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + Inches(0.1 if compact else 0.14), card_width - Inches(0.32), Inches(0.28)).text_frame
             label_run = label_frame.paragraphs[0].add_run()
             label_run.text = str(kpi.get("label", "Metric"))
-            label_run.font.size = Pt(10)
+            label_run.font.size = Pt(9 if compact else 10)
             label_run.font.bold = True
             label_run.font.color.rgb = self.text_secondary
 
-            value_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + Inches(0.46), card_width - Inches(0.32), Inches(0.44)).text_frame
+            value_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + Inches(0.34 if compact else 0.46), card_width - Inches(0.32), Inches(0.44)).text_frame
             value_run = value_frame.paragraphs[0].add_run()
             value_run.text = str(kpi.get("value", "--"))
-            value_run.font.size = Pt(20)
+            value_run.font.size = Pt(16 if compact else 20)
             value_run.font.bold = True
             value_run.font.color.rgb = self.text_primary
 
             context_items = list(kpi.get("context_items", []))
             if not context_items:
                 context_items = [{"text": line, "value": kpi.get("yoy")} for line in (list(kpi.get("context", [])) or [f"YoY: {kpi.get('yoy_label', '--')}"])]
-            context_frame = slide.shapes.add_textbox(card_left + Inches(0.16), card_top + card_height - Inches(0.72), card_width - Inches(0.32), Inches(0.58)).text_frame
+            context_frame = slide.shapes.add_textbox(
+                card_left + Inches(0.16),
+                card_top + card_height - Inches(0.55 if compact else 0.72),
+                card_width - Inches(0.32),
+                Inches(0.45 if compact else 0.58),
+            ).text_frame
             context_frame.clear()
             for line_index, item in enumerate(context_items[:3]):
                 para = context_frame.paragraphs[0] if line_index == 0 else context_frame.add_paragraph()
                 para.text = str(item.get("text", ""))
-                para.font.size = Pt(8.2)
+                para.font.size = Pt(7.4 if compact else 8.2)
                 para.font.bold = True
                 para.font.color.rgb = self._resolve_delta_color(str(kpi.get("key", "")), item.get("value"))
 
     def _resolve_delta_color(self, key: str, value: Any) -> RGBColor:
         if value is None or (isinstance(value, float) and pd.isna(value)):
+            return self.text_secondary
+        if key.strip().lower() in {"cost", "spend"}:
             return self.text_secondary
         lower_is_better = key in {"cost", "cpa", "cpc"}
         positive = float(value) >= 0

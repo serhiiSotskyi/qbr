@@ -202,7 +202,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
 
         self.assertEqual(manifest["report_family"], "Wightlink PPC Monthly")
         self.assertEqual(manifest["report_mode"], "monthly")
-        self.assertEqual(manifest["period_label"], "Jun 2026 (YTD Jan - Jun 2026)")
+        self.assertEqual(manifest["period_label"], "Jul 2026 (YTD Jan - Jul 2026)")
         self.assertEqual(manifest["target_output_slide_count"], manifest["streamlit_slide_count"])
         self.assertEqual(manifest["reference_pptx_filename"], "wightlink_qbr_visual_reference_only.pptx")
         self.assertEqual(manifest["trend_queries"], [])
@@ -218,12 +218,15 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
 
         chart_qa = package.read("CHART_QA_ADDENDUM_FOR_CLAUDE.txt").decode("utf-8")
         self.assertIn("Monthly Chart QA Addendum", chart_qa)
-        self.assertIn("YTD purchases and revenue chart slides", chart_qa)
+        self.assertIn("YTD purchases and revenue YoY chart slides", chart_qa)
+        self.assertIn("Purchases YoY and Revenue YoY", chart_qa)
         self.assertNotIn("Auction Insights", chart_qa)
 
         slide_mapping = package.read("SLIDE_MAPPING.csv").decode("utf-8")
         self.assertIn("All Performance Month Summary", slide_mapping)
         self.assertIn("PMax YTD Purchases and Revenue", slide_mapping)
+        self.assertNotIn("Other Month Summary", slide_mapping)
+        self.assertNotIn("Other YTD Purchases and Revenue", slide_mapping)
         self.assertNotIn("Auction Insights", slide_mapping)
         self.assertNotIn("Google Trends", slide_mapping)
 
