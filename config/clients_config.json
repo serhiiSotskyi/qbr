@@ -289,12 +289,21 @@
       ],
       "destinations": [],
       "brand_trends": {
-        "enabled": false,
-        "terms": []
+        "enabled": true,
+        "terms": [
+          "Olympic Holidays"
+        ]
       },
       "destination_trends": {
-        "enabled": false,
-        "destinations": []
+        "enabled": true,
+        "destinations": [
+          {
+            "name": "Category",
+            "terms": [
+              "Holidays to Greece"
+            ]
+          }
+        ]
       },
       "auction_insights": {
         "enabled": false,
@@ -307,7 +316,7 @@
         "include_campaign_mix": false,
         "include_campaign_summary": false,
         "include_destination_summary": false,
-        "include_trends": false,
+        "include_trends": true,
         "include_auction_insights": false,
         "include_recommendations": false
       },

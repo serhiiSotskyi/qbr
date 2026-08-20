@@ -7,6 +7,8 @@ from typing import Any
 
 import pandas as pd
 
+from src.source_normalizers import normalize_wightlink_performance_export
+
 
 COLUMN_ALIASES = {
     "date": "date",
@@ -172,7 +174,10 @@ def load_wightlink_performance_csv(csv_path: str | Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Performance CSV not found: {path}")
 
-    df = pd.read_csv(path)
+    try:
+        df = normalize_wightlink_performance_export(path)
+    except Exception:
+        df = pd.read_csv(path)
     if df.empty:
         raise ValueError("Performance CSV is empty.")
 

@@ -6,6 +6,8 @@ from typing import Dict, List
 
 import pandas as pd
 
+from .source_normalizers import normalize_wendy_wu_performance_export
+
 
 COLUMN_ALIASES: Dict[str, str] = {
     "Date": "date",
@@ -100,6 +102,15 @@ def load_csv(csv_path: str | Path) -> pd.DataFrame:
     df = df.rename(columns=rename_map)
 
     missing = REQUIRED_COLUMNS - set(df.columns)
+    if missing:
+        try:
+            normalized = normalize_wendy_wu_performance_export(path)
+        except Exception:
+            normalized = None
+        if normalized is not None:
+            df = normalized.rename(columns={col: COLUMN_ALIASES[col] for col in normalized.columns if col in COLUMN_ALIASES})
+            missing = REQUIRED_COLUMNS - set(df.columns)
+
     if missing:
         raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
 

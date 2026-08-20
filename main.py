@@ -10,7 +10,9 @@ from report_generator.pipelines.olympic_pipeline import generate_olympic_report
 from report_generator.pipelines.wightlink_annual_pipeline import generate_wightlink_annual_report
 from report_generator.pipelines.wightlink_monthly_pipeline import generate_wightlink_monthly_report
 from report_generator.pipelines.wightlink_pipeline import generate_wightlink_report
+from src.automated_sources import prepare_automated_source_inputs
 from src.config_loader import ConfigLoader
+from src.env_utils import load_env_file
 from src.report_pipeline import ReportPipeline
 from utils.text_report import TextReportPipeline
 
@@ -28,6 +30,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trends-ytd-previous-dir", help="Directory containing previous YTD Google Trends CSV exports.")
     parser.add_argument("--other-campaigns-dir", help="Directory containing Wendy Wu Google/MS campaign CSV exports for Other top-campaign slides.")
     parser.add_argument("--plan-workbook", help="Path to the optional Wightlink planning workbook.")
+    parser.add_argument(
+        "--auto-sources",
+        action="store_true",
+        help="Use configured API sources where available. Currently enables GA4 performance and DataForSEO trends.",
+    )
+    parser.add_argument(
+        "--use-ga4-performance",
+        action="store_true",
+        help="Pull the normalized performance CSV from GA4 instead of requiring --performance-csv.",
+    )
+    parser.add_argument(
+        "--use-dataforseo-trends",
+        action="store_true",
+        help="Pull quarterly YTD Google Trends CSVs from DataForSEO instead of requiring trends uploads.",
+    )
     parser.add_argument(
         "--report-mode",
         choices=["quarterly", "monthly", "annual"],
@@ -217,22 +234,57 @@ def run_text_report(
 
 
 def main() -> None:
+    project_root = Path(__file__).resolve().parent
+    load_env_file(project_root / ".env")
     args = parse_args()
 
     performance_csv = args.performance_csv or args.input_csv
+    use_ga4_performance = args.use_ga4_performance or args.auto_sources
+    use_dataforseo_trends = args.use_dataforseo_trends or args.auto_sources
+    other_campaigns_dir = args.other_campaigns_dir
+    trends_dir = args.trends_dir
+    trends_ytd_current_dir = args.trends_ytd_current_dir
+    trends_ytd_previous_dir = args.trends_ytd_previous_dir
+
+    if use_ga4_performance or use_dataforseo_trends:
+        if not args.client_id:
+            raise SystemExit("--client-id is required when using API sources.")
+        config_loader = _build_config_loader(project_root)
+        client_config = config_loader.get_client_config(args.client_id)
+        request_dir = project_root / "temp_uploads" / f"cli_api_sources_{pd.Timestamp.utcnow().strftime('%Y%m%d%H%M%S')}"
+        automated_paths = prepare_automated_source_inputs(
+            project_root=project_root,
+            request_dir=request_dir,
+            client_config=client_config,
+            report_mode=args.report_mode,
+            performance_csv_path=performance_csv,
+            use_ga4_performance=use_ga4_performance,
+            use_dataforseo_trends=use_dataforseo_trends,
+        )
+        if automated_paths.performance_csv_path is not None:
+            performance_csv = str(automated_paths.performance_csv_path)
+        if automated_paths.trends_dir is not None:
+            trends_dir = str(automated_paths.trends_dir)
+        if automated_paths.trends_ytd_current_dir is not None:
+            trends_ytd_current_dir = str(automated_paths.trends_ytd_current_dir)
+        if automated_paths.trends_ytd_previous_dir is not None:
+            trends_ytd_previous_dir = str(automated_paths.trends_ytd_previous_dir)
+        if automated_paths.other_campaigns_dir is not None and not other_campaigns_dir:
+            other_campaigns_dir = str(automated_paths.other_campaigns_dir)
+
     if not performance_csv:
-        raise SystemExit("A performance CSV is required. Pass it positionally or with --performance-csv.")
+        raise SystemExit("A performance CSV is required. Pass it positionally/with --performance-csv, or use --use-ga4-performance.")
 
     output_path = run_report(
         performance_csv=performance_csv,
         client_id=args.client_id,
-        trends_dir=args.trends_dir,
-        trends_ytd_current_dir=args.trends_ytd_current_dir,
-        trends_ytd_previous_dir=args.trends_ytd_previous_dir,
+        trends_dir=trends_dir,
+        trends_ytd_current_dir=trends_ytd_current_dir,
+        trends_ytd_previous_dir=trends_ytd_previous_dir,
         auction_csv=args.auction_csv,
         red_funnel_auction_csv=args.red_funnel_auction_csv,
         red_funnel_prior_auction_csv=args.red_funnel_prior_auction_csv,
-        other_campaigns_dir=args.other_campaigns_dir,
+        other_campaigns_dir=other_campaigns_dir,
         plan_workbook=args.plan_workbook,
         output_path=args.output,
         report_mode=args.report_mode,

@@ -22,9 +22,12 @@ from claude_handoff import (
 from main import run_report, run_text_report
 from notion_memory import NotionMemoryError, notion_save_key, save_report_to_notion
 from presentation_prompt_builder import build_presentation_prompt
+from src.env_utils import load_env_file, load_streamlit_secrets_into_env
 
 
 BASE_DIR = Path(__file__).resolve().parent
+load_env_file(BASE_DIR / ".env")
+load_streamlit_secrets_into_env()
 TEMP_DIR = BASE_DIR / "temp_uploads"
 TEMP_DIR.mkdir(exist_ok=True)
 WENDY_WU_CLIENT_IDS = {"wendy_wu", "wendy_wu_australia"}
@@ -70,12 +73,14 @@ def build_request_inputs(
     trends_previous_ytd_files=None,
     red_funnel_auction_file=None,
     red_funnel_prior_auction_file=None,
-) -> tuple[Path, str, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
+) -> tuple[Path, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
     request_id = uuid4().hex
     request_dir = TEMP_DIR / request_id
     request_dir.mkdir(parents=True, exist_ok=True)
 
-    perf_path = save_uploaded_file(performance_file, request_dir / "performance" / performance_file.name)
+    perf_path = None
+    if performance_file is not None:
+        perf_path = save_uploaded_file(performance_file, request_dir / "performance" / performance_file.name)
 
     auction_path = None
     if auction_file is not None:
@@ -164,6 +169,7 @@ def create_claude_handoff_bundle(
     request_dir: Path,
     client_name: str,
     report_mode: str = "quarterly",
+    source_generation_manifest: str | Path | None = None,
 ) -> tuple[Path, dict]:
     client_slug = resolve_wendy_wu_handoff_slug(client_id)
     handoff_bytes, manifest = build_claude_handoff_package(
@@ -174,6 +180,7 @@ def create_claude_handoff_bundle(
         client_slug=client_slug,
         report_mode=report_mode,
         reference_pptx=DEFAULT_REFERENCE_PPTX_PATH,
+        source_generation_manifest=source_generation_manifest,
     )
     mode_suffix = "_monthly" if report_mode == "monthly" else ""
     handoff_path = request_dir / f"{client_slug}{mode_suffix}_claude_handoff_package.zip"
@@ -196,6 +203,7 @@ def create_wightlink_claude_handoff_bundle(
     red_funnel_prior_auction_csv_path: str | Path | None,
     plan_book_path: str | Path | None,
     report_mode: str = "quarterly",
+    source_generation_manifest: str | Path | None = None,
 ) -> tuple[Path, dict]:
     trend_csv_files = sorted(Path(trends_dir).glob("*.csv")) if trends_dir else []
     trend_ytd_current_files = sorted(Path(trends_ytd_current_dir).glob("*.csv")) if trends_ytd_current_dir else []
@@ -214,6 +222,7 @@ def create_wightlink_claude_handoff_bundle(
         plan_book_csv=plan_book_path,
         reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
         report_mode=report_mode,
+        source_generation_manifest=source_generation_manifest,
     )
     mode_suffix = "_monthly" if report_mode == "monthly" else ""
     handoff_path = request_dir / f"wightlink{mode_suffix}_claude_handoff_package.zip"
@@ -230,6 +239,7 @@ def create_olympic_holidays_claude_handoff_bundle(
     performance_csv_path: str | Path,
     auction_csv_path: str | Path | None,
     trends_dir: str | Path | None,
+    source_generation_manifest: str | Path | None = None,
 ) -> tuple[Path, dict]:
     trend_csv_files = sorted(Path(trends_dir).glob("*.csv")) if trends_dir else []
     handoff_bytes, manifest = build_olympic_holidays_claude_handoff_package(
@@ -240,6 +250,7 @@ def create_olympic_holidays_claude_handoff_bundle(
         auction_csv=auction_csv_path,
         trend_csv_files=trend_csv_files,
         reference_pptx=DEFAULT_OLYMPIC_REFERENCE_PPTX_PATH,
+        source_generation_manifest=source_generation_manifest,
     )
     handoff_path = request_dir / "olympic_holidays_claude_handoff_package.zip"
     handoff_path.write_bytes(handoff_bytes)
