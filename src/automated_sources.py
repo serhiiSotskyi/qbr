@@ -370,13 +370,18 @@ def generate_dataforseo_trend_csvs(
     date_to = period.end
 
     for term in terms:
-        response = _fetch_dataforseo_interest_with_date_fallback(
-            api_client,
+        response = api_client.fetch_interest_over_time(
             keyword=term,
             location_name=location_name,
             date_from=date_from,
-            date_to=date_to,
+            date_to=None,
         )
+        if isinstance(response, dict):
+            response["_source_request"] = {
+                "date_from": _fmt_date(date_from),
+                "date_to_omitted": True,
+                "local_filter_date_to": _fmt_date(date_to),
+            }
         safe_term = _slug(term)
         _write_json(raw_dir / f"{safe_term}.json", response)
         trend_df = dataforseo_response_to_frame(response, fallback_keyword=term)

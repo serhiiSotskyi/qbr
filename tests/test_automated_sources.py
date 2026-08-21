@@ -258,7 +258,7 @@ class AutomatedSourcesTests(unittest.TestCase):
             self.assertEqual(current["wendy wu tours"].tolist(), [40.0, 80.0])
             self.assertEqual(previous["wendy wu tours"].tolist(), [30.0, 45.0])
 
-    def test_dataforseo_source_retries_without_date_to_when_api_rejects_field(self) -> None:
+    def test_dataforseo_source_omits_date_to_and_filters_locally(self) -> None:
         client_config = {
             "id": "wendy_wu",
             "country": "UK",
@@ -290,9 +290,9 @@ class AutomatedSourcesTests(unittest.TestCase):
             current_files = sorted(Path(paths.trends_ytd_current_dir).glob("*.csv"))
             current_values = pd.read_csv(current_files[0])["wendy wu tours"].tolist()
 
-        self.assertEqual(len(trends_client.calls), 2)
-        self.assertIsNone(trends_client.calls[-1])
+        self.assertEqual(trends_client.calls, [None])
         self.assertIn('"date_to_omitted": true', raw_payload)
+        self.assertIn('"local_filter_date_to": "2026-06-30"', raw_payload)
         self.assertEqual(current_values, [40.0, 80.0])
 
     def test_dataforseo_source_writes_olympic_trends_dir(self) -> None:
