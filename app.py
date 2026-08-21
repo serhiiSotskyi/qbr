@@ -147,12 +147,23 @@ def build_request_inputs(
     )
 
 
-def create_package_bundle(client_id: str, pptx_path: Path, report_txt_path: Path, prompt_txt_path: Path, request_dir: Path) -> Path:
+def create_package_bundle(
+    client_id: str,
+    pptx_path: Path,
+    report_txt_path: Path,
+    prompt_txt_path: Path,
+    request_dir: Path,
+    extra_files: list[Path] | None = None,
+) -> Path:
     package_path = request_dir / f"{client_id}_package.zip"
     with ZipFile(package_path, "w", compression=ZIP_DEFLATED) as archive:
         archive.write(pptx_path, arcname=f"{client_id}_report.pptx")
         archive.write(report_txt_path, arcname="report.txt")
         archive.write(prompt_txt_path, arcname="prompt.txt")
+        for extra_file in extra_files or []:
+            extra_path = Path(extra_file)
+            if extra_path.exists():
+                archive.write(extra_path, arcname=extra_path.name)
     return package_path
 
 

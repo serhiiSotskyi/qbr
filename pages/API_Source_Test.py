@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -30,6 +31,8 @@ from src.automated_sources import (
     supports_ga4_source,
 )
 from src.config_loader import ConfigLoader
+from src.google_slides_builder import generate_native_google_slides, google_slides_source_status
+from src.report_artifacts import artifact_companion_json_path, write_report_artifacts
 
 
 CONFIG_LOADER = ConfigLoader(
@@ -150,9 +153,10 @@ def main() -> None:
         pptx_path = outputs_dir / f"{client_id}_report.pptx"
         report_txt_path = outputs_dir / "report.txt"
         prompt_txt_path = outputs_dir / "prompt.txt"
+        generation_started_at = time.time()
 
         try:
-            with st.spinner("Generating API source CSVs, PPTX, TXT, and Claude handoff package..."):
+            with st.spinner("Generating API source CSVs, PPTX, TXT, Claude handoff package, and native Google Slides if configured..."):
                 generated_pptx = Path(
                     run_report(
                         performance_csv=perf_path,
@@ -186,8 +190,27 @@ def main() -> None:
                     )
                 )
                 prompt_txt_path.write_text(build_presentation_prompt(client_id, report_mode=report_mode), encoding="utf-8")
-                package_path = create_package_bundle(client_id, generated_pptx, generated_txt, prompt_txt_path, request_dir)
                 source_manifest = automated_paths.source_manifest_path
+                report_artifacts_path = write_report_artifacts(
+                    client_id=client_id,
+                    client_name=selected_client["name"],
+                    report_mode=report_mode,
+                    report_txt_path=generated_txt,
+                    pptx_path=generated_pptx,
+                    request_dir=request_dir,
+                    source_generation_manifest=source_manifest,
+                    companion_json_path=artifact_companion_json_path(generated_pptx),
+                    chart_search_roots=[outputs_dir, BASE_DIR / "charts" / client_id],
+                    generated_after=generation_started_at,
+                )
+                package_path = create_package_bundle(
+                    client_id,
+                    generated_pptx,
+                    generated_txt,
+                    prompt_txt_path,
+                    request_dir,
+                    extra_files=[report_artifacts_path],
+                )
                 claude_handoff_path = None
                 claude_handoff_manifest = None
                 if is_wendy_wu_streamlit_report(client_id, report_mode):
@@ -229,6 +252,13 @@ def main() -> None:
                         trends_dir=trends_dir,
                         source_generation_manifest=source_manifest,
                     )
+                native_slides_result = generate_native_google_slides(
+                    client_id=client_id,
+                    client_name=selected_client["name"],
+                    report_mode=report_mode,
+                    request_dir=request_dir,
+                    report_artifacts_path=report_artifacts_path,
+                )
         except Exception as exc:
             st.session_state.api_source_generated_bundle = None
             st.error(str(exc))
@@ -245,6 +275,8 @@ def main() -> None:
             "claude_handoff_path": str(claude_handoff_path) if claude_handoff_path else None,
             "claude_handoff_manifest": claude_handoff_manifest,
             "source_manifest_path": str(source_manifest) if source_manifest else None,
+            "report_artifacts_path": str(report_artifacts_path),
+            "google_slides_result": native_slides_result.to_dict(),
             "source_files": _generated_source_files(request_dir),
         }
         st.success("API source test files generated successfully.")
@@ -264,6 +296,7 @@ def _render_source_status(client_id: str, client_config: dict, report_mode: str)
     period = default_source_period(report_mode)
     ga4_status = ga4_source_status(client_id)
     dataforseo_status = dataforseo_source_status()
+    slides_status = google_slides_source_status(client_id, report_mode)
     trends_enabled = report_mode == "quarterly" and client_has_trends(client_config, report_mode)
     st.subheader("Source Status")
     st.write(
@@ -279,12 +312,24 @@ def _render_source_status(client_id: str, client_config: dict, report_mode: str)
                 "end": period.end.strftime("%Y-%m-%d"),
             },
             "trends_api_enabled_for_selection": trends_enabled,
+            "native_google_slides": {
+                "workspace_credentials": slides_status["google_workspace_credentials"],
+                "template": slides_status["google_slides_template"],
+                "output_folder": slides_status["google_drive_output_folder"],
+                "asset_folder": slides_status["google_drive_asset_folder"],
+                "enabled_for_selection": slides_status["native_slides_enabled_for_selection"],
+            },
         }
     )
     if not ga4_status["auth_configured"] or not ga4_status["property_id_configured"]:
         st.warning(ga4_status["message"])
     if trends_enabled and not dataforseo_status["configured"]:
         st.warning(dataforseo_status["message"])
+    if not slides_status["native_slides_enabled_for_selection"]:
+        if not slides_status["template"]["supported"]:
+            st.info(slides_status["template"]["message"])
+        else:
+            st.info(slides_status["workspace"]["message"] if not slides_status["workspace"]["configured"] else slides_status["template"]["message"])
 
 
 def _render_generated_outputs(bundle: dict | None) -> None:
@@ -297,10 +342,12 @@ def _render_generated_outputs(bundle: dict | None) -> None:
             "report_mode": bundle["report_mode"],
             "request_dir": bundle["request_dir"],
             "source_manifest": bundle["source_manifest_path"],
+            "report_artifacts": bundle.get("report_artifacts_path"),
             "generated_source_files": bundle["source_files"],
             "pptx": bundle["pptx_path"],
             "report_txt": bundle["report_txt_path"],
             "claude_handoff_zip": bundle["claude_handoff_path"],
+            "native_google_slides": bundle.get("google_slides_result"),
         }
     )
     if bundle.get("source_manifest_path"):
@@ -308,6 +355,35 @@ def _render_generated_outputs(bundle: dict | None) -> None:
         if manifest_path.exists():
             with st.expander("SOURCE_GENERATION_MANIFEST.json"):
                 st.json(json.loads(manifest_path.read_text(encoding="utf-8")))
+    if bundle.get("report_artifacts_path"):
+        artifacts_path = Path(bundle["report_artifacts_path"])
+        if artifacts_path.exists():
+            with st.expander("report_artifacts.json"):
+                st.json(json.loads(artifacts_path.read_text(encoding="utf-8")))
+    slides_result = bundle.get("google_slides_result") or {}
+    if slides_result:
+        if slides_result.get("status") == "success" and slides_result.get("google_slides_url"):
+            st.success("Native Google Slides deck generated.")
+            st.link_button("Open Native Google Slides Deck", slides_result["google_slides_url"])
+        elif slides_result.get("status") == "failed":
+            st.warning(slides_result.get("message", "Native Google Slides generation failed."))
+        else:
+            st.info(slides_result.get("message", "Native Google Slides generation was skipped."))
+        manifest_value = slides_result.get("manifest_path")
+        if manifest_value:
+            slides_manifest_path = Path(manifest_value)
+            if slides_manifest_path.exists():
+                with st.expander("google_slides_generation_manifest.json"):
+                    st.json(json.loads(slides_manifest_path.read_text(encoding="utf-8")))
+        qa_pdf_value = slides_result.get("qa_pdf_path")
+        if qa_pdf_value and Path(qa_pdf_value).exists():
+            with open(qa_pdf_value, "rb") as handle:
+                st.download_button(
+                    label="Download Native Slides QA PDF",
+                    data=handle,
+                    file_name="google_slides_qa.pdf",
+                    mime="application/pdf",
+                )
     with open(bundle["package_path"], "rb") as handle:
         st.download_button(
             label="Download Raw Streamlit Files",
