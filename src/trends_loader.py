@@ -46,6 +46,10 @@ class TrendsLoader:
             return _empty_trends_df()
 
         combined = pd.concat(frames, ignore_index=True)
+        combined["date"] = _parse_trend_dates(combined["date"])
+        combined = combined.dropna(subset=["date"]).copy()
+        if combined.empty:
+            return _empty_trends_df()
         combined["month_start"] = combined["date"].dt.to_period("M").dt.to_timestamp()
         return combined.sort_values(["term", "date"]).reset_index(drop=True)
 
@@ -62,7 +66,7 @@ class TrendsLoader:
         if date_col is None:
             return _empty_trends_df()
 
-        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+        df[date_col] = _parse_trend_dates(df[date_col])
         df = df.dropna(subset=[date_col]).copy()
         if df.empty:
             return _empty_trends_df()
@@ -73,7 +77,7 @@ class TrendsLoader:
 
         melted = df.melt(id_vars=[date_col], value_vars=value_columns, var_name="term", value_name="value")
         melted = melted.rename(columns={date_col: "date"})
-        melted["date"] = pd.to_datetime(melted["date"], errors="coerce")
+        melted["date"] = _parse_trend_dates(melted["date"])
         melted["value"] = pd.to_numeric(melted["value"], errors="coerce")
         melted = melted.dropna(subset=["date", "value"]).copy()
         if melted.empty:
@@ -142,6 +146,11 @@ def _find_date_column(columns: Iterable[str]) -> str | None:
         if str(column).strip().lower() in TREND_DATE_COLUMNS:
             return str(column)
     return None
+
+
+def _parse_trend_dates(values: pd.Series) -> pd.Series:
+    parsed = pd.to_datetime(values, errors="coerce", format="mixed", utc=True)
+    return parsed.dt.tz_convert(None)
 
 
 def _empty_trends_df() -> pd.DataFrame:

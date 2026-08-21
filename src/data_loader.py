@@ -114,7 +114,7 @@ def load_csv(csv_path: str | Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
 
-    df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce", format="mixed")
+    df["date"] = _parse_report_dates(df["date"], dayfirst=True)
     df = df.dropna(subset=["date"]).copy()
     if df.empty:
         raise ValueError("No valid dates found in CSV after parsing.")
@@ -134,6 +134,11 @@ def load_csv(csv_path: str | Path) -> pd.DataFrame:
     df["month_start"] = df["date"].dt.to_period("M").dt.to_timestamp()
 
     return df.sort_values("date").reset_index(drop=True)
+
+
+def _parse_report_dates(values: pd.Series, *, dayfirst: bool = False) -> pd.Series:
+    parsed = pd.to_datetime(values, dayfirst=dayfirst, errors="coerce", format="mixed", utc=True)
+    return parsed.dt.tz_convert(None)
 
 
 def detect_latest_complete_quarter(df: pd.DataFrame) -> QuarterInfo:

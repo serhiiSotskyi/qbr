@@ -25,6 +25,7 @@ from src.source_normalizers import (
     normalize_wendy_wu_performance_export,
     normalize_wightlink_performance_export,
 )
+from src.trends_loader import TrendsLoader
 
 
 class FakeGA4Client:
@@ -237,6 +238,50 @@ class AutomatedSourcesTests(unittest.TestCase):
         output = _build_wendy_wu_performance_frame(merged)
 
         self.assertEqual(output["Date"].tolist(), ["2026-04-01", "2026-04-02"])
+
+    def test_load_csv_handles_mixed_timezone_date_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "performance.csv"
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "2026-04-01T00:00:00+00:00",
+                        "Campaign Type": "Brand",
+                        "Destination": "Other",
+                        "Sales Leads": 1,
+                        "Cost": 10,
+                        "Impressions": 100,
+                        "Clicks": 5,
+                    },
+                    {
+                        "Date": "02/04/2026",
+                        "Campaign Type": "Generic",
+                        "Destination": "Japan",
+                        "Sales Leads": 2,
+                        "Cost": 20,
+                        "Impressions": 200,
+                        "Clicks": 10,
+                    },
+                ]
+            ).to_csv(path, index=False)
+
+            loaded = load_csv(path)
+
+        self.assertEqual(loaded["date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-04-01", "2026-04-02"])
+
+    def test_trends_loader_handles_mixed_timezone_date_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "wendy_wu_tours_current_ytd.csv"
+            pd.DataFrame(
+                [
+                    {"Week": "2026-04-01", "wendy wu tours": 40},
+                    {"Week": "2026-04-08T00:00:00+00:00", "wendy wu tours": 80},
+                ]
+            ).to_csv(path, index=False)
+
+            loaded = TrendsLoader(tmpdir).load_from_directory()
+
+        self.assertEqual(loaded["date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-04-01", "2026-04-08"])
 
     def test_dataforseo_response_normalizes_graph_points(self) -> None:
         frame = dataforseo_response_to_frame(FakeDataForSEOClient().fetch_interest_over_time(
