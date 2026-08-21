@@ -490,7 +490,12 @@ def dataforseo_response_to_frame(response: dict[str, Any], fallback_keyword: str
     if not records:
         return _empty_trends_export_frame()
 
-    return pd.DataFrame(records).sort_values(["term", "date"]).reset_index(drop=True)
+    frame = pd.DataFrame(records)
+    frame["date"] = _coerce_trend_date_column(frame["date"])
+    frame = frame.dropna(subset=["date"])
+    if frame.empty:
+        return _empty_trends_export_frame()
+    return frame.sort_values(["term", "date"]).reset_index(drop=True)
 
 
 def write_split_trend_csvs(
@@ -1142,7 +1147,10 @@ def _exclude_cost_row(date: pd.Timestamp | None, campaign_name: str, rules: Mapp
 
 
 def _trend_window(trend_df: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
-    return trend_df[(trend_df["date"] >= start) & (trend_df["date"] <= end)].copy()
+    working = trend_df.copy()
+    working["date"] = _coerce_trend_date_column(working["date"])
+    working = working.dropna(subset=["date"])
+    return working[(working["date"] >= start) & (working["date"] <= end)].copy()
 
 
 def _write_google_trends_csv(path: str | Path, trend_df: pd.DataFrame, term: str) -> None:
@@ -1155,8 +1163,17 @@ def _write_google_trends_csv(path: str | Path, trend_df: pd.DataFrame, term: str
     if working.empty:
         working = trend_df.copy()
     working = working.sort_values("date").rename(columns={"date": "Week", "value": term})
+    working["Week"] = _coerce_trend_date_column(working["Week"])
+    working = working.dropna(subset=["Week"])
     working["Week"] = working["Week"].dt.strftime("%Y-%m-%d")
     working[["Week", term]].to_csv(output, index=False)
+
+
+def _coerce_trend_date_column(values: Any) -> pd.Series:
+    parsed = pd.to_datetime(values, errors="coerce", utc=True)
+    if isinstance(parsed, pd.Timestamp):
+        parsed = pd.Series([parsed])
+    return parsed.dt.tz_convert(None)
 
 
 def _coerce_trend_values(values: Any, keywords: Sequence[str], fallback_keyword: str) -> list[tuple[str, float | None]]:

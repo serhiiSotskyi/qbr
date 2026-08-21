@@ -127,7 +127,7 @@ class FakeDataForSEOClient:
                                         {"date_from": "2025-01-05", "date_to": "2025-01-11", "values": [30]},
                                         {"date_from": "2025-04-05", "date_to": "2025-04-11", "values": [45]},
                                         {"date_from": "2026-01-05", "date_to": "2026-01-11", "values": [40]},
-                                        {"date_from": "2026-04-05", "date_to": "2026-04-11", "values": [80]},
+                                        {"date_from": "2026-04-05T00:00:00+00:00", "date_to": "2026-04-11", "values": [80]},
                                     ],
                                 }
                             ],
