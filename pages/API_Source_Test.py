@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+import traceback
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -134,6 +135,7 @@ def main() -> None:
             )
         except AutomatedSourceError as exc:
             st.error(str(exc))
+            st.code(traceback.format_exc(), language="python")
             return
 
         perf_path = str(automated_paths.performance_csv_path) if automated_paths.performance_csv_path else perf_path
@@ -263,6 +265,7 @@ def main() -> None:
         except Exception as exc:
             st.session_state.api_source_generated_bundle = None
             st.error(str(exc))
+            st.code(traceback.format_exc(), language="python")
             return
 
         st.session_state.api_source_generated_bundle = {
