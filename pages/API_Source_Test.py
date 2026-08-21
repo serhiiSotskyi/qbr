@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import streamlit as st
 
@@ -209,8 +210,8 @@ def main() -> None:
                     generated_txt,
                     prompt_txt_path,
                     request_dir,
-                    extra_files=[report_artifacts_path],
                 )
+                _append_package_files(package_path, [report_artifacts_path])
                 claude_handoff_path = None
                 claude_handoff_manifest = None
                 if is_wendy_wu_streamlit_report(client_id, report_mode):
@@ -410,6 +411,15 @@ def _generated_source_files(request_dir: Path) -> list[str]:
 
 def _monthly_without_auction(client_id: str, report_mode: str) -> bool:
     return report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
+
+
+def _append_package_files(package_path: Path, extra_files: list[Path]) -> None:
+    with ZipFile(package_path, "a", compression=ZIP_DEFLATED) as archive:
+        existing_names = set(archive.namelist())
+        for extra_file in extra_files:
+            extra_path = Path(extra_file)
+            if extra_path.exists() and extra_path.name not in existing_names:
+                archive.write(extra_path, arcname=extra_path.name)
 
 
 if __name__ == "__main__":
