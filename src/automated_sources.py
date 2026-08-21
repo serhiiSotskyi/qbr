@@ -370,7 +370,8 @@ def generate_dataforseo_trend_csvs(
     date_to = period.end
 
     for term in terms:
-        response = api_client.fetch_interest_over_time(
+        response = _fetch_dataforseo_interest_with_date_fallback(
+            api_client,
             keyword=term,
             location_name=location_name,
             date_from=date_from,
@@ -676,21 +677,21 @@ class DataForSEOTrendsClient:
         keyword: str,
         location_name: str,
         date_from: pd.Timestamp,
-        date_to: pd.Timestamp,
+        date_to: pd.Timestamp | None,
     ) -> dict[str, Any]:
-        payload = [
-            {
-                "keywords": [keyword],
-                "location_name": location_name,
-                "language_code": "en",
-                "type": "web",
-                "category_code": 0,
-                "date_from": _fmt_date(date_from),
-                "date_to": _fmt_date(date_to),
-                "item_types": ["google_trends_graph"],
-                "tag": f"qbr_{_slug(keyword)}_{_fmt_date(date_from)}_{_fmt_date(date_to)}",
-            }
-        ]
+        task = {
+            "keywords": [keyword],
+            "location_name": location_name,
+            "language_code": "en",
+            "type": "web",
+            "category_code": 0,
+            "date_from": _fmt_date(date_from),
+            "item_types": ["google_trends_graph"],
+            "tag": f"qbr_{_slug(keyword)}_{_fmt_date(date_from)}_{_fmt_date(date_to) if date_to is not None else 'open'}",
+        }
+        if date_to is not None:
+            task["date_to"] = _fmt_date(date_to)
+        payload = [task]
         response = self.session.post(
             DATAFORSEO_TRENDS_URL,
             auth=(self.login, self.password),
@@ -712,6 +713,39 @@ class DataForSEOTrendsClient:
             ]
             raise AutomatedSourceError(f"DataForSEO Trends task failed: {'; '.join(messages) or 'unknown task error'}")
         return data
+
+
+def _fetch_dataforseo_interest_with_date_fallback(
+    api_client: "DataForSEOTrendsClient",
+    *,
+    keyword: str,
+    location_name: str,
+    date_from: pd.Timestamp,
+    date_to: pd.Timestamp,
+) -> dict[str, Any]:
+    try:
+        return api_client.fetch_interest_over_time(
+            keyword=keyword,
+            location_name=location_name,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except AutomatedSourceError as exc:
+        if "date_to" not in str(exc).lower():
+            raise
+        response = api_client.fetch_interest_over_time(
+            keyword=keyword,
+            location_name=location_name,
+            date_from=date_from,
+            date_to=None,
+        )
+        if isinstance(response, dict):
+            response["_source_request_fallback"] = {
+                "date_to_omitted": True,
+                "requested_date_to": _fmt_date(date_to),
+                "original_error": str(exc),
+            }
+        return response
 
 
 def _source_start_date(period: SourcePeriod, report_mode: str) -> pd.Timestamp:

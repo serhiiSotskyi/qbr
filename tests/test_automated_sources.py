@@ -9,6 +9,7 @@ import pandas as pd
 
 from main import run_text_report
 from src.automated_sources import (
+    AutomatedSourceError,
     SourcePeriod,
     _to_float,
     dataforseo_response_to_frame,
@@ -137,6 +138,22 @@ class FakeDataForSEOClient:
         }
 
 
+class DateToRejectingDataForSEOClient(FakeDataForSEOClient):
+    def __init__(self) -> None:
+        self.calls = []
+
+    def fetch_interest_over_time(self, *, keyword, location_name, date_from, date_to):
+        self.calls.append(date_to)
+        if date_to is not None:
+            raise AutomatedSourceError("DataForSEO Trends task failed: Invalid Field: 'date_to'.")
+        return super().fetch_interest_over_time(
+            keyword=keyword,
+            location_name=location_name,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+
 class AutomatedSourcesTests(unittest.TestCase):
     def test_numeric_parser_handles_scientific_notation(self) -> None:
         self.assertAlmostEqual(_to_float("8.7E-5"), 0.000087)
@@ -240,6 +257,43 @@ class AutomatedSourcesTests(unittest.TestCase):
             previous = pd.read_csv(previous_files[0])
             self.assertEqual(current["wendy wu tours"].tolist(), [40.0, 80.0])
             self.assertEqual(previous["wendy wu tours"].tolist(), [30.0, 45.0])
+
+    def test_dataforseo_source_retries_without_date_to_when_api_rejects_field(self) -> None:
+        client_config = {
+            "id": "wendy_wu",
+            "country": "UK",
+            "brand_trends": {"enabled": True, "terms": ["wendy wu tours"]},
+            "destination_trends": {"enabled": False, "destinations": []},
+        }
+        period = SourcePeriod(
+            kind="quarterly",
+            year=2026,
+            quarter=2,
+            start=pd.Timestamp("2026-04-01"),
+            end=pd.Timestamp("2026-06-30"),
+        )
+        trends_client = DateToRejectingDataForSEOClient()
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {"DATAFORSEO_LOGIN": "login", "DATAFORSEO_PASSWORD": "password"},
+            clear=False,
+        ):
+            paths = generate_dataforseo_trend_csvs(
+                client_config=client_config,
+                report_mode="quarterly",
+                period=period,
+                output_dir=tmpdir,
+                trends_client=trends_client,
+            )
+
+            raw_payload = (Path(tmpdir) / "raw_api" / "dataforseo" / "wendy_wu_tours.json").read_text(encoding="utf-8")
+            current_files = sorted(Path(paths.trends_ytd_current_dir).glob("*.csv"))
+            current_values = pd.read_csv(current_files[0])["wendy wu tours"].tolist()
+
+        self.assertEqual(len(trends_client.calls), 2)
+        self.assertIsNone(trends_client.calls[-1])
+        self.assertIn('"date_to_omitted": true', raw_payload)
+        self.assertEqual(current_values, [40.0, 80.0])
 
     def test_dataforseo_source_writes_olympic_trends_dir(self) -> None:
         client_config = {"id": "olympic_holidays", "country": "UK"}
