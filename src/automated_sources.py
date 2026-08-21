@@ -822,6 +822,10 @@ def _merge_ga4_frames(cost_df: pd.DataFrame, event_df: pd.DataFrame) -> pd.DataF
     merged = cost_df.merge(event_pivot, on=["date", "campaign_name"], how="outer") if not cost_df.empty else event_pivot
     if merged.empty:
         raise AutomatedSourceError("GA4 returned no usable paid performance rows for the requested period.")
+    merged["date"] = _coerce_date_column(merged["date"])
+    merged = merged.dropna(subset=["date"])
+    if merged.empty:
+        raise AutomatedSourceError("GA4 returned no usable dated paid performance rows for the requested period.")
     for column in ["cost", "clicks", "impressions", "sales_leads", "purchases", "add_to_cart", "purchase_revenue"]:
         if column not in merged.columns:
             merged[column] = 0.0
@@ -847,6 +851,8 @@ def _pivot_event_metrics(event_df: pd.DataFrame) -> pd.DataFrame:
 
 def _build_wendy_wu_performance_frame(merged: pd.DataFrame, *, include_revenue: bool = True) -> pd.DataFrame:
     working = merged.copy()
+    working["date"] = _coerce_date_column(working["date"])
+    working = working.dropna(subset=["date"])
     working["Date"] = working["date"].dt.strftime("%Y-%m-%d")
     working["Campaign Type"] = working["campaign_name"].map(classify_campaign_type)
     working["Destination"] = working["campaign_name"].map(classify_destination)
@@ -873,6 +879,8 @@ def _build_wendy_wu_performance_frame(merged: pd.DataFrame, *, include_revenue: 
 
 def _build_wightlink_performance_frame(merged: pd.DataFrame) -> pd.DataFrame:
     working = merged.copy()
+    working["date"] = _coerce_date_column(working["date"])
+    working = working.dropna(subset=["date"])
     working["Date"] = working["date"].dt.strftime("%Y-%m-%d")
     working["Campaign Type"] = working["campaign_name"].map(classify_campaign_type)
     working["Data Type"] = working["campaign_name"].map(classify_wightlink_data_type)
@@ -896,6 +904,8 @@ def _build_wightlink_performance_frame(merged: pd.DataFrame) -> pd.DataFrame:
 
 def _build_olympic_performance_frame(merged: pd.DataFrame) -> pd.DataFrame:
     working = merged.copy()
+    working["date"] = _coerce_date_column(working["date"])
+    working = working.dropna(subset=["date"])
     working["Date"] = working["date"].dt.strftime("%Y-%m-%d")
     working["Campaign Type"] = working["campaign_name"].map(classify_campaign_type)
     output = (
@@ -1170,10 +1180,28 @@ def _write_google_trends_csv(path: str | Path, trend_df: pd.DataFrame, term: str
 
 
 def _coerce_trend_date_column(values: Any) -> pd.Series:
-    parsed = pd.to_datetime(values, errors="coerce", utc=True)
+    return _coerce_datetime_column(values, utc=True)
+
+
+def _coerce_date_column(values: Any) -> pd.Series:
+    return _coerce_datetime_column(values, utc=True)
+
+
+def _coerce_datetime_column(values: Any, *, utc: bool) -> pd.Series:
+    input_index = values.index if isinstance(values, pd.Series) else None
+    try:
+        parsed = pd.to_datetime(values, errors="coerce", utc=utc, format="mixed")
+    except (TypeError, ValueError):
+        parsed = pd.to_datetime(values, errors="coerce", utc=utc)
     if isinstance(parsed, pd.Timestamp):
         parsed = pd.Series([parsed])
-    return parsed.dt.tz_convert(None)
+    elif not isinstance(parsed, pd.Series):
+        parsed = pd.Series(parsed)
+    if input_index is not None:
+        parsed.index = input_index
+    if utc:
+        return parsed.dt.tz_convert(None)
+    return parsed
 
 
 def _coerce_trend_values(values: Any, keywords: Sequence[str], fallback_keyword: str) -> list[tuple[str, float | None]]:
@@ -1304,7 +1332,7 @@ def _validation_group(df: pd.DataFrame, group_columns: list[str], metrics: list[
     working = df.copy()
     for column in group_columns:
         if column == "Date":
-            working[column] = pd.to_datetime(working[column], errors="coerce", format="mixed").dt.strftime("%Y-%m-%d")
+            working[column] = _coerce_date_column(working[column]).dt.strftime("%Y-%m-%d")
         else:
             working[column] = working[column].fillna("Unknown").astype(str).str.strip()
     for metric in metrics:

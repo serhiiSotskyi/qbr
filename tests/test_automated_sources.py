@@ -11,6 +11,7 @@ from main import run_text_report
 from src.automated_sources import (
     AutomatedSourceError,
     SourcePeriod,
+    _build_wendy_wu_performance_frame,
     _to_float,
     dataforseo_response_to_frame,
     generate_dataforseo_trend_csvs,
@@ -208,6 +209,34 @@ class AutomatedSourcesTests(unittest.TestCase):
             self.assertIn("Japan", set(loaded["destination"]))
             self.assertIsNotNone(other_dir)
             self.assertTrue((Path(other_dir) / "ga4_campaigns.csv").exists())
+
+    def test_ga4_output_handles_mixed_timezone_dates(self) -> None:
+        merged = pd.DataFrame(
+            [
+                {
+                    "date": pd.Timestamp("2026-04-01"),
+                    "campaign_name": "UK Generic Japan",
+                    "cost": 100,
+                    "clicks": 20,
+                    "impressions": 1000,
+                    "sales_leads": 10,
+                    "purchase_revenue": 0,
+                },
+                {
+                    "date": "2026-04-02T00:00:00+00:00",
+                    "campaign_name": "UK Brand",
+                    "cost": 50,
+                    "clicks": 10,
+                    "impressions": 500,
+                    "sales_leads": 5,
+                    "purchase_revenue": 0,
+                },
+            ]
+        )
+
+        output = _build_wendy_wu_performance_frame(merged)
+
+        self.assertEqual(output["Date"].tolist(), ["2026-04-01", "2026-04-02"])
 
     def test_dataforseo_response_normalizes_graph_points(self) -> None:
         frame = dataforseo_response_to_frame(FakeDataForSEOClient().fetch_interest_over_time(
