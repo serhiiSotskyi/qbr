@@ -20,11 +20,12 @@ from src.automated_sources import (
     prepare_automated_source_inputs,
     resolve_trend_terms,
 )
-from src.data_loader import load_csv
+from src.data_loader import QuarterInfo, load_csv
 from src.source_normalizers import (
     normalize_wendy_wu_performance_export,
     normalize_wightlink_performance_export,
 )
+from src.trends_metrics import build_trend_summary
 from src.trends_loader import TrendsLoader
 
 
@@ -282,6 +283,52 @@ class AutomatedSourcesTests(unittest.TestCase):
             loaded = TrendsLoader(tmpdir).load_from_directory()
 
         self.assertEqual(loaded["date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-04-01", "2026-04-08"])
+
+    def test_trend_summary_handles_object_month_start_values(self) -> None:
+        current = pd.DataFrame(
+            [
+                {
+                    "month_start": "2026-01-01T00:00:00+00:00",
+                    "term": "wendy wu tours",
+                    "normalized_term": "wendy wu tour",
+                    "value": 40,
+                },
+                {
+                    "month_start": "2026-04-01",
+                    "term": "wendy wu tours",
+                    "normalized_term": "wendy wu tour",
+                    "value": 80,
+                },
+            ]
+        )
+        previous = pd.DataFrame(
+            [
+                {
+                    "month_start": "2025-01-01T00:00:00+00:00",
+                    "term": "wendy wu tours",
+                    "normalized_term": "wendy wu tour",
+                    "value": 30,
+                },
+                {
+                    "month_start": "2025-04-01",
+                    "term": "wendy wu tours",
+                    "normalized_term": "wendy wu tour",
+                    "value": 45,
+                },
+            ]
+        )
+
+        summary = build_trend_summary(
+            current,
+            name="Brand",
+            terms=["wendy wu tours"],
+            quarter=QuarterInfo(2026, 2),
+            comparison_period="ytd",
+            previous_trends_df=previous,
+        )
+
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["comparison"]["month_label"].tolist(), ["Jan", "Feb", "Mar", "Apr", "May", "Jun"])
 
     def test_dataforseo_response_normalizes_graph_points(self) -> None:
         frame = dataforseo_response_to_frame(FakeDataForSEOClient().fetch_interest_over_time(

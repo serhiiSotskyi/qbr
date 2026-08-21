@@ -84,12 +84,23 @@ def build_trend_summary(
 def _monthly_average(trends_df: pd.DataFrame) -> pd.DataFrame:
     if trends_df is None or trends_df.empty:
         return pd.DataFrame(columns=["month_start", "value"])
+    working = trends_df.copy()
+    working["month_start"] = _coerce_month_start(working["month_start"])
+    working["value"] = pd.to_numeric(working["value"], errors="coerce")
+    working = working.dropna(subset=["month_start", "value"]).copy()
+    if working.empty:
+        return pd.DataFrame(columns=["month_start", "value"])
     return (
-        trends_df.groupby("month_start", as_index=False)["value"]
+        working.groupby("month_start", as_index=False)["value"]
         .mean()
         .sort_values("month_start")
         .reset_index(drop=True)
     )
+
+
+def _coerce_month_start(values: pd.Series) -> pd.Series:
+    parsed = pd.to_datetime(values, errors="coerce", format="mixed", utc=True)
+    return parsed.dt.tz_convert(None).dt.to_period("M").dt.to_timestamp()
 
 
 def _comparison_windows(quarter: QuarterInfo, comparison_period: str) -> tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]:
