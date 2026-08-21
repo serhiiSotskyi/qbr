@@ -213,7 +213,11 @@ def main() -> None:
                     prompt_txt_path,
                     request_dir,
                 )
-                _append_package_files(package_path, [report_artifacts_path])
+                _append_package_paths(
+                    package_path,
+                    [report_artifacts_path, request_dir / "source_data", request_dir / "raw_api"],
+                    arc_base=request_dir,
+                )
                 claude_handoff_path = None
                 claude_handoff_manifest = None
                 if is_wendy_wu_streamlit_report(client_id, report_mode):
@@ -227,6 +231,7 @@ def main() -> None:
                         report_mode=report_mode,
                         source_generation_manifest=source_manifest,
                     )
+                    _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
                 elif is_wightlink_report(client_id, report_mode):
                     claude_handoff_path, claude_handoff_manifest = create_wightlink_claude_handoff_bundle(
                         pptx_path=generated_pptx,
@@ -244,6 +249,7 @@ def main() -> None:
                         report_mode=report_mode,
                         source_generation_manifest=source_manifest,
                     )
+                    _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
                 elif is_olympic_holidays_report(client_id, report_mode):
                     claude_handoff_path, claude_handoff_manifest = create_olympic_holidays_claude_handoff_bundle(
                         pptx_path=generated_pptx,
@@ -255,6 +261,7 @@ def main() -> None:
                         trends_dir=trends_dir,
                         source_generation_manifest=source_manifest,
                     )
+                    _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
                 native_slides_result = generate_native_google_slides(
                     client_id=client_id,
                     client_name=selected_client["name"],
@@ -416,13 +423,34 @@ def _monthly_without_auction(client_id: str, report_mode: str) -> bool:
     return report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
 
 
-def _append_package_files(package_path: Path, extra_files: list[Path]) -> None:
+def _append_package_paths(package_path: Path | None, paths: list[Path], *, arc_base: Path) -> None:
+    if package_path is None:
+        return
     with ZipFile(package_path, "a", compression=ZIP_DEFLATED) as archive:
         existing_names = set(archive.namelist())
-        for extra_file in extra_files:
-            extra_path = Path(extra_file)
-            if extra_path.exists() and extra_path.name not in existing_names:
-                archive.write(extra_path, arcname=extra_path.name)
+        for extra_path in _iter_package_paths(paths):
+            arcname = _package_arcname(extra_path, arc_base)
+            if arcname not in existing_names:
+                archive.write(extra_path, arcname=arcname)
+                existing_names.add(arcname)
+
+
+def _iter_package_paths(paths: list[Path]) -> list[Path]:
+    files: list[Path] = []
+    for path in paths:
+        candidate = Path(path)
+        if candidate.is_file():
+            files.append(candidate)
+        elif candidate.is_dir():
+            files.extend(sorted(item for item in candidate.rglob("*") if item.is_file()))
+    return files
+
+
+def _package_arcname(path: Path, arc_base: Path) -> str:
+    try:
+        return str(path.relative_to(arc_base))
+    except ValueError:
+        return path.name
 
 
 if __name__ == "__main__":
