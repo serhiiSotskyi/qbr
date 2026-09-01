@@ -317,6 +317,13 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
             any(request.get("deleteText", {}).get("objectId") == "p3_i202" for request in fake_client.batch_requests)
         )
         self.assertTrue(any(request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto" for request in fake_client.batch_requests))
+        create_table_request = next(
+            request["createTable"]
+            for request in fake_client.batch_requests
+            if request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto"
+        )
+        self.assertEqual(create_table_request["elementProperties"]["transform"]["scaleX"], 1)
+        self.assertEqual(create_table_request["elementProperties"]["transform"]["scaleY"], 1)
         self.assertEqual(manifest["builder"], "wendy_wu_monthly_template_manifest")
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
@@ -523,7 +530,7 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
                 "objectId": "ca_table_placeholder",
                 "shape": {"text": {"textElements": [{"textRun": {"content": "{{CA_MONTHLY_TABLE}}\n"}}]}},
                 "size": _size(720, 160),
-                "transform": _transform(80, 250),
+                "transform": {**_transform(80, 250), "scaleX": 1.2, "scaleY": 0.8},
             },
             {
                 "objectId": "ca_title",

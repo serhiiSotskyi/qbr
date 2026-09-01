@@ -454,7 +454,7 @@ def _create_table_from_placeholder_requests(
                 "elementProperties": {
                     "pageObjectId": element["slide_id"],
                     "size": element["size"],
-                    "transform": element["transform"],
+                    "transform": _table_creation_transform(element["transform"]),
                 },
                 "rows": rows,
                 "columns": columns,
@@ -650,6 +650,14 @@ def _find_placeholder_element(presentation: dict[str, Any], placeholder: str) ->
                 "transform": element.get("transform") or {},
             }
     return None
+
+
+def _table_creation_transform(transform: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(transform or {})
+    normalized["scaleX"] = 1
+    normalized["scaleY"] = 1
+    normalized.setdefault("unit", "PT")
+    return normalized
 
 
 def _presentation_text(presentation: dict[str, Any]) -> str:
