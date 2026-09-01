@@ -24,6 +24,7 @@ DEFAULT_TEMPLATE_IDS = {
     "GOOGLE_SLIDES_TEMPLATE_WWT_AUS_QBR": "1HukrzM7APAQbPJP9Z_9eyD-RNWa2WNSj6mOQ4dFyMQ8",
     "GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_QBR": "1-cKYm-FWXTVcY5-ozvac-sNpgYm1oIUyShgi6QAVvZ8",
     "GOOGLE_SLIDES_TEMPLATE_WWT_UK_QBR": "1P5L_zODZ1D81QZK5Z8nuZ41ygON3D8GqTjYEeeDqMec",
+    "GOOGLE_SLIDES_TEMPLATE_WWT_UK_MONTHLY": "1864ehY6EwTpneAnh0sTe9xtL6A7bWtLlmTMwqidsX2Q",
     "GOOGLE_SLIDES_TEMPLATE_OLYMPIC_QBR": "1F2pL0nW0RvWU-CaDuXLiYuO9ZL67hXqKt0_m9GSUhAQ",
 }
 
@@ -44,6 +45,18 @@ TEMPLATE_REGISTRY: dict[tuple[str, str], dict[str, str]] = {
     ("wendy_wu", "quarterly"): {
         "key": "wwt_uk_qbr",
         "env_key": "GOOGLE_SLIDES_TEMPLATE_WWT_UK_QBR",
+    },
+    ("wendy_wu", "monthly"): {
+        "key": "wwt_uk_monthly",
+        "env_key": "GOOGLE_SLIDES_TEMPLATE_WWT_UK_MONTHLY",
+        "required_roles": (
+            "cover",
+            "section_divider",
+            "monthly_summary",
+            "monthly_cpl_cvr_chart",
+            "monthly_leads_yoy_chart",
+            "monthly_revenue_yoy_chart",
+        ),
     },
     ("wendy_wu_australia", "quarterly"): {
         "key": "wwt_aus_qbr",
@@ -88,7 +101,7 @@ class GoogleSlidesTemplateRegistry:
                 "configured": False,
                 "template_key": None,
                 "template_env_key": None,
-                "message": "Native Google Slides generation is enabled only for quarterly/QBR templates in this test workflow.",
+                "message": "Native Google Slides generation is enabled only for report modes with a configured template.",
             }
         return {
             "supported": True,
@@ -102,7 +115,7 @@ class GoogleSlidesTemplateRegistry:
     def validate(self, client_id: str, report_mode: str) -> TemplateConfig:
         template = self.get_template(client_id, report_mode)
         if not template:
-            raise ValueError("Native Google Slides generation is currently supported for quarterly/QBR reports only.")
+            raise ValueError("Native Google Slides generation is not configured for this client/report mode.")
         if not template.template_id:
             raise ValueError(f"Missing Google Slides template ID for {template.env_key}.")
         return template

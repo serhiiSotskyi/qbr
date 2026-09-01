@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from src.data_loader import MonthInfo
 from src.google_slides_builder import (
     DriveChartAsset,
     build_chart_replacement_requests,
@@ -20,6 +21,7 @@ from src.google_slides_builder import (
 )
 from src.google_slides_templates import GoogleSlidesTemplateRegistry
 from src.google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
+from src.monthly_google_slides_builder import build_wendy_wu_monthly_slides_payload
 from src.env_utils import load_env_file
 from src.report_artifacts import write_report_artifacts
 
@@ -44,16 +46,19 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertNotIn("refresh-token-secret", status_text)
         self.assertIn("GOOGLE_DRIVE_OUTPUT_FOLDER_ID", status["message"])
 
-    def test_template_registry_supports_quarterly_only(self) -> None:
+    def test_template_registry_supports_quarterly_and_wendy_wu_monthly(self) -> None:
         registry = GoogleSlidesTemplateRegistry()
 
         quarterly = registry.status("wendy_wu", "quarterly")
-        monthly = registry.status("wendy_wu", "monthly")
+        wwt_uk_monthly = registry.status("wendy_wu", "monthly")
+        wwt_aus_monthly = registry.status("wendy_wu_australia", "monthly")
 
         self.assertTrue(quarterly["supported"])
         self.assertTrue(quarterly["configured"])
-        self.assertFalse(monthly["supported"])
-        self.assertIn("quarterly/QBR", monthly["message"])
+        self.assertTrue(wwt_uk_monthly["supported"])
+        self.assertTrue(wwt_uk_monthly["configured"])
+        self.assertFalse(wwt_aus_monthly["supported"])
+        self.assertIn("configured template", wwt_aus_monthly["message"])
 
 
 class ReportArtifactTests(unittest.TestCase):
@@ -248,9 +253,75 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
                     client.trash_file(result.presentation_id)
 
 
+class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
+    def test_monthly_payload_uses_current_month_cards_and_ytd_tables(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_monthly_artifact(root)
+
+            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+                payload = build_wendy_wu_monthly_slides_payload(
+                    request_dir=root,
+                    artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+                )
+
+        self.assertEqual(payload["period"]["label"], "Aug 2026")
+        self.assertEqual(payload["replacements"]["{{ALL_LEADS}}"], "60")
+        self.assertEqual(payload["replacements"]["{{ALL_SPEND}}"], "£600.00")
+        self.assertEqual(payload["replacements"]["{{ALL_LEADS_YOY}}"], "+100.00%")
+        overall = next(section for section in payload["sections"] if section["key"] == "overall")
+        self.assertEqual(len(overall["table_values"]), 10)
+        self.assertEqual(overall["table_values"][0], ["Month", "Impressions", "Clicks", "CTR", "CPC", "Cost", "Sales Leads", "CPL", "CVR", "Revenue"])
+        self.assertEqual(overall["table_values"][-1][0], "Total")
+
+    def test_monthly_native_slides_generate_table_and_chart_requests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_monthly_artifact(root)
+            fake_client = FakeGoogleWorkspaceClient(presentation=_fake_wendy_wu_monthly_presentation())
+
+            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+                result = generate_native_google_slides(
+                    client_id="wendy_wu",
+                    client_name="Wendy Wu Tours",
+                    report_mode="monthly",
+                    request_dir=root,
+                    report_artifacts_path=artifact_path,
+                    google_client=fake_client,
+                    workspace_config=_configured_workspace(),
+                    export_pdf=True,
+                )
+            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.google_slides_url, "https://docs.google.com/presentation/d/copied-deck/edit")
+        self.assertTrue(any(_is_replace_text(request, "{{MONTH_PERIOD}}", "Aug 2026") for request in fake_client.batch_requests))
+        self.assertTrue(
+            any(
+                request.get("insertTableRows", {}).get("tableObjectId") == "p3_i202"
+                and request["insertTableRows"]["number"] == 2
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(any(request.get("replaceImage", {}).get("imageObjectId") == "p4_i217" for request in fake_client.batch_requests))
+        self.assertTrue(
+            any(
+                request.get("replaceAllShapesWithImage", {})
+                .get("containsText", {})
+                .get("text")
+                == "{{ALL_LEADS_YOY_CHART}}"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(any(request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto" for request in fake_client.batch_requests))
+        self.assertEqual(manifest["builder"], "wendy_wu_monthly_template_manifest")
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+
 class FakeGoogleWorkspaceClient:
-    def __init__(self, raise_on_batch: bool = False) -> None:
+    def __init__(self, raise_on_batch: bool = False, presentation: dict | None = None) -> None:
         self.raise_on_batch = raise_on_batch
+        self.presentation = presentation
         self.batch_requests: list[dict] = []
         self.deleted_permissions: list[tuple[str, str]] = []
         self.upload_count = 0
@@ -259,7 +330,7 @@ class FakeGoogleWorkspaceClient:
         return {"id": "copied-deck", "name": title}
 
     def get_presentation(self, presentation_id: str) -> dict:
-        return _fake_presentation(include_sheets_chart=False)
+        return self.presentation or _fake_presentation(include_sheets_chart=False)
 
     def upload_file(self, path: Path, name: str, parent_folder_id: str, mime_type: str) -> dict:
         self.upload_count += 1
@@ -272,7 +343,7 @@ class FakeGoogleWorkspaceClient:
         self.deleted_permissions.append((file_id, permission_id))
 
     def batch_update_presentation(self, presentation_id: str, requests_body: list[dict]) -> dict:
-        self.batch_requests = requests_body
+        self.batch_requests.extend(requests_body)
         if self.raise_on_batch:
             raise RuntimeError("batch failed")
         return {"replies": [{} for _ in requests_body]}
@@ -309,6 +380,69 @@ def _write_native_artifact(root: Path, chart: Path) -> Path:
             }
         ],
         "charts": [{"id": "chart", "title": "Chart", "path": str(chart)}],
+    }
+    artifact_path = root / "report_artifacts.json"
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    return artifact_path
+
+
+def _write_wendy_wu_monthly_artifact(root: Path) -> Path:
+    source_data = root / "source_data"
+    source_data.mkdir(parents=True, exist_ok=True)
+    performance_csv = source_data / "performance.csv"
+    rows = []
+    section_rows = [
+        ("Brand", "China"),
+        ("Generic", "Japan"),
+        ("Performance Max", "SE Asia"),
+        ("Demand Gen", "India"),
+        ("Generic", "Central Asia & Mongolia"),
+        ("Generic", "Peru"),
+    ]
+    for year, leads, cost, revenue in ((2025, 5, 50, 500), (2026, 10, 100, 1000)):
+        for month in range(1, 9):
+            for campaign_type, destination in section_rows:
+                rows.append(
+                    {
+                        "Date": f"{year}-{month:02d}-01",
+                        "Campaign Type": campaign_type,
+                        "Destination": destination,
+                        "Impressions": 1000,
+                        "Clicks": 100,
+                        "Cost": cost,
+                        "Sales Leads": leads,
+                        "Revenue": revenue,
+                    }
+                )
+    performance_csv.write_text(
+        "Date,Campaign Type,Destination,Impressions,Clicks,Cost,Sales Leads,Revenue\n"
+        + "\n".join(
+            ",".join(str(row[column]) for column in ["Date", "Campaign Type", "Destination", "Impressions", "Clicks", "Cost", "Sales Leads", "Revenue"])
+            for row in rows
+        ),
+        encoding="utf-8",
+    )
+    source_manifest = source_data / "SOURCE_GENERATION_MANIFEST.json"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "source_generation": {
+                    "generated_files": {
+                        "performance_csv": "source_data/performance.csv",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifact = {
+        "client_id": "wendy_wu",
+        "client_name": "Wendy Wu Tours",
+        "report_mode": "monthly",
+        "period": {"label": "Aug 2026", "subtitle": "Aug 2026 (YTD Jan - Aug 2026)"},
+        "source_files": {"source_generation_manifest": str(source_manifest)},
+        "slides": [],
+        "charts": [],
     }
     artifact_path = root / "report_artifacts.json"
     artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
@@ -357,6 +491,57 @@ def _fake_presentation(include_sheets_chart: bool = False) -> dict:
             },
         ],
     }
+
+
+def _fake_wendy_wu_monthly_presentation() -> dict:
+    table_ids = [
+        "p3_i202",
+        "p6_i202",
+        "p8_i202",
+        "p10_i202",
+        "p12_i202",
+        "p16_i202",
+        "p19_i202",
+        "p22_i202",
+        "p25_i202",
+        "p28_i202",
+    ]
+    page_elements = [
+        {
+            "objectId": table_id,
+            "table": {"rows": 8, "columns": 10},
+            "transform": _transform(100, 130),
+        }
+        for table_id in table_ids
+    ]
+    page_elements.extend(
+        [
+            {
+                "objectId": "ca_table_placeholder",
+                "shape": {"text": {"textElements": [{"textRun": {"content": "{{CA_MONTHLY_TABLE}}\n"}}]}},
+                "size": _size(720, 160),
+                "transform": _transform(80, 250),
+            },
+            {
+                "objectId": "ca_title",
+                "shape": {"text": {"textElements": [{"textRun": {"content": "Central Asia Summary\n"}}]}},
+                "transform": _transform(50, 50),
+            },
+        ]
+    )
+    return {
+        "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
+        "slides": [{"objectId": "p3", "pageElements": page_elements}],
+    }
+
+
+def _is_replace_text(request: dict, placeholder: str, value: str) -> bool:
+    replacement = request.get("replaceAllText")
+    return bool(
+        replacement
+        and replacement.get("containsText", {}).get("text") == placeholder
+        and replacement.get("replaceText") == value
+    )
 
 
 def _size(width: float, height: float) -> dict:

@@ -37,5 +37,19 @@ but setting them explicitly is safer for Streamlit Cloud operations.
    `google_slides_generation_manifest.json`.
 7. If PDF export works, `google_slides_qa.pdf` is written for visual QA.
 
-Monthly and annual native Google Slides generation remain disabled until matching
-template decks are added to the registry.
+## Monthly Template Prototype
+
+A first WWT UK monthly native Slides template has been copied from the Jun 2026
+example deck and tokenized for the future monthly generator:
+
+- Template: `https://docs.google.com/presentation/d/1864ehY6EwTpneAnh0sTe9xtL6A7bWtLlmTMwqidsX2Q/edit`
+- Manifest: `docs/google_slides_templates/wendy_wu_uk_monthly_test_template.json`
+
+The API Source Test page now enables this template for WWT UK monthly reports.
+The monthly builder overwrites KPI cards, inserts YTD table rows as needed,
+fills/creates native tables from the manifest, and replaces chart slots with
+API-generated PNG charts.
+
+WWT AUS monthly, Wightlink monthly, Olympic monthly, and annual native Google
+Slides generation remain disabled until matching approved template mappings are
+added.

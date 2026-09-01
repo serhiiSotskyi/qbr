@@ -206,6 +206,20 @@ def generate_native_google_slides(
         )
 
     template = registry.validate(client_id, report_mode)
+    if client_id == "wendy_wu" and report_mode == "monthly":
+        from .monthly_google_slides_builder import generate_wendy_wu_monthly_google_slides
+
+        return generate_wendy_wu_monthly_google_slides(
+            client_id=client_id,
+            client_name=client_name,
+            request_dir=request_path,
+            report_artifacts_path=artifact_path,
+            template=template,
+            workspace_config=config,
+            google_client=google_client,
+            export_pdf=export_pdf,
+        )
+
     artifact = _read_artifact(artifact_path)
     period_label = str(artifact.get("period", {}).get("label") or "").strip()
     title = _output_deck_title(client_name, period_label, report_mode)

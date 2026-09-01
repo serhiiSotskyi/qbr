@@ -1,0 +1,226 @@
+{
+  "schema_version": "1.0",
+  "created_at": "2026-09-01",
+  "template_name": "WWT UK Monthly Native Slides Template - TEST tokenized",
+  "source_presentation_id": "1VcnTSo-tvmu_d4MX-C1XS4YV89VdfYbpWwbdQ0e3YeY",
+  "template_presentation_id": "1864ehY6EwTpneAnh0sTe9xtL6A7bWtLlmTMwqidsX2Q",
+  "template_url": "https://docs.google.com/presentation/d/1864ehY6EwTpneAnh0sTe9xtL6A7bWtLlmTMwqidsX2Q/edit",
+  "drive_folder_id": "1G74ZCk1XHct46n7VoXEYhgeioDXaRTTR",
+  "client_id": "wendy_wu",
+  "client_name": "Wendy Wu Tours UK",
+  "report_mode": "monthly",
+  "status": "prototype_template_created",
+  "global_placeholders": {
+    "{{CLIENT_NAME}}": "Visible client name.",
+    "{{MONTH_PERIOD}}": "Selected month label, for example Aug 2026.",
+    "{{MONTH_PERIOD_WITH_YTD}}": "Selected month plus YTD range, for example Aug 2026 (YTD Jan - Aug 2026)."
+  },
+  "generation_rules": {
+    "data_source": "monthly reports use API-generated performance data only",
+    "monthly_kpi_cards": "KPI cards show selected month only, with MoM and YoY comparisons.",
+    "tables": "Tables show YTD monthly rows and must be overwritten by the generator using native table object IDs.",
+    "charts": "Charts should be generated as high-resolution PNG and inserted into the existing chart slots.",
+    "spend_delta_style": "Spend MoM and YoY comparison text must stay neutral grey, regardless of positive or negative change."
+  },
+  "sections": [
+    {
+      "key": "cover",
+      "slides": [
+        {
+          "number": 1,
+          "slide_id": "p1",
+          "role": "cover",
+          "placeholders": [
+            "{{CLIENT_NAME}}",
+            "{{MONTH_PERIOD_WITH_YTD}}",
+            "{{ALL_LEADS}}",
+            "{{ALL_SPEND}}",
+            "{{ALL_CPL}}",
+            "{{ALL_CVR}}"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "performance_divider",
+      "slides": [
+        {
+          "number": 2,
+          "slide_id": "p2",
+          "role": "section_divider",
+          "footer": "{{CLIENT_NAME}} | {{MONTH_PERIOD}} | Summon"
+        }
+      ]
+    },
+    {
+      "key": "overall",
+      "label": "Overall",
+      "prefix": "ALL",
+      "summary_slide_id": "p3",
+      "summary_table_id": "p3_i202",
+      "cpl_cvr_chart_slide_id": "p4",
+      "cpl_cvr_chart_image_id": "p4_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_55",
+      "leads_yoy_placeholder": "{{ALL_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_67",
+      "revenue_yoy_placeholder": "{{ALL_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "brand",
+      "label": "Brand",
+      "prefix": "BRAND",
+      "summary_slide_id": "p6",
+      "summary_table_id": "p6_i202",
+      "cpl_cvr_chart_slide_id": "p7",
+      "cpl_cvr_chart_image_id": "p7_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_81",
+      "leads_yoy_placeholder": "{{BRAND_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_93",
+      "revenue_yoy_placeholder": "{{BRAND_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "generic",
+      "label": "Generic",
+      "prefix": "GEN",
+      "summary_slide_id": "p8",
+      "summary_table_id": "p8_i202",
+      "cpl_cvr_chart_slide_id": "p9",
+      "cpl_cvr_chart_image_id": "p9_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_107",
+      "leads_yoy_placeholder": "{{GEN_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_119",
+      "revenue_yoy_placeholder": "{{GEN_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "performance_max",
+      "label": "Performance Max",
+      "prefix": "PMAX",
+      "summary_slide_id": "p10",
+      "summary_table_id": "p10_i202",
+      "cpl_cvr_chart_slide_id": "p11",
+      "cpl_cvr_chart_image_id": "p11_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_133",
+      "leads_yoy_placeholder": "{{PMAX_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_145",
+      "revenue_yoy_placeholder": "{{PMAX_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "demand_gen",
+      "label": "Demand Gen",
+      "prefix": "DG",
+      "summary_slide_id": "p12",
+      "summary_table_id": "p12_i202",
+      "cpl_cvr_chart_slide_id": "p13",
+      "cpl_cvr_chart_image_id": "p13_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_159",
+      "leads_yoy_placeholder": "{{DG_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_171",
+      "revenue_yoy_placeholder": "{{DG_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "china",
+      "label": "China",
+      "prefix": "CHINA",
+      "summary_slide_id": "p16",
+      "summary_table_id": "p16_i202",
+      "cpl_cvr_chart_slide_id": "p17",
+      "cpl_cvr_chart_image_id": "p17_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_185",
+      "leads_yoy_placeholder": "{{CHINA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_197",
+      "revenue_yoy_placeholder": "{{CHINA_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "japan",
+      "label": "Japan",
+      "prefix": "JAPAN",
+      "summary_slide_id": "p19",
+      "summary_table_id": "p19_i202",
+      "cpl_cvr_chart_slide_id": "p20",
+      "cpl_cvr_chart_image_id": "p20_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_211",
+      "leads_yoy_placeholder": "{{JAPAN_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_223",
+      "revenue_yoy_placeholder": "{{JAPAN_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "se_asia",
+      "label": "SE Asia",
+      "prefix": "SEA",
+      "summary_slide_id": "p22",
+      "summary_table_id": "p22_i202",
+      "cpl_cvr_chart_slide_id": "p23",
+      "cpl_cvr_chart_image_id": "p23_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_237",
+      "leads_yoy_placeholder": "{{SEA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_249",
+      "revenue_yoy_placeholder": "{{SEA_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "india",
+      "label": "India",
+      "prefix": "INDIA",
+      "summary_slide_id": "p25",
+      "summary_table_id": "p25_i202",
+      "cpl_cvr_chart_slide_id": "p26",
+      "cpl_cvr_chart_image_id": "p26_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_263",
+      "leads_yoy_placeholder": "{{INDIA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_275",
+      "revenue_yoy_placeholder": "{{INDIA_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "other",
+      "label": "Other",
+      "prefix": "OTHER",
+      "summary_slide_id": "p28",
+      "summary_table_id": "p28_i202",
+      "cpl_cvr_chart_slide_id": "p29",
+      "cpl_cvr_chart_image_id": "p29_i217",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_289",
+      "leads_yoy_placeholder": "{{OTHER_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_301",
+      "revenue_yoy_placeholder": "{{OTHER_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "central_asia",
+      "label": "Central Asia",
+      "prefix": "CA",
+      "summary_slide_id": "g3f9d114eabf_5_315",
+      "summary_table_placeholder": "{{CA_MONTHLY_TABLE}}",
+      "cpl_cvr_chart_slide_id": "g3f9d114eabf_5_363",
+      "cpl_cvr_chart_placeholder": "{{CA_CPL_CVR_CHART}}",
+      "leads_yoy_slide_id": "g3f9d114eabf_5_375",
+      "leads_yoy_placeholder": "{{CA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9d114eabf_5_386",
+      "revenue_yoy_placeholder": "{{CA_REVENUE_YOY_CHART}}"
+    }
+  ],
+  "summary_kpi_placeholders": [
+    "{{PREFIX_LEADS}}",
+    "{{PREFIX_LEADS_MOM}}",
+    "{{PREFIX_LEADS_YOY}}",
+    "{{PREFIX_SPEND}}",
+    "{{PREFIX_SPEND_MOM}}",
+    "{{PREFIX_SPEND_YOY}}",
+    "{{PREFIX_CPL}}",
+    "{{PREFIX_CPL_MOM}}",
+    "{{PREFIX_CPL_YOY}}",
+    "{{PREFIX_CVR}}",
+    "{{PREFIX_CVR_MOM}}",
+    "{{PREFIX_CVR_YOY}}",
+    "{{PREFIX_CLICKS}}",
+    "{{PREFIX_CLICKS_MOM}}",
+    "{{PREFIX_CLICKS_YOY}}",
+    "{{PREFIX_CTR}}",
+    "{{PREFIX_CTR_MOM}}",
+    "{{PREFIX_CTR_YOY}}",
+    "{{PREFIX_REVENUE}}",
+    "{{PREFIX_REVENUE_STATUS}}",
+    "{{PREFIX_INSIGHTS}}"
+  ],
+  "known_limitations": [
+    "The source deck did not include a native table on the Central Asia summary slide. The first monthly generator pass should either create that table from data or duplicate a populated destination summary exemplar before filling it.",
+    "The existing native table body cells still contain example values from Jun 2026. The generator must overwrite every body cell before delivery; clearing native Google Slides tables requires per-cell requests."
+  ]
+}
