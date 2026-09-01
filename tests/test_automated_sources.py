@@ -13,6 +13,7 @@ from src.automated_sources import (
     SourcePeriod,
     _build_wendy_wu_performance_frame,
     _to_float,
+    classify_olympic_datastudio_campaign_type,
     classify_wendy_wu_aus_datastudio_destination,
     classify_wendy_wu_uk_datastudio_destination,
     dataforseo_response_to_frame,
@@ -118,6 +119,26 @@ class CompleteMonthFakeGA4Client:
             _ga4_event_row("20260615", "UK Generic Japan", "form_enquire_submit", 5, 0),
             _ga4_event_row("20260715", "UK Generic Japan", "form_enquire_submit", 6, 0),
             _ga4_event_row("20260720", "UK Brand", "form_enquire_submit", 3, 0),
+        ]
+
+
+class OlympicFakeGA4Client:
+    def __init__(self) -> None:
+        self.filters = []
+
+    def run_report(self, *, dimensions, metrics, dimension_filter=None, **kwargs):
+        self.filters.append(dimension_filter)
+        if "advertiserAdCost" in metrics:
+            return [
+                _ga4_cost_row("20260801", "Performance Max - Greece", 100, 10, 1000, channel_group="Cross-network"),
+                _ga4_cost_row("20260801", "PMax - Domes Luxury", 20, 2, 200, channel_group="Cross-network"),
+                _ga4_cost_row("20260801", "Display - Remarketing - Greece", 5, 1, 50, channel_group="Display"),
+            ]
+        return [
+            _ga4_event_row("20260801", "Performance Max - Greece", "purchase", 2, 500, channel_group="Cross-network"),
+            _ga4_event_row("20260801", "PMax - Domes Luxury", "add_to_cart", 3, 0, channel_group="Cross-network"),
+            _ga4_event_row("20260801", "Display - Remarketing - Greece", "add_to_cart", 2, 0, channel_group="Display"),
+            _ga4_event_row("20250110", "Q125", "add_to_cart", 1, 0, channel_group="Display"),
         ]
 
 
@@ -256,6 +277,34 @@ class AutomatedSourcesTests(unittest.TestCase):
         for campaign, expected in cases.items():
             with self.subTest(campaign=campaign):
                 self.assertEqual(classify_wendy_wu_uk_datastudio_destination(campaign), expected)
+
+    def test_olympic_api_source_matches_datastudio_channel_and_campaign_type_rules(self) -> None:
+        fake_client = OlympicFakeGA4Client()
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {
+                "GA4_PROPERTY_ID_OLYMPIC_HOLIDAYS": "123456",
+                "GA4_OAUTH_ACCESS_TOKEN": "token",
+            },
+            clear=False,
+        ):
+            performance_path, _ = generate_ga4_performance_csv(
+                client_config={"id": "olympic_holidays"},
+                report_mode="monthly",
+                output_dir=tmpdir,
+                ga4_client=fake_client,
+                today=pd.Timestamp("2026-09-01"),
+            )
+
+            output = pd.read_csv(performance_path)
+
+        self.assertIn("Display", str(fake_client.filters))
+        self.assertEqual(classify_olympic_datastudio_campaign_type("PMax - Domes Luxury"), "Other")
+        performance_max = output[output["Campaign Type"] == "Performance Max"]
+        other = output[output["Campaign Type"] == "Other"]
+        self.assertEqual(float(performance_max["Cost"].sum()), 100.0)
+        self.assertEqual(float(other["Cost"].sum()), 25.0)
+        self.assertEqual(float(other["Add to cart"].sum()), 5.0)
 
     def test_ga4_output_handles_mixed_timezone_dates(self) -> None:
         merged = pd.DataFrame(
@@ -597,22 +646,38 @@ class AutomatedSourcesTests(unittest.TestCase):
         self.assertEqual(terms, ["Wightlink Ferries", "Isle of Wight Ferry", "Isle of Wight Holidays"])
 
 
-def _ga4_cost_row(date: str, campaign: str, cost: float, clicks: float, impressions: float) -> dict:
+def _ga4_cost_row(
+    date: str,
+    campaign: str,
+    cost: float,
+    clicks: float,
+    impressions: float,
+    *,
+    channel_group: str = "Paid Search",
+) -> dict:
     return {
         "date": date,
         "sessionCampaignName": campaign,
-        "sessionDefaultChannelGroup": "Paid Search",
+        "sessionDefaultChannelGroup": channel_group,
         "advertiserAdCost": str(cost),
         "advertiserAdClicks": str(clicks),
         "advertiserAdImpressions": str(impressions),
     }
 
 
-def _ga4_event_row(date: str, campaign: str, event_name: str, key_events: float, revenue: float) -> dict:
+def _ga4_event_row(
+    date: str,
+    campaign: str,
+    event_name: str,
+    key_events: float,
+    revenue: float,
+    *,
+    channel_group: str = "Paid Search",
+) -> dict:
     return {
         "date": date,
         "campaignName": campaign,
-        "defaultChannelGroup": "Paid Search",
+        "defaultChannelGroup": channel_group,
         "eventName": event_name,
         "keyEvents": str(key_events),
         "purchaseRevenue": str(revenue),

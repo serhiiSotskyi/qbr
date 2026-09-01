@@ -85,6 +85,9 @@ CLIENT_SOURCE_RULES: dict[str, dict[str, Any]] = {
         "events": ("purchase", "add_to_cart"),
         "currency": "GBP",
         "ga4_property_env": ("GA4_PROPERTY_ID_OLYMPIC_HOLIDAYS", "GA4_PROPERTY_ID_OLYMPIC"),
+        "channel_groups": ("Paid Search", "Cross-network", "Display"),
+        "exclude_event_channel_campaign_exact": (("Display", "Q125"),),
+        "campaign_type_classifier": "olympic_datastudio",
         "trend_location": "United Kingdom",
         "trend_terms": ("Olympic Holidays", "Holidays to Greece"),
     },
@@ -280,6 +283,7 @@ def generate_ga4_performance_csv(
     period = default_source_period(report_mode, today=today)
     start_date = _source_start_date(period, report_mode)
     end_date = period.end
+    channel_groups = tuple(rules.get("channel_groups", PAID_CHANNEL_GROUPS))
 
     request_path = Path(output_dir)
     output_path = request_path / "source_data"
@@ -294,7 +298,7 @@ def generate_ga4_performance_csv(
         metrics=["advertiserAdCost", "advertiserAdClicks", "advertiserAdImpressions"],
         start_date=start_date,
         end_date=end_date,
-        dimension_filter=_in_list_filter("sessionDefaultChannelGroup", PAID_CHANNEL_GROUPS),
+        dimension_filter=_in_list_filter("sessionDefaultChannelGroup", channel_groups),
         currency_code=str(rules.get("currency", "GBP")),
     )
     event_rows = api_client.run_report(
@@ -304,7 +308,7 @@ def generate_ga4_performance_csv(
         start_date=start_date,
         end_date=end_date,
         dimension_filter=_and_filter(
-            _in_list_filter("defaultChannelGroup", PAID_CHANNEL_GROUPS),
+            _in_list_filter("defaultChannelGroup", channel_groups),
             _in_list_filter("eventName", rules["events"]),
         ),
         currency_code=str(rules.get("currency", "GBP")),
@@ -320,11 +324,17 @@ def generate_ga4_performance_csv(
     if rules["mode"] == "wightlink":
         performance_df = _build_wightlink_performance_frame(merged)
     elif rules["mode"] == "olympic":
-        performance_df = _build_olympic_performance_frame(merged)
+        performance_df = _build_olympic_performance_frame(
+            merged,
+            campaign_type_classifier=_campaign_type_classifier_for_rules(rules),
+        )
     elif client_id == "wightlink":
         performance_df = _build_wightlink_performance_frame(merged)
     elif client_id == "olympic_holidays":
-        performance_df = _build_olympic_performance_frame(merged)
+        performance_df = _build_olympic_performance_frame(
+            merged,
+            campaign_type_classifier=_campaign_type_classifier_for_rules(rules),
+        )
     else:
         performance_df = _build_wendy_wu_performance_frame(
             merged,
@@ -808,7 +818,8 @@ def _event_rows_to_frame(rows: Sequence[dict[str, Any]], rules: dict[str, Any]) 
         date = _parse_ga4_date(row.get("date"))
         event_name = str(row.get("eventName", "")).strip()
         campaign = _clean_campaign_name(row.get("campaignName"))
-        if _exclude_event_row(date, event_name, campaign, rules):
+        channel_group = str(row.get("defaultChannelGroup", "")).strip()
+        if _exclude_event_row(date, event_name, campaign, rules, channel_group=channel_group):
             continue
         records.append(
             {
@@ -920,12 +931,17 @@ def _build_wightlink_performance_frame(merged: pd.DataFrame) -> pd.DataFrame:
     return output[["Date", "Campaign Type", "Data Type", "Purchases", "Purchase Revenue", "Cost", "Impressions", "Clicks"]]
 
 
-def _build_olympic_performance_frame(merged: pd.DataFrame) -> pd.DataFrame:
+def _build_olympic_performance_frame(
+    merged: pd.DataFrame,
+    *,
+    campaign_type_classifier: Any | None = None,
+) -> pd.DataFrame:
     working = merged.copy()
     working["date"] = _coerce_date_column(working["date"])
     working = working.dropna(subset=["date"])
     working["Date"] = working["date"].dt.strftime("%Y-%m-%d")
-    working["Campaign Type"] = working["campaign_name"].map(classify_campaign_type)
+    classifier = campaign_type_classifier or classify_campaign_type
+    working["Campaign Type"] = working["campaign_name"].map(classifier)
     output = (
         working.groupby(["Date", "Campaign Type"], as_index=False)[["purchases", "purchase_revenue", "cost", "add_to_cart"]]
         .sum(min_count=1)
@@ -976,6 +992,20 @@ def classify_campaign_type(campaign_name: Any) -> str:
     if "generic" in normalized or "generics" in normalized or "non brand" in normalized or "nonbrand" in compact:
         return "Generic"
     return "Other"
+
+
+def classify_olympic_datastudio_campaign_type(campaign_name: Any) -> str:
+    normalized = _normalize_text(campaign_name)
+    if normalized == "pmax domes luxury":
+        return "Other"
+    return classify_campaign_type(campaign_name)
+
+
+def _campaign_type_classifier_for_rules(rules: Mapping[str, Any]) -> Any:
+    classifier_name = str(rules.get("campaign_type_classifier", "")).strip()
+    if classifier_name == "olympic_datastudio":
+        return classify_olympic_datastudio_campaign_type
+    return classify_campaign_type
 
 
 def classify_destination(campaign_name: Any) -> str:
@@ -1191,8 +1221,23 @@ def _and_filter(*expressions: dict[str, Any]) -> dict[str, Any]:
     return {"andGroup": {"expressions": [expr for expr in expressions if expr]}}
 
 
-def _exclude_event_row(date: pd.Timestamp | None, event_name: str, campaign_name: str, rules: dict[str, Any]) -> bool:
+def _exclude_event_row(
+    date: pd.Timestamp | None,
+    event_name: str,
+    campaign_name: str,
+    rules: dict[str, Any],
+    *,
+    channel_group: str | None = None,
+) -> bool:
     normalized_campaign = campaign_name.lower()
+    normalized_campaign_exact = _normalize_text(campaign_name)
+    normalized_channel = _normalize_text(channel_group)
+    for exclusion in rules.get("exclude_event_channel_campaign_exact", ()):
+        if not isinstance(exclusion, Sequence) or isinstance(exclusion, str) or len(exclusion) < 2:
+            continue
+        if normalized_channel == _normalize_text(exclusion[0]) and normalized_campaign_exact == _normalize_text(exclusion[1]):
+            return True
+
     for term in rules.get("exclude_event_any_campaign_contains", ()):
         if str(term).strip().lower() in normalized_campaign:
             return True
@@ -1452,6 +1497,7 @@ __all__ = [
     "DataForSEOTrendsClient",
     "GA4DataApiClient",
     "SourcePeriod",
+    "classify_olympic_datastudio_campaign_type",
     "classify_campaign_type",
     "classify_destination",
     "classify_wendy_wu_aus_datastudio_destination",
