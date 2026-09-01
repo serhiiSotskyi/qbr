@@ -109,7 +109,8 @@ def generate_wendy_wu_monthly_google_slides(
         requests_body.extend(_build_central_asia_label_requests(presentation))
         requests_body.extend(_build_scalar_replacement_requests(payload["replacements"]))
         table_dimensions = _table_dimensions_by_id(presentation)
-        requests_body.extend(_build_summary_table_requests(payload["sections"], table_dimensions, presentation))
+        table_cell_text = _table_cell_text_by_id(presentation)
+        requests_body.extend(_build_summary_table_requests(payload["sections"], table_dimensions, table_cell_text, presentation))
         uploaded_assets = _upload_chart_assets(asset_store, payload["sections"])
         requests_body.extend(_build_monthly_chart_requests(payload["sections"], uploaded_assets))
 
@@ -346,6 +347,7 @@ def _build_central_asia_label_requests(presentation: dict[str, Any]) -> list[dic
 def _build_summary_table_requests(
     sections: Sequence[dict[str, Any]],
     table_dimensions: dict[str, tuple[int, int]],
+    table_cell_text: dict[str, dict[tuple[int, int], str]],
     presentation: dict[str, Any],
 ) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
@@ -364,6 +366,7 @@ def _build_summary_table_requests(
                     values=table_values,
                     existing_rows=rows,
                     existing_columns=columns,
+                    existing_cell_text=table_cell_text.get(str(table_id), {}),
                 )
             )
             continue
@@ -387,6 +390,7 @@ def _replace_existing_table_requests(
     values: Sequence[Sequence[str]],
     existing_rows: int,
     existing_columns: int,
+    existing_cell_text: dict[tuple[int, int], str] | None = None,
 ) -> list[dict[str, Any]]:
     target_rows = len(values)
     target_columns = max(len(row) for row in values) if values else 0
@@ -418,7 +422,7 @@ def _replace_existing_table_requests(
             }
         )
 
-    requests_body.extend(_table_cell_text_requests(table_id, values, final_rows, final_columns))
+    requests_body.extend(_table_cell_text_requests(table_id, values, final_rows, final_columns, existing_cell_text or {}))
     return requests_body
 
 
@@ -457,7 +461,7 @@ def _create_table_from_placeholder_requests(
             }
         },
     ]
-    requests_body.extend(_table_cell_text_requests(table_id, values, rows, columns))
+    requests_body.extend(_table_cell_text_requests(table_id, values, rows, columns, {}))
     return requests_body
 
 
@@ -466,22 +470,25 @@ def _table_cell_text_requests(
     values: Sequence[Sequence[str]],
     row_count: int,
     column_count: int,
+    existing_cell_text: dict[tuple[int, int], str] | None = None,
 ) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
+    existing_cell_text = existing_cell_text or {}
     for row_index in range(row_count):
         row = values[row_index] if row_index < len(values) else []
         for column_index in range(column_count):
             text = str(row[column_index]) if column_index < len(row) else ""
             cell_location = {"rowIndex": row_index, "columnIndex": column_index}
-            requests_body.append(
-                {
-                    "deleteText": {
-                        "objectId": table_id,
-                        "cellLocation": cell_location,
-                        "textRange": {"type": "ALL"},
+            if existing_cell_text.get((row_index, column_index), "").strip():
+                requests_body.append(
+                    {
+                        "deleteText": {
+                            "objectId": table_id,
+                            "cellLocation": cell_location,
+                            "textRange": {"type": "ALL"},
+                        }
                     }
-                }
-            )
+                )
             if text:
                 requests_body.append(
                     {
@@ -607,6 +614,29 @@ def _table_dimensions_by_id(presentation: dict[str, Any]) -> dict[str, tuple[int
     return dimensions
 
 
+def _table_cell_text_by_id(presentation: dict[str, Any]) -> dict[str, dict[tuple[int, int], str]]:
+    cell_text: dict[str, dict[tuple[int, int], str]] = {}
+    for slide in presentation.get("slides") or []:
+        for element in slide.get("pageElements") or []:
+            table = element.get("table")
+            object_id = str(element.get("objectId") or "")
+            if not object_id or not isinstance(table, dict):
+                continue
+            table_rows = table.get("tableRows") or []
+            if not isinstance(table_rows, list):
+                continue
+            table_cells: dict[tuple[int, int], str] = {}
+            for row_index, row in enumerate(table_rows):
+                cells = row.get("tableCells") if isinstance(row, dict) else None
+                if not isinstance(cells, list):
+                    continue
+                for column_index, cell in enumerate(cells):
+                    if isinstance(cell, dict):
+                        table_cells[(row_index, column_index)] = _table_cell_text(cell)
+            cell_text[object_id] = table_cells
+    return cell_text
+
+
 def _find_placeholder_element(presentation: dict[str, Any], placeholder: str) -> dict[str, Any] | None:
     for slide in presentation.get("slides") or []:
         slide_id = str(slide.get("objectId") or "")
@@ -629,6 +659,15 @@ def _presentation_text(presentation: dict[str, Any]) -> str:
 def _element_text(element: dict[str, Any]) -> str:
     parts: list[str] = []
     for item in element.get("shape", {}).get("text", {}).get("textElements", []) or []:
+        text_run = item.get("textRun")
+        if text_run and text_run.get("content"):
+            parts.append(str(text_run["content"]))
+    return "".join(parts)
+
+
+def _table_cell_text(cell: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for item in cell.get("text", {}).get("textElements", []) or []:
         text_run = item.get("textRun")
         if text_run and text_run.get("content"):
             parts.append(str(text_run["content"]))

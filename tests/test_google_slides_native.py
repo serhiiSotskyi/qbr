@@ -313,6 +313,9 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                 for request in fake_client.batch_requests
             )
         )
+        self.assertFalse(
+            any(request.get("deleteText", {}).get("objectId") == "p3_i202" for request in fake_client.batch_requests)
+        )
         self.assertTrue(any(request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto" for request in fake_client.batch_requests))
         self.assertEqual(manifest["builder"], "wendy_wu_monthly_template_manifest")
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
