@@ -135,6 +135,13 @@ def _looks_headerless(df: pd.DataFrame) -> bool:
 
 def _rename_columns(df: pd.DataFrame, canonical_columns: list[str]) -> pd.DataFrame:
     lookup = {_normalize_header(column): column for column in canonical_columns}
+    if "Revenue" in canonical_columns and "Purchase Revenue" not in canonical_columns:
+        lookup.update(
+            {
+                "purchaserevenue": "Revenue",
+                "salesrevenue": "Revenue",
+            }
+        )
     rename_map = {
         column: lookup[_normalize_header(column)]
         for column in df.columns

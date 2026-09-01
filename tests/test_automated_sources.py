@@ -13,6 +13,8 @@ from src.automated_sources import (
     SourcePeriod,
     _build_wendy_wu_performance_frame,
     _to_float,
+    classify_wendy_wu_aus_datastudio_destination,
+    classify_wendy_wu_uk_datastudio_destination,
     dataforseo_response_to_frame,
     generate_dataforseo_trend_csvs,
     generate_ga4_performance_csv,
@@ -71,8 +73,16 @@ class FakeGA4Client:
                 "date": "20260402",
                 "campaignName": "(not set)",
                 "defaultChannelGroup": "Paid Search",
-                "eventName": "form_enquire_submit",
+                "eventName": "brochure_downloads",
                 "keyEvents": "99",
+                "purchaseRevenue": "0",
+            },
+            {
+                "date": "20260404",
+                "campaignName": "(not set)",
+                "defaultChannelGroup": "Paid Search",
+                "eventName": "form_enquire_submit",
+                "keyEvents": "2",
                 "purchaseRevenue": "0",
             },
             {
@@ -206,11 +216,46 @@ class AutomatedSourcesTests(unittest.TestCase):
             )
 
             loaded = load_csv(performance_path)
-            self.assertEqual(float(loaded["sales_leads"].sum()), 15.0)
+            self.assertEqual(float(loaded["sales_leads"].sum()), 17.0)
             self.assertEqual(float(loaded["cost"].sum()), 125.0)
             self.assertIn("Japan", set(loaded["destination"]))
             self.assertIsNotNone(other_dir)
             self.assertTrue((Path(other_dir) / "ga4_campaigns.csv").exists())
+
+    def test_wendy_wu_aus_api_destinations_match_datastudio_buckets(self) -> None:
+        cases = {
+            "AUS - Generic - China": "China",
+            "AUS - Generic - Japan": "Japan",
+            "AUS - Generic - India": "India",
+            "AUS - Generic - Vietnam": "SE Asia",
+            "AUS - Generic - Vietnam & Cambodia": "SE Asia",
+            "AUS - Generic - Thailand": "Other",
+            "AUS - Generic - Malaysia": "Other",
+            "AUS - Generic - Laos - General": "Other",
+            "AUS - Generic - Central Asia": "Other",
+            "AUS - Generic - Mongolia": "Other",
+        }
+
+        for campaign, expected in cases.items():
+            with self.subTest(campaign=campaign):
+                self.assertEqual(classify_wendy_wu_aus_datastudio_destination(campaign), expected)
+
+    def test_wendy_wu_uk_api_destinations_match_datastudio_buckets(self) -> None:
+        cases = {
+            "UK - Generic - China": "China",
+            "UK - Generic - Japan": "Japan",
+            "UK - Generic - India": "India",
+            "UK - Generic - Vietnam": "SE Asia",
+            "UK - Generic - Cambodia": "SE Asia",
+            "UK - Generic - Thailand - General": "Other",
+            "UK - Generic - Malaysia & Borneo - General": "Other",
+            "UK - Generic - Central Asia - General": "Central Asia",
+            "UK - Generic - Mongolia": "Central Asia",
+        }
+
+        for campaign, expected in cases.items():
+            with self.subTest(campaign=campaign):
+                self.assertEqual(classify_wendy_wu_uk_datastudio_destination(campaign), expected)
 
     def test_ga4_output_handles_mixed_timezone_dates(self) -> None:
         merged = pd.DataFrame(
@@ -239,6 +284,28 @@ class AutomatedSourcesTests(unittest.TestCase):
         output = _build_wendy_wu_performance_frame(merged)
 
         self.assertEqual(output["Date"].tolist(), ["2026-04-01", "2026-04-02"])
+
+    def test_wendy_wu_export_normalizer_maps_purchase_revenue_header(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "wendy_wu.csv"
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "2026-08-01",
+                        "Campaign Type": "Brand",
+                        "Destination": "Other",
+                        "Sales Leads": 2,
+                        "Cost": 10,
+                        "Impressions": 100,
+                        "Clicks": 5,
+                        "Purchase revenue": 123.45,
+                    }
+                ]
+            ).to_csv(path, index=False)
+
+            normalized = normalize_wendy_wu_performance_export(path)
+
+        self.assertEqual(normalized["Revenue"].tolist(), [123.45])
 
     def test_load_csv_handles_mixed_timezone_date_strings(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

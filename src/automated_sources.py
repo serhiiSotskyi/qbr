@@ -47,6 +47,7 @@ CLIENT_SOURCE_RULES: dict[str, dict[str, Any]] = {
         "ga4_property_env": ("GA4_PROPERTY_ID_WENDY_WU", "GA4_PROPERTY_ID_WWT_UK"),
         "trend_location": "United Kingdom",
         "include_revenue": True,
+        "destination_classifier": "wwt_uk_datastudio",
     },
     "wendy_wu_australia": {
         "mode": "lead",
@@ -62,8 +63,15 @@ CLIENT_SOURCE_RULES: dict[str, dict[str, Any]] = {
         "ga4_property_env": ("GA4_PROPERTY_ID_WENDY_WU_AUSTRALIA", "GA4_PROPERTY_ID_WWT_AUS"),
         "trend_location": "Australia",
         "exclude_current_year_not_set_from": 2026,
+        "allow_current_year_not_set_events": (
+            "form_enquire_submit",
+            "form_newsletter_signup",
+            "purchase",
+        ),
         "exclude_event_campaign_contains": {"hubspot_live_chat": ("general 22",)},
+        "exclude_event_any_campaign_contains": ("general 22",),
         "include_revenue": False,
+        "destination_classifier": "wwt_aus_datastudio",
     },
     "wightlink": {
         "mode": "wightlink",
@@ -318,7 +326,11 @@ def generate_ga4_performance_csv(
     elif client_id == "olympic_holidays":
         performance_df = _build_olympic_performance_frame(merged)
     else:
-        performance_df = _build_wendy_wu_performance_frame(merged, include_revenue=bool(rules.get("include_revenue", True)))
+        performance_df = _build_wendy_wu_performance_frame(
+            merged,
+            include_revenue=bool(rules.get("include_revenue", True)),
+            destination_classifier=_destination_classifier_for_rules(rules),
+        )
 
     performance_path = output_path / "performance.csv"
     performance_df.to_csv(performance_path, index=False)
@@ -849,13 +861,19 @@ def _pivot_event_metrics(event_df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _build_wendy_wu_performance_frame(merged: pd.DataFrame, *, include_revenue: bool = True) -> pd.DataFrame:
+def _build_wendy_wu_performance_frame(
+    merged: pd.DataFrame,
+    *,
+    include_revenue: bool = True,
+    destination_classifier: Any | None = None,
+) -> pd.DataFrame:
     working = merged.copy()
     working["date"] = _coerce_date_column(working["date"])
     working = working.dropna(subset=["date"])
     working["Date"] = working["date"].dt.strftime("%Y-%m-%d")
     working["Campaign Type"] = working["campaign_name"].map(classify_campaign_type)
-    working["Destination"] = working["campaign_name"].map(classify_destination)
+    classifier = destination_classifier or classify_destination
+    working["Destination"] = working["campaign_name"].map(classifier)
     output = (
         working.groupby(["Date", "Campaign Type", "Destination"], as_index=False)[
             ["impressions", "clicks", "cost", "sales_leads", "purchase_revenue"]
@@ -973,6 +991,43 @@ def classify_destination(campaign_name: Any) -> str:
     if any(term in normalized for term in ("se asia", "southeast asia", "south east asia", "vietnam", "cambodia", "thailand", "malaysia", "borneo", "mekong", "laos")):
         return "SE Asia"
     return "Other"
+
+
+def classify_wendy_wu_uk_datastudio_destination(campaign_name: Any) -> str:
+    normalized = _normalize_text(campaign_name)
+    if "china" in normalized:
+        return "China"
+    if "japan" in normalized:
+        return "Japan"
+    if "india" in normalized:
+        return "India"
+    if any(term in normalized for term in ("central asia", "mongolia", "kazakhstan", "uzbekistan", "kyrgyzstan", "tajikistan", "turkmenistan")):
+        return "Central Asia"
+    if any(term in normalized for term in ("se asia", "southeast asia", "south east asia", "vietnam", "cambodia")):
+        return "SE Asia"
+    return "Other"
+
+
+def classify_wendy_wu_aus_datastudio_destination(campaign_name: Any) -> str:
+    normalized = _normalize_text(campaign_name)
+    if "china" in normalized:
+        return "China"
+    if "japan" in normalized:
+        return "Japan"
+    if "india" in normalized:
+        return "India"
+    if any(term in normalized for term in ("se asia", "southeast asia", "south east asia", "vietnam", "cambodia")):
+        return "SE Asia"
+    return "Other"
+
+
+def _destination_classifier_for_rules(rules: Mapping[str, Any]) -> Any:
+    classifier_name = str(rules.get("destination_classifier", "")).strip()
+    if classifier_name == "wwt_uk_datastudio":
+        return classify_wendy_wu_uk_datastudio_destination
+    if classifier_name == "wwt_aus_datastudio":
+        return classify_wendy_wu_aus_datastudio_destination
+    return classify_destination
 
 
 def classify_wightlink_data_type(campaign_name: Any) -> str:
@@ -1137,14 +1192,25 @@ def _and_filter(*expressions: dict[str, Any]) -> dict[str, Any]:
 
 
 def _exclude_event_row(date: pd.Timestamp | None, event_name: str, campaign_name: str, rules: dict[str, Any]) -> bool:
+    normalized_campaign = campaign_name.lower()
+    for term in rules.get("exclude_event_any_campaign_contains", ()):
+        if str(term).strip().lower() in normalized_campaign:
+            return True
+
     if date is not None and not pd.isna(date):
         exclude_from = rules.get("exclude_current_year_not_set_from")
-        if exclude_from and int(date.year) >= int(exclude_from) and _normalize_text(campaign_name) in {"", "not set"}:
+        allowed_not_set_events = {str(value).strip() for value in rules.get("allow_current_year_not_set_events", ())}
+        if (
+            exclude_from
+            and int(date.year) >= int(exclude_from)
+            and _normalize_text(campaign_name) in {"", "not set"}
+            and event_name not in allowed_not_set_events
+        ):
             return True
 
     event_exclusions = rules.get("exclude_event_campaign_contains", {})
     for term in event_exclusions.get(event_name, ()):
-        if str(term).strip().lower() in campaign_name.lower():
+        if str(term).strip().lower() in normalized_campaign:
             return True
     return False
 
@@ -1388,6 +1454,8 @@ __all__ = [
     "SourcePeriod",
     "classify_campaign_type",
     "classify_destination",
+    "classify_wendy_wu_aus_datastudio_destination",
+    "classify_wendy_wu_uk_datastudio_destination",
     "client_has_trends",
     "dataforseo_env_configured",
     "dataforseo_source_status",
