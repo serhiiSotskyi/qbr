@@ -306,10 +306,22 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertTrue(any(request.get("replaceImage", {}).get("imageObjectId") == "p4_i217" for request in fake_client.batch_requests))
         self.assertTrue(
             any(
+                request.get("updatePageElementTransform", {}).get("objectId") == "p4_i217"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
                 request.get("replaceAllShapesWithImage", {})
                 .get("containsText", {})
                 .get("text")
                 == "{{ALL_LEADS_YOY_CHART}}"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updatePageElementTransform", {}).get("objectId") == "all_leads_yoy_placeholder"
                 for request in fake_client.batch_requests
             )
         )
@@ -531,6 +543,12 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
                 "shape": {"text": {"textElements": [{"textRun": {"content": "{{CA_MONTHLY_TABLE}}\n"}}]}},
                 "size": _size(720, 160),
                 "transform": {**_transform(80, 250), "scaleX": 1.2, "scaleY": 0.8},
+            },
+            {
+                "objectId": "all_leads_yoy_placeholder",
+                "shape": {"text": {"textElements": [{"textRun": {"content": "{{ALL_LEADS_YOY_CHART}}\n"}}]}},
+                "size": _size(720, 300),
+                "transform": _transform(90, 180),
             },
             {
                 "objectId": "ca_title",

@@ -22,6 +22,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WWT_UK_MONTHLY_TEMPLATE_MANIFEST = PROJECT_ROOT / "docs" / "google_slides_templates" / "wendy_wu_uk_monthly_test_template.json"
 BATCH_UPDATE_CHUNK_SIZE = 400
 CENTRAL_ASIA_CANONICAL_LABEL = "Central Asia & Mongolia"
+MONTHLY_CHART_TRANSFORM = {
+    "scaleX": 115.229,
+    "scaleY": 115.229,
+    "translateX": 899000,
+    "translateY": 1535962.5,
+    "unit": "EMU",
+}
 
 SECTION_SCOPE_MAP: dict[str, tuple[str, str | None]] = {
     "overall": ("overall", None),
@@ -112,7 +119,7 @@ def generate_wendy_wu_monthly_google_slides(
         table_cell_text = _table_cell_text_by_id(presentation)
         requests_body.extend(_build_summary_table_requests(payload["sections"], table_dimensions, table_cell_text, presentation))
         uploaded_assets = _upload_chart_assets(asset_store, payload["sections"])
-        requests_body.extend(_build_monthly_chart_requests(payload["sections"], uploaded_assets))
+        requests_body.extend(_build_monthly_chart_requests(payload["sections"], uploaded_assets, presentation))
 
         batch_update_request_count = len(requests_body)
         _send_batch_updates(client, copied_id, requests_body)
@@ -524,8 +531,10 @@ def _upload_chart_assets(
 def _build_monthly_chart_requests(
     sections: Sequence[dict[str, Any]],
     uploaded_assets: dict[tuple[str, str], str],
+    presentation: dict[str, Any],
 ) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
+    placeholder_ids = _placeholder_object_ids(presentation)
     for section in sections:
         if section.get("missing"):
             continue
@@ -542,16 +551,26 @@ def _build_monthly_chart_requests(
                         }
                     }
                 )
+                requests_body.append(_chart_frame_transform_request(str(section["cpl_cvr_chart_image_id"])))
             elif section.get("cpl_cvr_chart_placeholder"):
-                requests_body.append(_replace_placeholder_with_image_request(str(section["cpl_cvr_chart_placeholder"]), cpl_url))
+                placeholder = str(section["cpl_cvr_chart_placeholder"])
+                requests_body.append(_replace_placeholder_with_image_request(placeholder, cpl_url))
+                if placeholder_ids.get(placeholder):
+                    requests_body.append(_chart_frame_transform_request(placeholder_ids[placeholder]))
 
         leads_url = uploaded_assets.get((section_key, "leads_yoy"))
         if leads_url and section.get("leads_yoy_placeholder"):
-            requests_body.append(_replace_placeholder_with_image_request(str(section["leads_yoy_placeholder"]), leads_url))
+            placeholder = str(section["leads_yoy_placeholder"])
+            requests_body.append(_replace_placeholder_with_image_request(placeholder, leads_url))
+            if placeholder_ids.get(placeholder):
+                requests_body.append(_chart_frame_transform_request(placeholder_ids[placeholder]))
 
         revenue_url = uploaded_assets.get((section_key, "revenue_yoy"))
         if revenue_url and section.get("revenue_yoy_placeholder"):
-            requests_body.append(_replace_placeholder_with_image_request(str(section["revenue_yoy_placeholder"]), revenue_url))
+            placeholder = str(section["revenue_yoy_placeholder"])
+            requests_body.append(_replace_placeholder_with_image_request(placeholder, revenue_url))
+            if placeholder_ids.get(placeholder):
+                requests_body.append(_chart_frame_transform_request(placeholder_ids[placeholder]))
     return requests_body
 
 
@@ -561,6 +580,16 @@ def _replace_placeholder_with_image_request(placeholder: str, url: str) -> dict[
             "containsText": {"text": placeholder, "matchCase": True},
             "imageUrl": url,
             "replaceMethod": "CENTER_INSIDE",
+        }
+    }
+
+
+def _chart_frame_transform_request(object_id: str) -> dict[str, Any]:
+    return {
+        "updatePageElementTransform": {
+            "objectId": object_id,
+            "transform": dict(MONTHLY_CHART_TRANSFORM),
+            "applyMode": "ABSOLUTE",
         }
     }
 
@@ -662,6 +691,20 @@ def _table_creation_transform(transform: dict[str, Any]) -> dict[str, Any]:
 
 def _presentation_text(presentation: dict[str, Any]) -> str:
     return "\n".join(_element_text(element) for slide in presentation.get("slides") or [] for element in slide.get("pageElements") or [])
+
+
+def _placeholder_object_ids(presentation: dict[str, Any]) -> dict[str, str]:
+    placeholder_ids: dict[str, str] = {}
+    for slide in presentation.get("slides") or []:
+        for element in slide.get("pageElements") or []:
+            text = _element_text(element)
+            if "{{" not in text:
+                continue
+            for placeholder in re.findall(r"\{\{[^}]+\}\}", text):
+                object_id = str(element.get("objectId") or "")
+                if object_id:
+                    placeholder_ids[placeholder] = object_id
+    return placeholder_ids
 
 
 def _element_text(element: dict[str, Any]) -> str:
