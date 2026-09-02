@@ -219,6 +219,19 @@ def generate_native_google_slides(
             google_client=google_client,
             export_pdf=export_pdf,
         )
+    if client_id == "wightlink" and report_mode == "monthly":
+        from .wightlink_monthly_google_slides_builder import generate_wightlink_monthly_google_slides
+
+        return generate_wightlink_monthly_google_slides(
+            client_id=client_id,
+            client_name=client_name,
+            request_dir=request_path,
+            report_artifacts_path=artifact_path,
+            template=template,
+            workspace_config=config,
+            google_client=google_client,
+            export_pdf=export_pdf,
+        )
 
     artifact = _read_artifact(artifact_path)
     period_label = str(artifact.get("period", {}).get("label") or "").strip()

@@ -24,6 +24,7 @@ DEFAULT_TEMPLATE_IDS = {
     "GOOGLE_SLIDES_TEMPLATE_WWT_AUS_QBR": "1HukrzM7APAQbPJP9Z_9eyD-RNWa2WNSj6mOQ4dFyMQ8",
     "GOOGLE_SLIDES_TEMPLATE_WWT_AUS_MONTHLY": "1ASCjBsbAKx5IzkZcmGWkOxDrqRRNzqrDxLHs5T8wFdg",
     "GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_QBR": "1-cKYm-FWXTVcY5-ozvac-sNpgYm1oIUyShgi6QAVvZ8",
+    "GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_MONTHLY": "1wCKSgsdRWavQ3Sg-P6ddaApplLDfA7wZP_MT3Fj4mb4",
     "GOOGLE_SLIDES_TEMPLATE_WWT_UK_QBR": "1P5L_zODZ1D81QZK5Z8nuZ41ygON3D8GqTjYEeeDqMec",
     "GOOGLE_SLIDES_TEMPLATE_WWT_UK_MONTHLY": "1864ehY6EwTpneAnh0sTe9xtL6A7bWtLlmTMwqidsX2Q",
     "GOOGLE_SLIDES_TEMPLATE_OLYMPIC_QBR": "1F2pL0nW0RvWU-CaDuXLiYuO9ZL67hXqKt0_m9GSUhAQ",
@@ -78,6 +79,17 @@ TEMPLATE_REGISTRY: dict[tuple[str, str], dict[str, str]] = {
     ("wightlink", "quarterly"): {
         "key": "wightlink_qbr",
         "env_key": "GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_QBR",
+    },
+    ("wightlink", "monthly"): {
+        "key": "wightlink_monthly",
+        "env_key": "GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_MONTHLY",
+        "required_roles": (
+            "cover",
+            "section_divider",
+            "monthly_summary",
+            "monthly_ytd_purchases_yoy_chart",
+            "monthly_ytd_revenue_yoy_chart",
+        ),
     },
     ("olympic_holidays", "quarterly"): {
         "key": "olympic_qbr",

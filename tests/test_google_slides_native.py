@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
+
 from src.data_loader import MonthInfo
 from src.google_slides_builder import (
     DriveChartAsset,
@@ -22,6 +24,7 @@ from src.google_slides_builder import (
 from src.google_slides_templates import GoogleSlidesTemplateRegistry
 from src.google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
 from src.monthly_google_slides_builder import build_wendy_wu_monthly_slides_payload
+from src.wightlink_monthly_google_slides_builder import build_wightlink_monthly_slides_payload
 from src.env_utils import load_env_file
 from src.report_artifacts import write_report_artifacts
 
@@ -52,6 +55,7 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         quarterly = registry.status("wendy_wu", "quarterly")
         wwt_uk_monthly = registry.status("wendy_wu", "monthly")
         wwt_aus_monthly = registry.status("wendy_wu_australia", "monthly")
+        wightlink_monthly = registry.status("wightlink", "monthly")
 
         self.assertTrue(quarterly["supported"])
         self.assertTrue(quarterly["configured"])
@@ -59,6 +63,8 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertTrue(wwt_uk_monthly["configured"])
         self.assertTrue(wwt_aus_monthly["supported"])
         self.assertTrue(wwt_aus_monthly["configured"])
+        self.assertTrue(wightlink_monthly["supported"])
+        self.assertTrue(wightlink_monthly["configured"])
 
 
 class ReportArtifactTests(unittest.TestCase):
@@ -395,6 +401,77 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
 
+class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
+    def test_monthly_payload_uses_current_month_cards_ytd_tables_and_charts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wightlink_monthly_artifact(root)
+
+            payload = build_wightlink_monthly_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+            )
+
+            self.assertEqual(payload["period"]["label"], "Jun 2026")
+            self.assertEqual(payload["replacements"]["{{ALL_PURCHASES}}"], "312")
+            self.assertEqual(payload["replacements"]["{{ALL_COST}}"], "£1,092")
+            self.assertEqual(payload["replacements"]["{{ALL_COST_PLAN}}"], "n/a")
+            overall = next(section for section in payload["sections"] if section["key"] == "overall")
+            self.assertEqual(len(overall["table_values"]), 8)
+            self.assertEqual(overall["table_values"][0], ["Month", "Cost", "Purchases", "CPA", "Purchase Revenue", "ROAS", "CVR"])
+            self.assertTrue(overall["charts"]["purchases_yoy"].exists())
+            self.assertTrue(overall["charts"]["revenue_yoy"].exists())
+
+    def test_monthly_native_slides_generate_table_chart_and_cost_style_requests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wightlink_monthly_artifact(root)
+            fake_client = FakeGoogleWorkspaceClient(presentation=_fake_wightlink_monthly_presentation(existing_rows=6))
+
+            result = generate_native_google_slides(
+                client_id="wightlink",
+                client_name="Wightlink",
+                report_mode="monthly",
+                request_dir=root,
+                report_artifacts_path=artifact_path,
+                google_client=fake_client,
+                workspace_config=_configured_workspace(),
+                export_pdf=True,
+            )
+            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(manifest["builder"], "wightlink_monthly_template_manifest")
+        self.assertTrue(any(_is_replace_text(request, "{{MONTH_PERIOD}}", "Jun 2026") for request in fake_client.batch_requests))
+        self.assertTrue(
+            any(
+                request.get("insertTableRows", {}).get("tableObjectId") == "g3f9e9a7bb65_2_0"
+                and request["insertTableRows"]["number"] == 2
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("deleteObject", {}).get("objectId") == "g3f9e9a7bb65_2_1"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("deleteObject", {}).get("objectId") == "g3f9e9a7bb65_2_2"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertGreaterEqual(sum(1 for request in fake_client.batch_requests if "createImage" in request), 8)
+        cost_style_updates = [
+            request["updateTextStyle"]
+            for request in fake_client.batch_requests
+            if request.get("updateTextStyle", {}).get("objectId") in {"p3_i248", "p3_i249"}
+        ]
+        self.assertEqual(len(cost_style_updates), 2)
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+
 class FakeGoogleWorkspaceClient:
     def __init__(self, raise_on_batch: bool = False, presentation: dict | None = None) -> None:
         self.raise_on_batch = raise_on_batch
@@ -531,6 +608,48 @@ def _write_wendy_wu_monthly_artifact(
     return artifact_path
 
 
+def _write_wightlink_monthly_artifact(root: Path) -> Path:
+    source_data = root / "source_data"
+    source_data.mkdir(parents=True, exist_ok=True)
+    performance_csv = source_data / "performance.csv"
+    rows = []
+    for year in (2025, 2026):
+        months = (6,) if year == 2025 else range(1, 7)
+        year_factor = 1.0 if year == 2025 else 1.2
+        for month in months:
+            month_factor = 1 + month / 20
+            for campaign_type, data_type, purchases, revenue, cost, impressions, clicks in [
+                ("Brand", "Ferry", 100, 10000, 200, 2000, 400),
+                ("Generic", "Routes", 80, 8000, 400, 3000, 500),
+                ("Performance Max", "Ferry", 20, 2000, 100, 1000, 120),
+            ]:
+                rows.append(
+                    {
+                        "Date": f"{year}-{month:02d}-15",
+                        "Campaign Type": campaign_type,
+                        "Data Type": data_type,
+                        "Purchases": purchases * year_factor * month_factor,
+                        "Purchase Revenue": revenue * year_factor * month_factor,
+                        "Cost": cost * year_factor * month_factor,
+                        "Impressions": impressions,
+                        "Clicks": clicks,
+                    }
+                )
+    pd.DataFrame(rows).to_csv(performance_csv, index=False)
+    artifact = {
+        "client_id": "wightlink",
+        "client_name": "Wightlink",
+        "report_mode": "monthly",
+        "period": {"label": "Jun 2026", "subtitle": "Jun 2026 (YTD Jan - Jun 2026)"},
+        "source_files": {},
+        "slides": [],
+        "charts": [],
+    }
+    artifact_path = root / "report_artifacts.json"
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    return artifact_path
+
+
 def _fake_presentation(include_sheets_chart: bool = False) -> dict:
     chart_element = (
         {"objectId": "chart_1", "sheetsChart": {}, "size": _size(500, 300), "transform": _transform(250, 210)}
@@ -614,6 +733,43 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
                 "objectId": "ca_title",
                 "shape": {"text": {"textElements": [{"textRun": {"content": "Central Asia Summary\n"}}]}},
                 "transform": _transform(50, 50),
+            },
+        ]
+    )
+    return {
+        "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
+        "slides": [{"objectId": "p3", "pageElements": page_elements}],
+    }
+
+
+def _fake_wightlink_monthly_presentation(existing_rows: int = 8) -> dict:
+    table_ids = [
+        "g3f9e9a7bb65_2_0",
+        "g3f9e9a7bb65_2_3",
+        "g3f9e9a7bb65_2_6",
+        "g3f9e9a7bb65_2_9",
+    ]
+    page_elements = [
+        {
+            "objectId": table_id,
+            "table": {"rows": existing_rows, "columns": 7},
+            "transform": _transform(100, 130),
+        }
+        for table_id in table_ids
+    ]
+    page_elements.extend(
+        [
+            {
+                "objectId": "all_purchase_chart_placeholder",
+                "shape": {"text": {"textElements": [{"textRun": {"content": "{{ALL_PURCHASES_YOY_CHART}}\n"}}]}},
+                "size": _size(320, 250),
+                "transform": _transform(80, 180),
+            },
+            {
+                "objectId": "all_revenue_chart_placeholder",
+                "shape": {"text": {"textElements": [{"textRun": {"content": "{{ALL_REVENUE_YOY_CHART}}\n"}}]}},
+                "size": _size(320, 250),
+                "transform": _transform(400, 180),
             },
         ]
     )
