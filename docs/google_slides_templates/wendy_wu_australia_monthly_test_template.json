@@ -1,0 +1,189 @@
+{
+  "schema_version": "1.0",
+  "created_at": "2026-09-02",
+  "template_name": "WWT AUS Monthly Native Slides Template - TEST tokenized",
+  "source_presentation_id": "1aI_bgn-lB2GCJVfjGmsDMX-iLlhRi7HpFs0HfS4un4M",
+  "template_presentation_id": "1ASCjBsbAKx5IzkZcmGWkOxDrqRRNzqrDxLHs5T8wFdg",
+  "template_url": "https://docs.google.com/presentation/d/1ASCjBsbAKx5IzkZcmGWkOxDrqRRNzqrDxLHs5T8wFdg/edit",
+  "client_id": "wendy_wu_australia",
+  "client_name": "Wendy Wu Tours Australia",
+  "report_mode": "monthly",
+  "status": "prototype_template_created",
+  "global_placeholders": {
+    "{{CLIENT_NAME}}": "Visible client name.",
+    "{{MONTH_PERIOD}}": "Selected month label, for example Aug 2026.",
+    "{{MONTH_PERIOD_WITH_YTD}}": "Selected month plus YTD range, for example Aug 2026 (YTD Jan - Aug 2026)."
+  },
+  "generation_rules": {
+    "data_source": "monthly reports use API-generated performance data only",
+    "monthly_kpi_cards": "KPI cards show selected month only, with MoM and YoY comparisons.",
+    "tables": "Tables show YTD monthly rows and must be overwritten by the generator using native table object IDs.",
+    "charts": "Charts should be generated as high-resolution PNG and inserted into the existing chart slots.",
+    "spend_delta_style": "Spend MoM and YoY comparison text must stay neutral grey, regardless of positive or negative change."
+  },
+  "sections": [
+    {
+      "key": "cover",
+      "slides": [
+        {
+          "number": 1,
+          "slide_id": "p1",
+          "role": "cover",
+          "placeholders": [
+            "{{CLIENT_NAME}}",
+            "{{MONTH_PERIOD_WITH_YTD}}",
+            "{{ALL_LEADS}}",
+            "{{ALL_SPEND}}",
+            "{{ALL_CPL}}",
+            "{{ALL_CVR}}"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "performance_divider",
+      "slides": [
+        {
+          "number": 2,
+          "slide_id": "p2",
+          "role": "section_divider",
+          "footer": "{{CLIENT_NAME}} | {{MONTH_PERIOD}} | Summon"
+        }
+      ]
+    },
+    {
+      "key": "overall",
+      "label": "Overall",
+      "prefix": "ALL",
+      "summary_slide_id": "p3",
+      "summary_table_id": "p3_i202",
+      "cpl_cvr_chart_slide_id": "p4",
+      "cpl_cvr_chart_image_id": "p4_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_1_5",
+      "leads_yoy_placeholder": "{{ALL_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_1_17",
+      "revenue_yoy_placeholder": "{{ALL_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "brand",
+      "label": "Brand",
+      "prefix": "BRAND",
+      "summary_slide_id": "p6",
+      "summary_table_id": "p6_i202",
+      "cpl_cvr_chart_slide_id": "p7",
+      "cpl_cvr_chart_image_id": "p7_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_1_37",
+      "leads_yoy_placeholder": "{{BRAND_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_1_49",
+      "revenue_yoy_placeholder": "{{BRAND_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "generic",
+      "label": "Generic",
+      "prefix": "GEN",
+      "summary_slide_id": "p8",
+      "summary_table_id": "p8_i202",
+      "cpl_cvr_chart_slide_id": "p9",
+      "cpl_cvr_chart_image_id": "p9_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_1_68",
+      "leads_yoy_placeholder": "{{GEN_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_1_80",
+      "revenue_yoy_placeholder": "{{GEN_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "performance_max",
+      "label": "Performance Max",
+      "prefix": "PMAX",
+      "summary_slide_id": "p10",
+      "summary_table_id": "p10_i202",
+      "cpl_cvr_chart_slide_id": "p11",
+      "cpl_cvr_chart_image_id": "p11_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_1_106",
+      "leads_yoy_placeholder": "{{PMAX_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_1_118",
+      "revenue_yoy_placeholder": "{{PMAX_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "demand_gen",
+      "label": "Demand Gen",
+      "prefix": "DG",
+      "summary_slide_id": "p12",
+      "summary_table_id": "p12_i202",
+      "cpl_cvr_chart_slide_id": "p13",
+      "cpl_cvr_chart_image_id": "p13_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_1_137",
+      "leads_yoy_placeholder": "{{DG_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_1_149",
+      "revenue_yoy_placeholder": "{{DG_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "china",
+      "label": "China",
+      "prefix": "CHINA",
+      "summary_slide_id": "p16",
+      "summary_table_id": "p16_i202",
+      "cpl_cvr_chart_slide_id": "p17",
+      "cpl_cvr_chart_image_id": "p17_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_10_8",
+      "leads_yoy_placeholder": "{{CHINA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_10_20",
+      "revenue_yoy_placeholder": "{{CHINA_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "japan",
+      "label": "Japan",
+      "prefix": "JAPAN",
+      "summary_slide_id": "p19",
+      "summary_table_id": "p19_i202",
+      "cpl_cvr_chart_slide_id": "p20",
+      "cpl_cvr_chart_image_id": "p20_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_10_39",
+      "leads_yoy_placeholder": "{{JAPAN_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_10_51",
+      "revenue_yoy_placeholder": "{{JAPAN_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "se_asia",
+      "label": "SE Asia",
+      "prefix": "SEA",
+      "summary_slide_id": "p22",
+      "summary_table_id": "p22_i202",
+      "cpl_cvr_chart_slide_id": "p23",
+      "cpl_cvr_chart_image_id": "p23_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_10_70",
+      "leads_yoy_placeholder": "{{SEA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_10_82",
+      "revenue_yoy_placeholder": "{{SEA_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "india",
+      "label": "India",
+      "prefix": "INDIA",
+      "summary_slide_id": "p25",
+      "summary_table_id": "p25_i202",
+      "cpl_cvr_chart_slide_id": "p26",
+      "cpl_cvr_chart_image_id": "p26_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_10_101",
+      "leads_yoy_placeholder": "{{INDIA_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_10_113",
+      "revenue_yoy_placeholder": "{{INDIA_REVENUE_YOY_CHART}}"
+    },
+    {
+      "key": "other",
+      "label": "Other",
+      "prefix": "OTHER",
+      "summary_slide_id": "p28",
+      "summary_table_id": "p28_i202",
+      "cpl_cvr_chart_slide_id": "p29",
+      "cpl_cvr_chart_image_id": "p29_i217",
+      "leads_yoy_slide_id": "g3f9e4bd80d8_10_132",
+      "leads_yoy_placeholder": "{{OTHER_LEADS_YOY_CHART}}",
+      "revenue_yoy_slide_id": "g3f9e4bd80d8_10_144",
+      "revenue_yoy_placeholder": "{{OTHER_REVENUE_YOY_CHART}}"
+    }
+  ],
+  "known_limitations": [
+    "The source example contained a pending Central Asia section, but Central Asia & Mongolia remains UK-only in the current workflow, so those slides were removed from this AUS template copy.",
+    "The template is enabled only for API Source Test monthly generation until the native Slides workflow is promoted."
+  ]
+}

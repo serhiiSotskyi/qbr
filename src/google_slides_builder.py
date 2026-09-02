@@ -206,7 +206,7 @@ def generate_native_google_slides(
         )
 
     template = registry.validate(client_id, report_mode)
-    if client_id == "wendy_wu" and report_mode == "monthly":
+    if client_id in {"wendy_wu", "wendy_wu_australia"} and report_mode == "monthly":
         from .monthly_google_slides_builder import generate_wendy_wu_monthly_google_slides
 
         return generate_wendy_wu_monthly_google_slides(

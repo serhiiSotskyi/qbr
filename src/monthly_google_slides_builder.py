@@ -20,6 +20,11 @@ from .narrative_generator import generate_overall_bullets, generate_scope_bullet
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WWT_UK_MONTHLY_TEMPLATE_MANIFEST = PROJECT_ROOT / "docs" / "google_slides_templates" / "wendy_wu_uk_monthly_test_template.json"
+WWT_AUS_MONTHLY_TEMPLATE_MANIFEST = PROJECT_ROOT / "docs" / "google_slides_templates" / "wendy_wu_australia_monthly_test_template.json"
+WWT_MONTHLY_TEMPLATE_MANIFESTS = {
+    "wendy_wu": WWT_UK_MONTHLY_TEMPLATE_MANIFEST,
+    "wendy_wu_australia": WWT_AUS_MONTHLY_TEMPLATE_MANIFEST,
+}
 BATCH_UPDATE_CHUNK_SIZE = 400
 CENTRAL_ASIA_CANONICAL_LABEL = "Central Asia & Mongolia"
 MONTHLY_CHART_TRANSFORM = {
@@ -29,6 +34,7 @@ MONTHLY_CHART_TRANSFORM = {
     "translateY": 1535962.5,
     "unit": "EMU",
 }
+MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU = 274325
 
 SECTION_SCOPE_MAP: dict[str, tuple[str, str | None]] = {
     "overall": ("overall", None),
@@ -88,7 +94,7 @@ def generate_wendy_wu_monthly_google_slides(
     }
 
     artifact = _read_json(artifact_path)
-    template_manifest = _read_json(WWT_UK_MONTHLY_TEMPLATE_MANIFEST)
+    template_manifest = _read_json(_monthly_template_manifest_path(client_id))
     client = google_client or GoogleWorkspaceClient(workspace_config)
     asset_store: DriveChartAssetStore | None = None
     copied_id: str | None = None
@@ -104,6 +110,7 @@ def generate_wendy_wu_monthly_google_slides(
             request_dir=request_path,
             artifact=artifact,
             template_manifest=template_manifest,
+            client_id=client_id,
         )
         title = _output_deck_title(client_name, payload["period"]["label"])
         copied = client.copy_file(template.template_id, title, workspace_config.output_folder_id)
@@ -166,6 +173,7 @@ def build_wendy_wu_monthly_slides_payload(
     request_dir: str | Path,
     artifact: dict[str, Any],
     template_manifest: dict[str, Any] | None = None,
+    client_id: str | None = None,
     project_root: str | Path = PROJECT_ROOT,
 ) -> dict[str, Any]:
     request_path = Path(request_dir)
@@ -175,7 +183,8 @@ def build_wendy_wu_monthly_slides_payload(
         chart_styles_path=root / "config" / "chart_styles.yaml",
         clients_config_path=root / "config" / "clients_config.json",
     )
-    client_config = config_loader.get_client_config("wendy_wu")
+    resolved_client_id = client_id or str(artifact.get("client_id") or "wendy_wu")
+    client_config = config_loader.get_client_config(resolved_client_id)
     performance_csv = _resolve_performance_csv_path(request_path, artifact)
     df = load_csv(performance_csv)
     month = detect_latest_complete_month(df)
@@ -192,13 +201,23 @@ def build_wendy_wu_monthly_slides_payload(
 
     chart_styles = config_loader.get_chart_styles(client_config)
     chart_builder = ChartBuilder(request_path / "outputs" / "native_google_slides_charts", chart_styles=chart_styles)
-    manifest = template_manifest or _read_json(WWT_UK_MONTHLY_TEMPLATE_MANIFEST)
+    manifest = template_manifest or _read_json(_monthly_template_manifest_path(resolved_client_id))
     sections = []
 
     for section in _monthly_sections(manifest):
         scope = _scope_for_section(report, section["key"])
         if scope is None:
-            sections.append({"key": section["key"], "prefix": section["prefix"], "missing": True})
+            sections.append(
+                {
+                    "key": section["key"],
+                    "prefix": section["prefix"],
+                    "missing": True,
+                    "summary_table_placeholder": section.get("summary_table_placeholder"),
+                    "cpl_cvr_chart_placeholder": section.get("cpl_cvr_chart_placeholder"),
+                    "leads_yoy_placeholder": section.get("leads_yoy_placeholder"),
+                    "revenue_yoy_placeholder": section.get("revenue_yoy_placeholder"),
+                }
+            )
             continue
         scope_key = _chart_scope_key(section["key"])
         charts = chart_builder.build_monthly_scope_trend_charts(
@@ -232,7 +251,7 @@ def build_wendy_wu_monthly_slides_payload(
     }
     for section in sections:
         if section.get("missing"):
-            replacements.update(_missing_section_replacements(str(section["prefix"])))
+            replacements.update(_missing_section_replacements(section))
             continue
         replacements.update(_section_replacements(section))
 
@@ -255,6 +274,13 @@ def _monthly_sections(template_manifest: dict[str, Any]) -> list[dict[str, Any]]
         if isinstance(section, dict) and section.get("prefix"):
             sections.append(section)
     return sections
+
+
+def _monthly_template_manifest_path(client_id: str) -> Path:
+    try:
+        return WWT_MONTHLY_TEMPLATE_MANIFESTS[client_id]
+    except KeyError as exc:
+        raise ValueError(f"No monthly Google Slides template manifest is configured for client '{client_id}'.") from exc
 
 
 def _scope_for_section(report: dict[str, Any], section_key: str) -> dict[str, Any] | None:
@@ -295,7 +321,8 @@ def _section_replacements(section: dict[str, Any]) -> dict[str, str]:
     return replacements
 
 
-def _missing_section_replacements(prefix: str) -> dict[str, str]:
+def _missing_section_replacements(section: dict[str, Any]) -> dict[str, str]:
+    prefix = str(section["prefix"])
     replacements = {
         f"{{{{{prefix}_INSIGHTS}}}}": "No data is available for this section in the generated performance CSV.",
         f"{{{{{prefix}_REVENUE_STATUS}}}}": "Revenue data unavailable",
@@ -305,6 +332,15 @@ def _missing_section_replacements(prefix: str) -> dict[str, str]:
         if field != "REVENUE":
             replacements[f"{{{{{prefix}_{field}_MOM}}}}"] = "n/a"
             replacements[f"{{{{{prefix}_{field}_YOY}}}}"] = "n/a"
+    for key in (
+        "summary_table_placeholder",
+        "cpl_cvr_chart_placeholder",
+        "leads_yoy_placeholder",
+        "revenue_yoy_placeholder",
+    ):
+        placeholder = section.get(key)
+        if placeholder:
+            replacements[str(placeholder)] = "No data available for this section."
     return replacements
 
 
@@ -430,6 +466,8 @@ def _replace_existing_table_requests(
         )
 
     requests_body.extend(_table_cell_text_requests(table_id, values, final_rows, final_columns, existing_cell_text or {}))
+    if target_rows > existing_rows:
+        requests_body.append(_table_row_height_request(table_id, existing_rows, target_rows))
     return requests_body
 
 
@@ -590,6 +628,24 @@ def _chart_frame_transform_request(object_id: str) -> dict[str, Any]:
             "objectId": object_id,
             "transform": dict(MONTHLY_CHART_TRANSFORM),
             "applyMode": "ABSOLUTE",
+        }
+    }
+
+
+def _table_row_height_request(object_id: str, base_rows: int, target_rows: int) -> dict[str, Any]:
+    row_height = MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU
+    if target_rows > 0:
+        row_height = int(round(MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU * base_rows / target_rows))
+    return {
+        "updateTableRowProperties": {
+            "objectId": object_id,
+            "tableRowProperties": {
+                "minRowHeight": {
+                    "magnitude": row_height,
+                    "unit": "EMU",
+                }
+            },
+            "fields": "minRowHeight",
         }
     }
 

@@ -57,8 +57,8 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertTrue(quarterly["configured"])
         self.assertTrue(wwt_uk_monthly["supported"])
         self.assertTrue(wwt_uk_monthly["configured"])
-        self.assertFalse(wwt_aus_monthly["supported"])
-        self.assertIn("configured template", wwt_aus_monthly["message"])
+        self.assertTrue(wwt_aus_monthly["supported"])
+        self.assertTrue(wwt_aus_monthly["configured"])
 
 
 class ReportArtifactTests(unittest.TestCase):
@@ -274,6 +274,26 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(overall["table_values"][0], ["Month", "Impressions", "Clicks", "CTR", "CPC", "Cost", "Sales Leads", "CPL", "CVR", "Revenue"])
         self.assertEqual(overall["table_values"][-1][0], "Total")
 
+    def test_monthly_payload_supports_wendy_wu_australia_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_monthly_artifact(
+                root,
+                client_id="wendy_wu_australia",
+                client_name="Wendy Wu Tours Australia",
+            )
+
+            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+                payload = build_wendy_wu_monthly_slides_payload(
+                    request_dir=root,
+                    artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+                )
+
+        self.assertEqual(payload["replacements"]["{{CLIENT_NAME}}"], "Wendy Wu Tours Australia")
+        self.assertNotIn("{{CA_LEADS}}", payload["replacements"])
+        self.assertEqual(payload["replacements"]["{{OTHER_LEADS}}"], "20")
+        self.assertEqual(payload["replacements"]["{{ALL_SPEND_MOM}}"], "+0.00%")
+
     def test_monthly_native_slides_generate_table_and_chart_requests(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -304,6 +324,12 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
             )
         )
         self.assertTrue(any(request.get("replaceImage", {}).get("imageObjectId") == "p4_i217" for request in fake_client.batch_requests))
+        table_row_update = next(
+            request["updateTableRowProperties"]
+            for request in fake_client.batch_requests
+            if request.get("updateTableRowProperties", {}).get("objectId") == "p3_i202"
+        )
+        self.assertEqual(table_row_update["tableRowProperties"]["minRowHeight"]["magnitude"], 219460)
         self.assertTrue(
             any(
                 request.get("updatePageElementTransform", {}).get("objectId") == "p4_i217"
@@ -337,6 +363,35 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(create_table_request["elementProperties"]["transform"]["scaleX"], 1)
         self.assertEqual(create_table_request["elementProperties"]["transform"]["scaleY"], 1)
         self.assertEqual(manifest["builder"], "wendy_wu_monthly_template_manifest")
+        self.assertEqual(manifest["client_id"], "wendy_wu")
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+    def test_monthly_native_slides_generate_for_wendy_wu_australia_without_central_asia(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_monthly_artifact(
+                root,
+                client_id="wendy_wu_australia",
+                client_name="Wendy Wu Tours Australia",
+            )
+            fake_client = FakeGoogleWorkspaceClient(presentation=_fake_wendy_wu_monthly_presentation())
+
+            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+                result = generate_native_google_slides(
+                    client_id="wendy_wu_australia",
+                    client_name="Wendy Wu Tours Australia",
+                    report_mode="monthly",
+                    request_dir=root,
+                    report_artifacts_path=artifact_path,
+                    google_client=fake_client,
+                    workspace_config=_configured_workspace(),
+                    export_pdf=True,
+                )
+            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(manifest["client_id"], "wendy_wu_australia")
+        self.assertFalse(any(request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto" for request in fake_client.batch_requests))
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
 
@@ -408,7 +463,12 @@ def _write_native_artifact(root: Path, chart: Path) -> Path:
     return artifact_path
 
 
-def _write_wendy_wu_monthly_artifact(root: Path) -> Path:
+def _write_wendy_wu_monthly_artifact(
+    root: Path,
+    *,
+    client_id: str = "wendy_wu",
+    client_name: str = "Wendy Wu Tours",
+) -> Path:
     source_data = root / "source_data"
     source_data.mkdir(parents=True, exist_ok=True)
     performance_csv = source_data / "performance.csv"
@@ -458,8 +518,8 @@ def _write_wendy_wu_monthly_artifact(root: Path) -> Path:
         encoding="utf-8",
     )
     artifact = {
-        "client_id": "wendy_wu",
-        "client_name": "Wendy Wu Tours",
+        "client_id": client_id,
+        "client_name": client_name,
         "report_mode": "monthly",
         "period": {"label": "Aug 2026", "subtitle": "Aug 2026 (YTD Jan - Aug 2026)"},
         "source_files": {"source_generation_manifest": str(source_manifest)},
