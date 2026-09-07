@@ -185,7 +185,7 @@ def load_wightlink_performance_csv(csv_path: str | Path) -> pd.DataFrame:
     if "date" not in working.columns or "campaign_type" not in working.columns:
         raise ValueError("Wightlink performance CSV must contain date and campaign type columns.")
 
-    working["date"] = pd.to_datetime(working["date"], dayfirst=True, format="mixed", errors="coerce")
+    working["date"] = _parse_wightlink_dates(working["date"])
     working = working.dropna(subset=["date"]).copy()
     if working.empty:
         raise ValueError("Wightlink performance CSV has no valid dates.")
@@ -243,6 +243,18 @@ def build_performance_scope(df: pd.DataFrame) -> dict[str, Any]:
         "table_rows": table_rows,
         "has_data": True,
     }
+
+
+def _parse_wightlink_dates(values: pd.Series) -> pd.Series:
+    """Parse generated ISO dates before falling back to day-first uploaded exports."""
+    text = values.astype(str).str.strip()
+    parsed = pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns]")
+    iso_mask = text.str.match(r"^\d{4}-\d{1,2}-\d{1,2}(?:\s|$|T)")
+    if iso_mask.any():
+        parsed.loc[iso_mask] = pd.to_datetime(text.loc[iso_mask], format="ISO8601", errors="coerce")
+    if (~iso_mask).any():
+        parsed.loc[~iso_mask] = pd.to_datetime(text.loc[~iso_mask], dayfirst=True, format="mixed", errors="coerce")
+    return parsed
 
 
 def build_period_campaigns(

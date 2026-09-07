@@ -314,6 +314,31 @@ class WightlinkQuarterlyTests(unittest.TestCase):
         self.assertEqual([chart["title"] for chart in overall_ytd["charts"]], ["YTD Purchases YoY", "YTD Revenue YoY"])
         self.assertNotIn("table", overall_ytd)
 
+    def test_wightlink_iso_dates_are_not_parsed_as_dayfirst_dates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "wightlink_iso_dates.csv"
+            rows = [
+                {
+                    "Date": f"2026-08-{day:02d}",
+                    "Campaign Type": "Brand",
+                    "Data Type": "Ferry",
+                    "Purchases": 10,
+                    "Purchase Revenue": 100,
+                    "Cost": 5,
+                    "Impressions": 1000,
+                    "Clicks": 100,
+                }
+                for day in range(1, 13)
+            ]
+            pd.DataFrame(rows).to_csv(csv_path, index=False)
+
+            parsed = parse_wightlink_monthly_performance_csv(csv_path)
+
+        self.assertEqual(parsed["month"].label, "Aug 2026")
+        self.assertEqual(parsed["current"]["totals"]["purchases"], 120)
+        self.assertEqual(parsed["current"]["totals"]["cost"], 60)
+        self.assertEqual(parsed["current"]["totals"]["purchase_revenue"], 1200)
+
 
 def _write_performance_csv(path: Path, include_data_type: bool) -> Path:
     rows = []
