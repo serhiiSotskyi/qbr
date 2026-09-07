@@ -45,6 +45,22 @@ WWT_MONTHLY_TEMPLATE_MANIFESTS = {
 }
 BATCH_UPDATE_CHUNK_SIZE = 400
 CENTRAL_ASIA_CANONICAL_LABEL = "Central Asia & Mongolia"
+SUMMARY_TABLE_HEADER_FILL_RGB = {"red": 0.09, "green": 0.09, "blue": 0.09}
+SUMMARY_TABLE_HEADER_TEXT_RGB = {"red": 1, "green": 1, "blue": 1}
+SUMMARY_TABLE_BODY_TEXT_RGB = {"red": 0, "green": 0, "blue": 0}
+SUMMARY_TABLE_FONT_SIZE_PT = 7
+SUMMARY_TABLE_REVENUE_COLUMN_WEIGHTS = (
+    0.070,
+    0.115,
+    0.080,
+    0.085,
+    0.065,
+    0.140,
+    0.100,
+    0.080,
+    0.085,
+    0.180,
+)
 MONTHLY_CHART_TRANSFORM = {
     "scaleX": 115.229,
     "scaleY": 115.229,
@@ -52,7 +68,7 @@ MONTHLY_CHART_TRANSFORM = {
     "translateY": 1535962.5,
     "unit": "EMU",
 }
-MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU = 274325
+MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU = 231250
 
 SECTION_SCOPE_MAP: dict[str, tuple[str, str | None]] = {
     "overall": ("overall", None),
@@ -153,9 +169,16 @@ def generate_wendy_wu_monthly_google_slides(
         )
         table_dimensions = _table_dimensions_by_id(presentation)
         table_cell_text = _table_cell_text_by_id(presentation)
+        table_geometry = _summary_table_exemplar_geometry(
+            presentation, payload["sections"]
+        )
         requests_body.extend(
             _build_summary_table_requests(
-                payload["sections"], table_dimensions, table_cell_text, presentation
+                payload["sections"],
+                table_dimensions,
+                table_cell_text,
+                presentation,
+                table_geometry,
             )
         )
         uploaded_assets = _upload_chart_assets(asset_store, payload["sections"])
@@ -483,6 +506,7 @@ def _build_summary_table_requests(
     table_dimensions: dict[str, tuple[int, int]],
     table_cell_text: dict[str, dict[tuple[int, int], str]],
     presentation: dict[str, Any],
+    table_geometry: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
     for section in sections:
@@ -503,6 +527,11 @@ def _build_summary_table_requests(
                     existing_rows=rows,
                     existing_columns=columns,
                     existing_cell_text=table_cell_text.get(str(table_id), {}),
+                    column_widths=(
+                        table_geometry.get("column_widths")
+                        if table_geometry
+                        else []
+                    ),
                 )
             )
             continue
@@ -515,6 +544,7 @@ def _build_summary_table_requests(
                     placeholder=str(placeholder),
                     table_id=f"{section['key']}_monthly_table_auto",
                     values=table_values,
+                    table_geometry=table_geometry,
                 )
             )
     return requests_body
@@ -527,6 +557,7 @@ def _replace_existing_table_requests(
     existing_rows: int,
     existing_columns: int,
     existing_cell_text: dict[tuple[int, int], str] | None = None,
+    column_widths: Sequence[int] | None = None,
 ) -> list[dict[str, Any]]:
     target_rows = len(values)
     target_columns = max(len(row) for row in values) if values else 0
@@ -566,6 +597,13 @@ def _replace_existing_table_requests(
             table_id, values, final_rows, final_columns, existing_cell_text or {}
         )
     )
+    requests_body.extend(
+        _table_column_width_requests(
+            table_id,
+            _summary_table_column_widths(final_columns, column_widths or []),
+        )
+    )
+    requests_body.extend(_table_format_requests(table_id, values, final_columns))
     if target_rows > existing_rows:
         requests_body.append(
             _table_row_height_request(table_id, existing_rows, target_rows)
@@ -579,6 +617,7 @@ def _create_table_from_placeholder_requests(
     placeholder: str,
     table_id: str,
     values: Sequence[Sequence[str]],
+    table_geometry: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     element = _find_placeholder_element(presentation, placeholder)
     if not element:
@@ -593,6 +632,16 @@ def _create_table_from_placeholder_requests(
 
     rows = len(values)
     columns = max(len(row) for row in values) if values else 1
+    table_size = (
+        table_geometry.get("size")
+        if table_geometry and table_geometry.get("size")
+        else element["size"]
+    )
+    table_transform = (
+        table_geometry.get("transform")
+        if table_geometry and table_geometry.get("transform")
+        else _table_creation_transform(element["transform"])
+    )
     requests_body = [
         {"deleteObject": {"objectId": element["object_id"]}},
         {
@@ -600,15 +649,139 @@ def _create_table_from_placeholder_requests(
                 "objectId": table_id,
                 "elementProperties": {
                     "pageObjectId": element["slide_id"],
-                    "size": element["size"],
-                    "transform": _table_creation_transform(element["transform"]),
+                    "size": table_size,
+                    "transform": table_transform,
                 },
                 "rows": rows,
                 "columns": columns,
             }
         },
     ]
+    column_widths = (
+        table_geometry.get("column_widths")
+        if table_geometry and table_geometry.get("column_widths")
+        else []
+    )
+    requests_body.extend(
+        _table_column_width_requests(
+            table_id,
+            _summary_table_column_widths(columns, column_widths),
+        )
+    )
     requests_body.extend(_table_cell_text_requests(table_id, values, rows, columns, {}))
+    requests_body.extend(_table_format_requests(table_id, values, columns))
+    requests_body.append(_table_row_height_request(table_id, rows, rows))
+    return requests_body
+
+
+def _table_format_requests(
+    table_id: str, values: Sequence[Sequence[str]], column_count: int
+) -> list[dict[str, Any]]:
+    if not values or column_count <= 0:
+        return []
+    requests_body: list[dict[str, Any]] = [
+        {
+            "updateTableCellProperties": {
+                "objectId": table_id,
+                "tableRange": {
+                    "location": {"rowIndex": 0, "columnIndex": 0},
+                    "rowSpan": 1,
+                    "columnSpan": column_count,
+                },
+                "tableCellProperties": {
+                    "tableCellBackgroundFill": {
+                        "solidFill": {
+                            "color": {"rgbColor": SUMMARY_TABLE_HEADER_FILL_RGB}
+                        }
+                    }
+                },
+                "fields": "tableCellBackgroundFill.solidFill.color",
+            }
+        }
+    ]
+    for row_index, row in enumerate(values):
+        for column_index in range(min(column_count, len(row))):
+            if not str(row[column_index]).strip():
+                continue
+            cell_location = {"rowIndex": row_index, "columnIndex": column_index}
+            requests_body.append(
+                {
+                    "updateParagraphStyle": {
+                        "objectId": table_id,
+                        "cellLocation": cell_location,
+                        "textRange": {"type": "ALL"},
+                        "style": {"alignment": "CENTER"},
+                        "fields": "alignment",
+                    }
+                }
+            )
+            style = {
+                "foregroundColor": {
+                    "opaqueColor": {
+                        "rgbColor": (
+                            SUMMARY_TABLE_HEADER_TEXT_RGB
+                            if row_index == 0
+                            else SUMMARY_TABLE_BODY_TEXT_RGB
+                        )
+                    }
+                },
+                "bold": row_index == 0,
+                "fontFamily": "Calibri",
+                "fontSize": {"magnitude": SUMMARY_TABLE_FONT_SIZE_PT, "unit": "PT"},
+            }
+            requests_body.append(
+                {
+                    "updateTextStyle": {
+                        "objectId": table_id,
+                        "cellLocation": cell_location,
+                        "textRange": {"type": "ALL"},
+                        "style": style,
+                        "fields": "foregroundColor,bold,fontFamily,fontSize",
+                    }
+                }
+            )
+    return requests_body
+
+
+def _summary_table_column_widths(
+    column_count: int, current_widths: Sequence[int]
+) -> list[int]:
+    widths = [int(width) for width in current_widths if int(width) > 0]
+    if (
+        column_count != len(SUMMARY_TABLE_REVENUE_COLUMN_WEIGHTS)
+        or len(widths) < column_count
+    ):
+        return widths
+    total_width = sum(widths[:column_count])
+    if total_width <= 0:
+        return widths
+    adjusted = [
+        int(round(total_width * weight))
+        for weight in SUMMARY_TABLE_REVENUE_COLUMN_WEIGHTS
+    ]
+    adjusted[-1] += total_width - sum(adjusted)
+    return adjusted
+
+
+def _table_column_width_requests(
+    table_id: str, column_widths: Sequence[int]
+) -> list[dict[str, Any]]:
+    requests_body = []
+    for column_index, width in enumerate(column_widths):
+        if width <= 0:
+            continue
+        requests_body.append(
+            {
+                "updateTableColumnProperties": {
+                    "objectId": table_id,
+                    "columnIndices": [column_index],
+                    "tableColumnProperties": {
+                        "columnWidth": {"magnitude": width, "unit": "EMU"}
+                    },
+                    "fields": "columnWidth",
+                }
+            }
+        )
     return requests_body
 
 
@@ -831,6 +1004,39 @@ def _table_dimensions_by_id(presentation: dict[str, Any]) -> dict[str, tuple[int
             if object_id and rows and columns:
                 dimensions[object_id] = (rows, columns)
     return dimensions
+
+
+def _summary_table_exemplar_geometry(
+    presentation: dict[str, Any], sections: Sequence[dict[str, Any]]
+) -> dict[str, Any] | None:
+    table_ids = [
+        str(section.get("summary_table_id") or "")
+        for section in sections
+        if section.get("summary_table_id")
+    ]
+    for wanted_id in table_ids:
+        for slide in presentation.get("slides") or []:
+            for element in slide.get("pageElements") or []:
+                if str(element.get("objectId") or "") != wanted_id:
+                    continue
+                table = element.get("table")
+                if not isinstance(table, dict):
+                    continue
+                column_widths = []
+                for column in table.get("tableColumns") or []:
+                    width = (
+                        (column.get("columnWidth") or {}).get("magnitude")
+                        if isinstance(column, dict)
+                        else None
+                    )
+                    if isinstance(width, (int, float)):
+                        column_widths.append(int(width))
+                return {
+                    "size": element.get("size") or {},
+                    "transform": element.get("transform") or {},
+                    "column_widths": column_widths,
+                }
+    return None
 
 
 def _table_cell_text_by_id(

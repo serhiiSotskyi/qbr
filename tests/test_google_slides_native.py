@@ -485,7 +485,7 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
             if request.get("updateTableRowProperties", {}).get("objectId") == "p3_i202"
         )
         self.assertEqual(
-            table_row_update["tableRowProperties"]["minRowHeight"]["magnitude"], 219460
+            table_row_update["tableRowProperties"]["minRowHeight"]["magnitude"], 185000
         )
         self.assertTrue(
             any(
@@ -518,22 +518,52 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
+                request.get("updateTextStyle", {}).get("objectId") == "p3_i202"
+                and request["updateTextStyle"].get("cellLocation")
+                == {"rowIndex": 0, "columnIndex": 0}
+                and request["updateTextStyle"]["style"]["foregroundColor"][
+                    "opaqueColor"
+                ]["rgbColor"]
+                == {"red": 1, "green": 1, "blue": 1}
+                and request["updateTextStyle"]["style"]["bold"] is True
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updateTableCellProperties", {}).get("objectId")
+                == "p3_i202"
+                and request["updateTableCellProperties"]["tableRange"]["location"]
+                == {"rowIndex": 0, "columnIndex": 0}
+                and request["updateTableCellProperties"]["tableRange"]["rowSpan"]
+                == 1
+                for request in fake_client.batch_requests
+            )
+        )
+        p3_widths = [
+            request["updateTableColumnProperties"]["tableColumnProperties"][
+                "columnWidth"
+            ]["magnitude"]
+            for request in fake_client.batch_requests
+            if request.get("updateTableColumnProperties", {}).get("objectId")
+            == "p3_i202"
+        ]
+        self.assertEqual(len(p3_widths), 10)
+        self.assertGreater(p3_widths[-1], p3_widths[1])
+        self.assertFalse(
+            any(
                 request.get("createTable", {}).get("objectId")
                 == "central_asia_monthly_table_auto"
                 for request in fake_client.batch_requests
             )
         )
-        create_table_request = next(
-            request["createTable"]
-            for request in fake_client.batch_requests
-            if request.get("createTable", {}).get("objectId")
-            == "central_asia_monthly_table_auto"
-        )
-        self.assertEqual(
-            create_table_request["elementProperties"]["transform"]["scaleX"], 1
-        )
-        self.assertEqual(
-            create_table_request["elementProperties"]["transform"]["scaleY"], 1
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId") == "ca_i202"
+                and request["updateTextStyle"].get("cellLocation")
+                == {"rowIndex": 0, "columnIndex": 0}
+                for request in fake_client.batch_requests
+            )
         )
         self.assertEqual(manifest["builder"], "wendy_wu_monthly_template_manifest")
         self.assertEqual(manifest["client_id"], "wendy_wu")
@@ -1097,11 +1127,19 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
         "p22_i202",
         "p25_i202",
         "p28_i202",
+        "ca_i202",
     ]
     page_elements = [
         {
             "objectId": table_id,
-            "table": {"rows": 8, "columns": 10},
+            "table": {
+                "rows": 8,
+                "columns": 10,
+                "tableColumns": [
+                    {"columnWidth": {"magnitude": 600000, "unit": "EMU"}}
+                    for _ in range(10)
+                ],
+            },
             "transform": _transform(100, 130),
         }
         for table_id in table_ids

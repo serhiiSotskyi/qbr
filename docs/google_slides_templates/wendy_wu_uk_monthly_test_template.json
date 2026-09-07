@@ -187,7 +187,7 @@
       "label": "Central Asia",
       "prefix": "CA",
       "summary_slide_id": "g3f9d114eabf_5_315",
-      "summary_table_placeholder": "{{CA_MONTHLY_TABLE}}",
+      "summary_table_id": "ca_i202",
       "cpl_cvr_chart_slide_id": "g3f9d114eabf_5_363",
       "cpl_cvr_chart_placeholder": "{{CA_CPL_CVR_CHART}}",
       "leads_yoy_slide_id": "g3f9d114eabf_5_375",
@@ -220,7 +220,6 @@
     "{{PREFIX_INSIGHTS}}"
   ],
   "known_limitations": [
-    "The source deck did not include a native table on the Central Asia summary slide. The first monthly generator pass should either create that table from data or duplicate a populated destination summary exemplar before filling it.",
     "The existing native table body cells still contain example values from Jun 2026. The generator must overwrite every body cell before delivery; clearing native Google Slides tables requires per-cell requests."
   ]
 }
