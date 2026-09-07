@@ -269,6 +269,260 @@ def prepare_automated_source_inputs(
     )
 
 
+def validate_generated_ga4_performance_source(
+    *,
+    client_config: dict[str, Any],
+    report_mode: str,
+    performance_csv_path: str | Path,
+    output_path: str | Path | None = None,
+    ga4_client: "GA4DataApiClient | None" = None,
+    today: pd.Timestamp | None = None,
+    raise_on_error: bool = True,
+) -> dict[str, Any]:
+    client_id = str(client_config.get("id", "")).strip()
+    rules = _client_rules(client_id)
+    period = default_source_period(report_mode, today=today)
+    performance_path = Path(performance_csv_path)
+    validation = _build_csv_freshness_validation(
+        client_id=client_id,
+        report_mode=report_mode,
+        performance_csv_path=performance_path,
+        period=period,
+    )
+
+    if client_id == "wightlink" and report_mode == "monthly":
+        direct = _fetch_wightlink_direct_ga4_totals(
+            rules=rules,
+            period=period,
+            ga4_client=ga4_client,
+        )
+        validation["direct_ga4_aggregate"] = direct
+        validation["direct_comparison"] = _compare_source_totals_to_direct_ga4(
+            validation["source_totals"],
+            direct["totals"],
+        )
+        validation["errors"].extend(validation["direct_comparison"]["errors"])
+    else:
+        validation["direct_ga4_aggregate"] = None
+        validation["direct_comparison"] = {
+            "status": "skipped",
+            "message": "Direct aggregate validation is currently enforced for Wightlink monthly reports.",
+            "errors": [],
+        }
+
+    validation["status"] = "failed" if validation["errors"] else "passed"
+    validation["message"] = (
+        "Generated GA4 performance source passed validation."
+        if validation["status"] == "passed"
+        else "Generated GA4 performance source failed validation."
+    )
+
+    if output_path:
+        _write_json(Path(output_path), validation)
+
+    if validation["errors"] and raise_on_error:
+        details = "; ".join(validation["errors"][:5])
+        raise AutomatedSourceError(f"GA4 source validation failed: {details}")
+
+    return validation
+
+
+def _build_csv_freshness_validation(
+    *,
+    client_id: str,
+    report_mode: str,
+    performance_csv_path: Path,
+    period: SourcePeriod,
+) -> dict[str, Any]:
+    normalized = normalize_performance_csv_for_client(performance_csv_path, client_id)
+    if "Date" not in normalized.columns:
+        raise AutomatedSourceError("Generated performance CSV is missing a Date column.")
+
+    working = normalized.copy()
+    working["_date"] = _coerce_date_column(working["Date"])
+    working = working.dropna(subset=["_date"])
+    period_rows = working[(working["_date"] >= period.start) & (working["_date"] <= period.end)].copy()
+    present_days = sorted(period_rows["_date"].dt.strftime("%Y-%m-%d").dropna().unique().tolist())
+    expected_days = pd.date_range(period.start, period.end, freq="D").strftime("%Y-%m-%d").tolist()
+    missing_days = [day for day in expected_days if day not in set(present_days)]
+    date_min = period_rows["_date"].min() if not period_rows.empty else None
+    date_max = period_rows["_date"].max() if not period_rows.empty else None
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    if period_rows.empty:
+        errors.append(f"generated CSV has no rows for expected {period.label} period {_fmt_date(period.start)} to {_fmt_date(period.end)}")
+    else:
+        if date_min is not None and date_min > period.start:
+            message = f"generated CSV starts on {date_min.strftime('%Y-%m-%d')} for {period.label}, expected {_fmt_date(period.start)}"
+            if report_mode == "monthly":
+                errors.append(message)
+            else:
+                warnings.append(message)
+        if date_max is not None and date_max < period.end:
+            message = f"generated CSV ends on {date_max.strftime('%Y-%m-%d')} for {period.label}, expected {_fmt_date(period.end)}"
+            if report_mode == "monthly":
+                errors.append(message)
+            else:
+                warnings.append(message)
+        if report_mode == "monthly":
+            final_week_start = period.end - pd.Timedelta(days=6)
+            final_week = period_rows[period_rows["_date"] >= final_week_start]
+            activity_total = _sum_activity_columns(final_week, client_id)
+            if final_week.empty or activity_total <= 0:
+                errors.append(
+                    f"generated CSV has no measurable activity in the final seven days of {period.label} "
+                    f"({_fmt_date(final_week_start)} to {_fmt_date(period.end)})"
+                )
+        if missing_days:
+            warnings.append(
+                f"generated CSV is missing {len(missing_days)} calendar day(s) in {period.label}; "
+                "this is allowed only when the API has no rows for those dates"
+            )
+
+    return {
+        "schema_version": "1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "client_id": client_id,
+        "report_mode": report_mode,
+        "expected_period": _period_manifest(period),
+        "performance_csv": str(performance_csv_path),
+        "row_count": int(len(normalized)),
+        "period_row_count": int(len(period_rows)),
+        "period_date_min": date_min.strftime("%Y-%m-%d") if date_min is not None and not pd.isna(date_min) else None,
+        "period_date_max": date_max.strftime("%Y-%m-%d") if date_max is not None and not pd.isna(date_max) else None,
+        "expected_day_count": len(expected_days),
+        "present_day_count": len(present_days),
+        "missing_days": missing_days[:31],
+        "missing_day_count": len(missing_days),
+        "source_totals": _summarize_performance_totals(period_rows, client_id),
+        "warnings": warnings,
+        "errors": errors,
+    }
+
+
+def _sum_activity_columns(df: pd.DataFrame, client_id: str) -> float:
+    metric_columns = {
+        "wightlink": ["Cost", "Purchases", "Purchase Revenue", "Clicks", "Impressions"],
+        "olympic_holidays": ["Cost", "Purchases", "Revenue", "Add to cart"],
+    }.get(client_id, ["Cost", "Sales Leads", "Revenue", "Clicks", "Impressions"])
+    total = 0.0
+    for column in metric_columns:
+        if column in df.columns:
+            total += pd.to_numeric(df[column].map(_to_float), errors="coerce").fillna(0.0).sum()
+    return float(total)
+
+
+def _summarize_performance_totals(df: pd.DataFrame, client_id: str) -> dict[str, float]:
+    metric_map = {
+        "wightlink": {
+            "cost": "Cost",
+            "purchases": "Purchases",
+            "purchase_revenue": "Purchase Revenue",
+            "clicks": "Clicks",
+            "impressions": "Impressions",
+        },
+        "olympic_holidays": {
+            "cost": "Cost",
+            "purchases": "Purchases",
+            "revenue": "Revenue",
+            "add_to_cart": "Add to cart",
+        },
+    }.get(
+        client_id,
+        {
+            "cost": "Cost",
+            "sales_leads": "Sales Leads",
+            "revenue": "Revenue",
+            "clicks": "Clicks",
+            "impressions": "Impressions",
+        },
+    )
+    totals: dict[str, float] = {}
+    for key, column in metric_map.items():
+        if column not in df.columns:
+            totals[key] = 0.0
+            continue
+        totals[key] = float(pd.to_numeric(df[column].map(_to_float), errors="coerce").fillna(0.0).sum())
+    return totals
+
+
+def _fetch_wightlink_direct_ga4_totals(
+    *,
+    rules: Mapping[str, Any],
+    period: SourcePeriod,
+    ga4_client: "GA4DataApiClient | None",
+) -> dict[str, Any]:
+    api_client = ga4_client or GA4DataApiClient()
+    property_id = _resolve_ga4_property_id("wightlink")
+    channel_groups = tuple(rules.get("channel_groups", PAID_CHANNEL_GROUPS))
+    cost_rows = api_client.run_report(
+        property_id=property_id,
+        dimensions=["date", "sessionDefaultChannelGroup"],
+        metrics=["advertiserAdCost", "advertiserAdClicks", "advertiserAdImpressions"],
+        start_date=period.start,
+        end_date=period.end,
+        dimension_filter=_in_list_filter("sessionDefaultChannelGroup", channel_groups),
+        currency_code=str(rules.get("currency", "GBP")),
+    )
+    event_rows = api_client.run_report(
+        property_id=property_id,
+        dimensions=["date", "defaultChannelGroup", "eventName"],
+        metrics=["keyEvents", "purchaseRevenue"],
+        start_date=period.start,
+        end_date=period.end,
+        dimension_filter=_and_filter(
+            _in_list_filter("defaultChannelGroup", channel_groups),
+            _in_list_filter("eventName", rules["events"]),
+        ),
+        currency_code=str(rules.get("currency", "GBP")),
+    )
+    totals = {
+        "cost": sum(_to_float(row.get("advertiserAdCost")) or 0.0 for row in cost_rows),
+        "clicks": sum(_to_float(row.get("advertiserAdClicks")) or 0.0 for row in cost_rows),
+        "impressions": sum(_to_float(row.get("advertiserAdImpressions")) or 0.0 for row in cost_rows),
+        "purchases": sum(_to_float(row.get("keyEvents")) or 0.0 for row in event_rows),
+        "purchase_revenue": sum(_to_float(row.get("purchaseRevenue")) or 0.0 for row in event_rows),
+    }
+    return {
+        "property_id": property_id,
+        "period": _period_manifest(period),
+        "row_counts": {"cost_rows": len(cost_rows), "event_rows": len(event_rows)},
+        "totals": totals,
+    }
+
+
+def _compare_source_totals_to_direct_ga4(source_totals: Mapping[str, Any], direct_totals: Mapping[str, Any]) -> dict[str, Any]:
+    errors: list[str] = []
+    metrics = ["cost", "purchases", "purchase_revenue", "clicks", "impressions"]
+    comparisons = {}
+    for metric in metrics:
+        source_value = float(_to_float(source_totals.get(metric)) or 0.0)
+        direct_value = float(_to_float(direct_totals.get(metric)) or 0.0)
+        delta = source_value - direct_value
+        tolerance = _validation_tolerance(metric, direct_value)
+        passed = abs(delta) <= tolerance
+        comparisons[metric] = {
+            "source": source_value,
+            "direct_ga4": direct_value,
+            "delta": delta,
+            "tolerance": tolerance,
+            "passed": passed,
+        }
+        if not passed:
+            errors.append(
+                f"{metric} source total {source_value:.2f} does not match fresh GA4 aggregate {direct_value:.2f} "
+                f"(delta {delta:.2f}, tolerance {tolerance:.2f})"
+            )
+    return {"status": "failed" if errors else "passed", "comparisons": comparisons, "errors": errors}
+
+
+def _validation_tolerance(metric: str, direct_value: float) -> float:
+    if metric in {"clicks", "impressions"}:
+        return max(0.5, abs(direct_value) * 0.0001)
+    return max(0.01, abs(direct_value) * 0.0001)
+
+
 def generate_ga4_performance_csv(
     *,
     client_config: dict[str, Any],
@@ -1517,6 +1771,7 @@ __all__ = [
     "resolve_trend_terms",
     "supports_ga4_source",
     "summarize_validation_deltas",
+    "validate_generated_ga4_performance_source",
     "validate_generated_performance_against_fixture",
     "write_source_generation_manifest",
     "write_split_trend_csvs",

@@ -31,6 +31,7 @@ from src.automated_sources import (
     prepare_automated_source_inputs,
     resolve_ga4_property_id,
     supports_ga4_source,
+    validate_generated_ga4_performance_source,
 )
 from src.config_loader import ConfigLoader
 from src.google_slides_builder import generate_native_google_slides, google_slides_source_status
@@ -92,6 +93,7 @@ def main() -> None:
         st.session_state.api_source_generated_bundle = None
 
     if st.button("Generate API Source Test Files"):
+        st.session_state.api_source_generated_bundle = None
         if not supports_ga4_source(client_id):
             st.error(f"GA4 source generation is not configured for {client_id}.")
             return
@@ -151,6 +153,22 @@ def main() -> None:
 
         if not perf_path:
             st.error("No GA4 performance source was generated.")
+            return
+
+        source_validation_path = Path(perf_path).parent / "SOURCE_VALIDATION.json"
+        try:
+            validate_generated_ga4_performance_source(
+                client_config=client_config,
+                report_mode=report_mode,
+                performance_csv_path=perf_path,
+                output_path=source_validation_path,
+                raise_on_error=True,
+            )
+        except AutomatedSourceError as exc:
+            st.error(str(exc))
+            if source_validation_path.exists():
+                with st.expander("SOURCE_VALIDATION.json"):
+                    st.json(json.loads(source_validation_path.read_text(encoding="utf-8")))
             return
 
         pptx_path = outputs_dir / f"{client_id}_report.pptx"
@@ -286,6 +304,7 @@ def main() -> None:
             "claude_handoff_path": str(claude_handoff_path) if claude_handoff_path else None,
             "claude_handoff_manifest": claude_handoff_manifest,
             "source_manifest_path": str(source_manifest) if source_manifest else None,
+            "source_validation_path": str(source_validation_path),
             "report_artifacts_path": str(report_artifacts_path),
             "google_slides_result": native_slides_result.to_dict(),
             "source_files": _generated_source_files(request_dir),
@@ -353,6 +372,7 @@ def _render_generated_outputs(bundle: dict | None) -> None:
             "report_mode": bundle["report_mode"],
             "request_dir": bundle["request_dir"],
             "source_manifest": bundle["source_manifest_path"],
+            "source_validation": bundle.get("source_validation_path"),
             "report_artifacts": bundle.get("report_artifacts_path"),
             "generated_source_files": bundle["source_files"],
             "pptx": bundle["pptx_path"],
@@ -366,6 +386,11 @@ def _render_generated_outputs(bundle: dict | None) -> None:
         if manifest_path.exists():
             with st.expander("SOURCE_GENERATION_MANIFEST.json"):
                 st.json(json.loads(manifest_path.read_text(encoding="utf-8")))
+    if bundle.get("source_validation_path"):
+        validation_path = Path(bundle["source_validation_path"])
+        if validation_path.exists():
+            with st.expander("SOURCE_VALIDATION.json"):
+                st.json(json.loads(validation_path.read_text(encoding="utf-8")))
     if bundle.get("report_artifacts_path"):
         artifacts_path = Path(bundle["report_artifacts_path"])
         if artifacts_path.exists():

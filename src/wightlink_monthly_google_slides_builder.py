@@ -702,7 +702,8 @@ def _monthly_subtitle(month: Any) -> str:
 
 def _output_deck_title(client_name: str, period_label: str) -> str:
     cleaned_period = f" {period_label}" if period_label else ""
-    return f"{client_name}{cleaned_period} Monthly Report - API Source Test"
+    generated_stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H%M UTC")
+    return f"{client_name}{cleaned_period} Monthly Report - API Source Test - {generated_stamp}"
 
 
 __all__ = [

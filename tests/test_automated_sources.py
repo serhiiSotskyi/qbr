@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,6 +23,7 @@ from src.automated_sources import (
     ga4_source_status,
     prepare_automated_source_inputs,
     resolve_trend_terms,
+    validate_generated_ga4_performance_source,
 )
 from src.data_loader import QuarterInfo, load_csv
 from src.source_normalizers import (
@@ -139,6 +141,19 @@ class OlympicFakeGA4Client:
             _ga4_event_row("20260801", "PMax - Domes Luxury", "add_to_cart", 3, 0, channel_group="Cross-network"),
             _ga4_event_row("20260801", "Display - Remarketing - Greece", "add_to_cart", 2, 0, channel_group="Display"),
             _ga4_event_row("20250110", "Q125", "add_to_cart", 1, 0, channel_group="Display"),
+        ]
+
+
+class WightlinkDirectAggregateFakeGA4Client:
+    def run_report(self, *, dimensions, metrics, **kwargs):
+        if "advertiserAdCost" in metrics:
+            return [
+                _ga4_cost_row("20260801", "Search - Brand", 100, 1000, 10000),
+                _ga4_cost_row("20260831", "Search - Generic - Routes", 200, 2000, 20000),
+            ]
+        return [
+            _ga4_event_row("20260801", "Search - Brand", "purchase", 10, 1000),
+            _ga4_event_row("20260831", "Search - Generic - Routes", "purchase", 20, 2000),
         ]
 
 
@@ -640,6 +655,104 @@ class AutomatedSourcesTests(unittest.TestCase):
             )
 
             self.assertTrue(Path(output).exists())
+
+    def test_wightlink_monthly_source_validation_passes_on_complete_matching_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {
+                "GA4_PROPERTY_ID_WIGHTLINK": "123456",
+                "GA4_OAUTH_ACCESS_TOKEN": "token",
+            },
+            clear=False,
+        ):
+            source_path = Path(tmpdir) / "performance.csv"
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "2026-08-01",
+                        "Campaign Type": "Brand",
+                        "Data Type": "Ferry",
+                        "Purchases": 10,
+                        "Purchase Revenue": 1000,
+                        "Cost": 100,
+                        "Impressions": 10000,
+                        "Clicks": 1000,
+                    },
+                    {
+                        "Date": "2026-08-31",
+                        "Campaign Type": "Generic",
+                        "Data Type": "Routes",
+                        "Purchases": 20,
+                        "Purchase Revenue": 2000,
+                        "Cost": 200,
+                        "Impressions": 20000,
+                        "Clicks": 2000,
+                    },
+                ]
+            ).to_csv(source_path, index=False)
+
+            validation = validate_generated_ga4_performance_source(
+                client_config={"id": "wightlink"},
+                report_mode="monthly",
+                performance_csv_path=source_path,
+                ga4_client=WightlinkDirectAggregateFakeGA4Client(),
+                today=pd.Timestamp("2026-09-07"),
+            )
+
+        self.assertEqual(validation["status"], "passed")
+        self.assertEqual(validation["period_date_max"], "2026-08-31")
+        self.assertEqual(validation["direct_comparison"]["status"], "passed")
+
+    def test_wightlink_monthly_source_validation_rejects_partial_month_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {
+                "GA4_PROPERTY_ID_WIGHTLINK": "123456",
+                "GA4_OAUTH_ACCESS_TOKEN": "token",
+            },
+            clear=False,
+        ):
+            source_path = Path(tmpdir) / "performance.csv"
+            validation_path = Path(tmpdir) / "SOURCE_VALIDATION.json"
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "2026-08-01",
+                        "Campaign Type": "Brand",
+                        "Data Type": "Ferry",
+                        "Purchases": 10,
+                        "Purchase Revenue": 1000,
+                        "Cost": 100,
+                        "Impressions": 10000,
+                        "Clicks": 1000,
+                    },
+                    {
+                        "Date": "2026-08-23",
+                        "Campaign Type": "Generic",
+                        "Data Type": "Routes",
+                        "Purchases": 5,
+                        "Purchase Revenue": 500,
+                        "Cost": 50,
+                        "Impressions": 5000,
+                        "Clicks": 500,
+                    },
+                ]
+            ).to_csv(source_path, index=False)
+
+            with self.assertRaisesRegex(AutomatedSourceError, "expected 2026-08-31"):
+                validate_generated_ga4_performance_source(
+                    client_config={"id": "wightlink"},
+                    report_mode="monthly",
+                    performance_csv_path=source_path,
+                    output_path=validation_path,
+                    ga4_client=WightlinkDirectAggregateFakeGA4Client(),
+                    today=pd.Timestamp("2026-09-07"),
+                )
+
+            validation = json.loads(validation_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(validation["status"], "failed")
+        self.assertIn("2026-08-31", " ".join(validation["errors"]))
 
     def test_wightlink_trend_terms_are_fixed_for_api_pull(self) -> None:
         terms = resolve_trend_terms({"id": "wightlink"})
