@@ -389,6 +389,31 @@ class WendyWuQbrTests(unittest.TestCase):
         self.assertIn("Revenue", kpis)
         self.assertFalse(report["overall"]["prior_monthly"].empty)
 
+    def test_api_source_iso_dates_are_not_parsed_as_dayfirst_dates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "wendy_wu_iso_dates.csv"
+            rows = [
+                {
+                    "Date": f"2026-08-{day:02d}",
+                    "Campaign Type": "Brand",
+                    "Destination": "Japan",
+                    "Sales Leads": 10,
+                    "Cost": 5,
+                    "Impressions": 1000,
+                    "Clicks": 100,
+                    "Revenue": 100,
+                }
+                for day in range(1, 13)
+            ]
+            pd.DataFrame(rows).to_csv(csv_path, index=False)
+
+            df = load_csv(csv_path)
+            month = detect_latest_complete_month(df, today=pd.Timestamp("2026-09-07"))
+
+        self.assertEqual(month.label, "Aug 2026")
+        self.assertEqual(float(df["sales_leads"].sum()), 120)
+        self.assertEqual(float(df["cost"].sum()), 60)
+
     def test_monthly_pptx_uses_performance_only_sections(self) -> None:
         csv_path = _write_monthly_fixture()
         with tempfile.TemporaryDirectory() as tmpdir:

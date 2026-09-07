@@ -338,6 +338,16 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
         "main",
         "src.google_slides_builder",
     ]
+    if client_id in WENDY_WU_CLIENT_IDS and report_mode == "monthly":
+        module_names = [
+            "src.data_loader",
+            "src.metrics",
+            "src.report_pipeline",
+            "utils.text_report",
+            "src.monthly_google_slides_builder",
+            "src.google_slides_builder",
+            "main",
+        ]
     if client_id == "wightlink" and report_mode == "monthly":
         module_names = [
             "src.source_normalizers",
@@ -422,6 +432,12 @@ def _validate_parser_against_source(
     source_validation: dict,
 ) -> None:
     if client_id != "wightlink" or report_mode != "monthly":
+        if client_id in WENDY_WU_CLIENT_IDS and report_mode == "monthly":
+            _validate_wendy_wu_monthly_parser_against_source(
+                client_id=client_id,
+                performance_csv_path=performance_csv_path,
+                source_validation=source_validation,
+            )
         return
 
     parser_module = sys.modules.get("report_generator.parsers.wightlink_monthly_performance_parser")
@@ -441,6 +457,47 @@ def _validate_parser_against_source(
     )
     if errors:
         raise RuntimeError("Wightlink monthly parser totals do not match validated GA4 source: " + "; ".join(errors))
+
+
+def _validate_wendy_wu_monthly_parser_against_source(
+    *,
+    client_id: str,
+    performance_csv_path: str | Path,
+    source_validation: dict,
+) -> None:
+    data_loader_module = importlib.import_module("src.data_loader")
+    metrics_module = importlib.import_module("src.metrics")
+
+    client_config = CONFIG_LOADER.get_client_config(client_id)
+    df = data_loader_module.load_csv(performance_csv_path)
+    month = data_loader_module.detect_latest_complete_month(df)
+    report = metrics_module.prepare_report_data(
+        df,
+        month,
+        campaign_order=CONFIG_LOADER.get_campaign_types(client_config),
+        destination_order=CONFIG_LOADER.get_destinations(client_config),
+        destination_aliases=client_config.get("destination_aliases"),
+        destination_other_config=client_config.get("destination_other"),
+        report_mode="monthly",
+    )
+    totals = report.get("overall", {}).get("total", {})
+    parser_totals = {
+        "cost": totals.get("Cost"),
+        "sales_leads": totals.get("Sales Leads"),
+        "revenue": totals.get("Revenue", 0.0),
+        "clicks": totals.get("Clicks"),
+        "impressions": totals.get("Impressions"),
+    }
+    source_totals = source_validation.get("source_totals", {})
+    errors = _compare_totals(
+        actual=parser_totals,
+        expected=source_totals,
+        metrics=("cost", "sales_leads", "revenue", "clicks", "impressions"),
+        actual_label="parser",
+        expected_label="validated source",
+    )
+    if errors:
+        raise RuntimeError("Wendy Wu monthly parser totals do not match validated GA4 source: " + "; ".join(errors))
 
 
 def _compare_totals(

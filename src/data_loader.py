@@ -137,7 +137,13 @@ def load_csv(csv_path: str | Path) -> pd.DataFrame:
 
 
 def _parse_report_dates(values: pd.Series, *, dayfirst: bool = False) -> pd.Series:
-    parsed = pd.to_datetime(values, dayfirst=dayfirst, errors="coerce", format="mixed", utc=True)
+    text = values.astype(str).str.strip()
+    parsed = pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns, UTC]")
+    iso_mask = text.str.match(r"^\d{4}-\d{1,2}-\d{1,2}(?:\s|$|T)")
+    if iso_mask.any():
+        parsed.loc[iso_mask] = pd.to_datetime(text.loc[iso_mask], errors="coerce", format="ISO8601", utc=True)
+    if (~iso_mask).any():
+        parsed.loc[~iso_mask] = pd.to_datetime(text.loc[~iso_mask], dayfirst=dayfirst, errors="coerce", format="mixed", utc=True)
     return parsed.dt.tz_convert(None)
 
 

@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from main import run_text_report
+from report_generator.pipelines.olympic_pipeline import _parse_olympic_dates
 from src.automated_sources import (
     AutomatedSourceError,
     SourcePeriod,
@@ -320,6 +321,12 @@ class AutomatedSourcesTests(unittest.TestCase):
         self.assertEqual(float(performance_max["Cost"].sum()), 100.0)
         self.assertEqual(float(other["Cost"].sum()), 25.0)
         self.assertEqual(float(other["Add to cart"].sum()), 5.0)
+
+    def test_olympic_iso_dates_are_not_parsed_as_dayfirst_dates(self) -> None:
+        parsed = _parse_olympic_dates(pd.Series([f"2026-08-{day:02d}" for day in range(1, 13)]))
+
+        self.assertEqual(parsed.min(), pd.Timestamp("2026-08-01"))
+        self.assertEqual(parsed.max(), pd.Timestamp("2026-08-12"))
 
     def test_ga4_output_handles_mixed_timezone_dates(self) -> None:
         merged = pd.DataFrame(

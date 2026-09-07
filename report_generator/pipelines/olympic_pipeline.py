@@ -131,7 +131,7 @@ def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
         raise ValueError(f"Olympic Holidays CSV missing required columns: {sorted(missing)}")
 
     working_df = working_df[list(required)].copy()
-    working_df["date"] = pd.to_datetime(working_df["date"], dayfirst=True, errors="coerce")
+    working_df["date"] = _parse_olympic_dates(working_df["date"])
     working_df = working_df.dropna(subset=["date"]).copy()
     if working_df.empty:
         raise ValueError("Olympic Holidays CSV has no valid dates.")
@@ -893,6 +893,17 @@ def _format_yoy_table(yoy_summary: dict[str, Any] | None) -> pd.DataFrame:
     if not yoy_summary:
         return pd.DataFrame([{"Status": "No matched prior-year quarter"}])
     return yoy_summary["table"].copy()
+
+
+def _parse_olympic_dates(values: pd.Series) -> pd.Series:
+    text = values.astype(str).str.strip()
+    parsed = pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns]")
+    iso_mask = text.str.match(r"^\d{4}-\d{1,2}-\d{1,2}(?:\s|$|T)")
+    if iso_mask.any():
+        parsed.loc[iso_mask] = pd.to_datetime(text.loc[iso_mask], format="ISO8601", errors="coerce")
+    if (~iso_mask).any():
+        parsed.loc[~iso_mask] = pd.to_datetime(text.loc[~iso_mask], dayfirst=True, errors="coerce")
+    return parsed
 
 
 def _format_channel_table(frame: pd.DataFrame) -> pd.DataFrame:
