@@ -74,6 +74,14 @@ class FakeGA4Client:
                 "purchaseRevenue": "0",
             },
             {
+                "date": "20260401",
+                "campaignName": "AU Generic Japan",
+                "defaultChannelGroup": "Paid Search",
+                "eventName": "purchase",
+                "keyEvents": "0",
+                "purchaseRevenue": "123.45",
+            },
+            {
                 "date": "20260402",
                 "campaignName": "(not set)",
                 "defaultChannelGroup": "Paid Search",
@@ -255,6 +263,8 @@ class AutomatedSourcesTests(unittest.TestCase):
             loaded = load_csv(performance_path)
             self.assertEqual(float(loaded["sales_leads"].sum()), 17.0)
             self.assertEqual(float(loaded["cost"].sum()), 125.0)
+            self.assertIn("revenue", loaded.columns)
+            self.assertEqual(float(loaded["revenue"].sum()), 123.45)
             self.assertIn("Japan", set(loaded["destination"]))
             self.assertIsNotNone(other_dir)
             self.assertTrue((Path(other_dir) / "ga4_campaigns.csv").exists())

@@ -70,7 +70,7 @@ CLIENT_SOURCE_RULES: dict[str, dict[str, Any]] = {
         ),
         "exclude_event_campaign_contains": {"hubspot_live_chat": ("general 22",)},
         "exclude_event_any_campaign_contains": ("general 22",),
-        "include_revenue": False,
+        "include_revenue": True,
         "destination_classifier": "wwt_aus_datastudio",
     },
     "wightlink": {
