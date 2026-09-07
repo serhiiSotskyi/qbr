@@ -49,10 +49,14 @@ CONFIG_LOADER = ConfigLoader(
 
 def main() -> None:
     st.title("API Source Test")
-    st.caption("Test-only workflow: GA4 supplies performance CSVs and DataForSEO supplies Trends CSVs. The main upload page is unchanged.")
+    st.caption(
+        "Test-only workflow: GA4 supplies performance CSVs and DataForSEO supplies Trends CSVs. The main upload page is unchanged."
+    )
 
     client_options = load_client_options()
-    selected_client = st.selectbox("Client", client_options, format_func=lambda client: client["name"])
+    selected_client = st.selectbox(
+        "Client", client_options, format_func=lambda client: client["name"]
+    )
     client_id = selected_client["id"]
     report_mode = _report_mode_selector(client_id)
     client_config = CONFIG_LOADER.get_client_config(client_id)
@@ -60,8 +64,14 @@ def main() -> None:
     _render_source_status(client_id, client_config, report_mode)
 
     st.subheader("Manual Uploads")
-    st.caption("Performance and Trends uploads are intentionally hidden on this test page.")
-    auction_file = None if _monthly_without_auction(client_id, report_mode) else st.file_uploader("Auction CSV", type=["csv"])
+    st.caption(
+        "Performance and Trends uploads are intentionally hidden on this test page."
+    )
+    auction_file = (
+        None
+        if _monthly_without_auction(client_id, report_mode)
+        else st.file_uploader("Auction CSV", type=["csv"])
+    )
     plan_workbook_file = None
     red_funnel_auction_file = None
     red_funnel_prior_auction_file = None
@@ -100,7 +110,9 @@ def main() -> None:
             st.error(f"GA4 source generation is not configured for {client_id}.")
             return
 
-        use_dataforseo_trends = report_mode == "quarterly" and client_has_trends(client_config, report_mode)
+        use_dataforseo_trends = report_mode == "quarterly" and client_has_trends(
+            client_config, report_mode
+        )
 
         (
             request_dir,
@@ -142,13 +154,25 @@ def main() -> None:
             st.code(traceback.format_exc(), language="python")
             return
 
-        perf_path = str(automated_paths.performance_csv_path) if automated_paths.performance_csv_path else perf_path
-        trends_dir = str(automated_paths.trends_dir) if automated_paths.trends_dir else trends_dir
+        perf_path = (
+            str(automated_paths.performance_csv_path)
+            if automated_paths.performance_csv_path
+            else perf_path
+        )
+        trends_dir = (
+            str(automated_paths.trends_dir)
+            if automated_paths.trends_dir
+            else trends_dir
+        )
         trends_ytd_current_dir = (
-            str(automated_paths.trends_ytd_current_dir) if automated_paths.trends_ytd_current_dir else trends_ytd_current_dir
+            str(automated_paths.trends_ytd_current_dir)
+            if automated_paths.trends_ytd_current_dir
+            else trends_ytd_current_dir
         )
         trends_ytd_previous_dir = (
-            str(automated_paths.trends_ytd_previous_dir) if automated_paths.trends_ytd_previous_dir else trends_ytd_previous_dir
+            str(automated_paths.trends_ytd_previous_dir)
+            if automated_paths.trends_ytd_previous_dir
+            else trends_ytd_previous_dir
         )
         if automated_paths.other_campaigns_dir is not None and not other_campaigns_dir:
             other_campaigns_dir = str(automated_paths.other_campaigns_dir)
@@ -170,7 +194,9 @@ def main() -> None:
             st.error(str(exc))
             if source_validation_path.exists():
                 with st.expander("SOURCE_VALIDATION.json"):
-                    st.json(json.loads(source_validation_path.read_text(encoding="utf-8")))
+                    st.json(
+                        json.loads(source_validation_path.read_text(encoding="utf-8"))
+                    )
             return
 
         pptx_path = outputs_dir / f"{client_id}_report.pptx"
@@ -179,8 +205,14 @@ def main() -> None:
         generation_started_at = time.time()
 
         try:
-            with st.spinner("Generating API source CSVs, PPTX, TXT, Claude handoff package, and native Google Slides if configured..."):
-                fresh_run_report, fresh_run_text_report, fresh_generate_native_google_slides = _fresh_generation_functions(
+            with st.spinner(
+                "Generating API source CSVs, PPTX, TXT, Claude handoff package, and native Google Slides if configured..."
+            ):
+                (
+                    fresh_run_report,
+                    fresh_run_text_report,
+                    fresh_generate_native_google_slides,
+                ) = _fresh_generation_functions(
                     client_id,
                     report_mode,
                 )
@@ -222,7 +254,10 @@ def main() -> None:
                         report_mode=report_mode,
                     )
                 )
-                prompt_txt_path.write_text(build_presentation_prompt(client_id, report_mode=report_mode), encoding="utf-8")
+                prompt_txt_path.write_text(
+                    build_presentation_prompt(client_id, report_mode=report_mode),
+                    encoding="utf-8",
+                )
                 source_manifest = automated_paths.source_manifest_path
                 report_artifacts_path = write_report_artifacts(
                     client_id=client_id,
@@ -251,53 +286,75 @@ def main() -> None:
                 )
                 _append_package_paths(
                     package_path,
-                    [report_artifacts_path, request_dir / "source_data", request_dir / "raw_api"],
+                    [
+                        report_artifacts_path,
+                        request_dir / "source_data",
+                        request_dir / "raw_api",
+                    ],
                     arc_base=request_dir,
                 )
                 claude_handoff_path = None
                 claude_handoff_manifest = None
                 if is_wendy_wu_streamlit_report(client_id, report_mode):
-                    claude_handoff_path, claude_handoff_manifest = create_claude_handoff_bundle(
-                        client_id=client_id,
-                        pptx_path=generated_pptx,
-                        report_txt_path=generated_txt,
-                        prompt_txt_path=prompt_txt_path,
-                        request_dir=request_dir,
-                        client_name=selected_client["name"],
-                        report_mode=report_mode,
-                        source_generation_manifest=source_manifest,
+                    claude_handoff_path, claude_handoff_manifest = (
+                        create_claude_handoff_bundle(
+                            client_id=client_id,
+                            pptx_path=generated_pptx,
+                            report_txt_path=generated_txt,
+                            prompt_txt_path=prompt_txt_path,
+                            request_dir=request_dir,
+                            client_name=selected_client["name"],
+                            report_mode=report_mode,
+                            source_generation_manifest=source_manifest,
+                        )
                     )
-                    _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
+                    _append_package_paths(
+                        claude_handoff_path,
+                        [request_dir / "source_data"],
+                        arc_base=request_dir,
+                    )
                 elif is_wightlink_report(client_id, report_mode):
-                    claude_handoff_path, claude_handoff_manifest = create_wightlink_claude_handoff_bundle(
-                        pptx_path=generated_pptx,
-                        report_txt_path=generated_txt,
-                        prompt_txt_path=prompt_txt_path,
-                        request_dir=request_dir,
-                        performance_csv_path=perf_path,
-                        auction_csv_path=auction_path,
-                        trends_dir=trends_dir,
-                        trends_ytd_current_dir=trends_ytd_current_dir,
-                        trends_ytd_previous_dir=trends_ytd_previous_dir,
-                        red_funnel_auction_csv_path=red_funnel_auction_path,
-                        red_funnel_prior_auction_csv_path=red_funnel_prior_auction_path,
-                        plan_book_path=plan_workbook_path,
-                        report_mode=report_mode,
-                        source_generation_manifest=source_manifest,
+                    claude_handoff_path, claude_handoff_manifest = (
+                        create_wightlink_claude_handoff_bundle(
+                            pptx_path=generated_pptx,
+                            report_txt_path=generated_txt,
+                            prompt_txt_path=prompt_txt_path,
+                            request_dir=request_dir,
+                            performance_csv_path=perf_path,
+                            auction_csv_path=auction_path,
+                            trends_dir=trends_dir,
+                            trends_ytd_current_dir=trends_ytd_current_dir,
+                            trends_ytd_previous_dir=trends_ytd_previous_dir,
+                            red_funnel_auction_csv_path=red_funnel_auction_path,
+                            red_funnel_prior_auction_csv_path=red_funnel_prior_auction_path,
+                            plan_book_path=plan_workbook_path,
+                            report_mode=report_mode,
+                            source_generation_manifest=source_manifest,
+                        )
                     )
-                    _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
+                    _append_package_paths(
+                        claude_handoff_path,
+                        [request_dir / "source_data"],
+                        arc_base=request_dir,
+                    )
                 elif is_olympic_holidays_report(client_id, report_mode):
-                    claude_handoff_path, claude_handoff_manifest = create_olympic_holidays_claude_handoff_bundle(
-                        pptx_path=generated_pptx,
-                        report_txt_path=generated_txt,
-                        prompt_txt_path=prompt_txt_path,
-                        request_dir=request_dir,
-                        performance_csv_path=perf_path,
-                        auction_csv_path=auction_path,
-                        trends_dir=trends_dir,
-                        source_generation_manifest=source_manifest,
+                    claude_handoff_path, claude_handoff_manifest = (
+                        create_olympic_holidays_claude_handoff_bundle(
+                            pptx_path=generated_pptx,
+                            report_txt_path=generated_txt,
+                            prompt_txt_path=prompt_txt_path,
+                            request_dir=request_dir,
+                            performance_csv_path=perf_path,
+                            auction_csv_path=auction_path,
+                            trends_dir=trends_dir,
+                            source_generation_manifest=source_manifest,
+                        )
                     )
-                    _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
+                    _append_package_paths(
+                        claude_handoff_path,
+                        [request_dir / "source_data"],
+                        arc_base=request_dir,
+                    )
                 native_slides_result = fresh_generate_native_google_slides(
                     client_id=client_id,
                     client_name=selected_client["name"],
@@ -319,7 +376,9 @@ def main() -> None:
             "report_txt_path": str(generated_txt),
             "prompt_txt_path": str(prompt_txt_path),
             "package_path": str(package_path),
-            "claude_handoff_path": str(claude_handoff_path) if claude_handoff_path else None,
+            "claude_handoff_path": (
+                str(claude_handoff_path) if claude_handoff_path else None
+            ),
             "claude_handoff_manifest": claude_handoff_manifest,
             "source_manifest_path": str(source_manifest) if source_manifest else None,
             "source_validation_path": str(source_validation_path),
@@ -369,7 +428,11 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
     import main as report_main
     import src.google_slides_builder as slides_module
 
-    return report_main.run_report, report_main.run_text_report, slides_module.generate_native_google_slides
+    return (
+        report_main.run_report,
+        report_main.run_text_report,
+        slides_module.generate_native_google_slides,
+    )
 
 
 def _validate_report_artifacts_against_source(
@@ -392,7 +455,9 @@ def _validate_report_artifacts_against_source(
         None,
     )
     if not summary:
-        raise RuntimeError("Report artifact validation failed: missing All Performance Month Summary slide.")
+        raise RuntimeError(
+            "Report artifact validation failed: missing All Performance Month Summary slide."
+        )
 
     kpis = {
         str(card.get("key")): card.get("value_raw")
@@ -421,7 +486,10 @@ def _validate_report_artifacts_against_source(
             )
 
     if errors:
-        raise RuntimeError("Report artifact totals do not match validated GA4 source: " + "; ".join(errors))
+        raise RuntimeError(
+            "Report artifact totals do not match validated GA4 source: "
+            + "; ".join(errors)
+        )
 
 
 def _validate_parser_against_source(
@@ -440,11 +508,15 @@ def _validate_parser_against_source(
             )
         return
 
-    parser_module = sys.modules.get("report_generator.parsers.wightlink_monthly_performance_parser")
+    parser_module = sys.modules.get(
+        "report_generator.parsers.wightlink_monthly_performance_parser"
+    )
     if parser_module is not None:
         parser_module = importlib.reload(parser_module)
     else:
-        parser_module = importlib.import_module("report_generator.parsers.wightlink_monthly_performance_parser")
+        parser_module = importlib.import_module(
+            "report_generator.parsers.wightlink_monthly_performance_parser"
+        )
     parsed = parser_module.parse_wightlink_monthly_performance_csv(performance_csv_path)
     parser_totals = parsed.get("current", {}).get("totals", {})
     source_totals = source_validation.get("source_totals", {})
@@ -456,7 +528,10 @@ def _validate_parser_against_source(
         expected_label="validated source",
     )
     if errors:
-        raise RuntimeError("Wightlink monthly parser totals do not match validated GA4 source: " + "; ".join(errors))
+        raise RuntimeError(
+            "Wightlink monthly parser totals do not match validated GA4 source: "
+            + "; ".join(errors)
+        )
 
 
 def _validate_wendy_wu_monthly_parser_against_source(
@@ -497,7 +572,10 @@ def _validate_wendy_wu_monthly_parser_against_source(
         expected_label="validated source",
     )
     if errors:
-        raise RuntimeError("Wendy Wu monthly parser totals do not match validated GA4 source: " + "; ".join(errors))
+        raise RuntimeError(
+            "Wendy Wu monthly parser totals do not match validated GA4 source: "
+            + "; ".join(errors)
+        )
 
 
 def _compare_totals(
@@ -539,24 +617,34 @@ def _safe_float(value) -> float | None:
 
 def _report_mode_selector(client_id: str) -> str:
     if client_id == "wightlink":
-        return st.selectbox("Wightlink report mode", ["quarterly", "monthly", "annual"], index=0)
+        return st.selectbox(
+            "Wightlink report mode", ["quarterly", "monthly", "annual"], index=0
+        )
     if client_id in WENDY_WU_CLIENT_IDS:
         return st.selectbox("Wendy Wu report mode", ["quarterly", "monthly"], index=0)
     return "quarterly"
 
 
-def _render_source_status(client_id: str, client_config: dict, report_mode: str) -> None:
+def _render_source_status(
+    client_id: str, client_config: dict, report_mode: str
+) -> None:
     period = default_source_period(report_mode)
     ga4_status = ga4_source_status(client_id)
     dataforseo_status = dataforseo_source_status()
     slides_status = google_slides_source_status(client_id, report_mode)
-    trends_enabled = report_mode == "quarterly" and client_has_trends(client_config, report_mode)
+    trends_enabled = report_mode == "quarterly" and client_has_trends(
+        client_config, report_mode
+    )
     st.subheader("Source Status")
     st.write(
         {
-            "ga4_credentials": "configured" if ga4_status["auth_configured"] else "missing",
+            "ga4_credentials": (
+                "configured" if ga4_status["auth_configured"] else "missing"
+            ),
             "ga4_auth_method": ga4_status["auth_method"],
-            "dataforseo_credentials": "configured" if dataforseo_status["configured"] else "missing",
+            "dataforseo_credentials": (
+                "configured" if dataforseo_status["configured"] else "missing"
+            ),
             "selected_property_id": resolve_ga4_property_id(client_id),
             "report_period": {
                 "mode": report_mode,
@@ -570,7 +658,10 @@ def _render_source_status(client_id: str, client_config: dict, report_mode: str)
                 "template": slides_status["google_slides_template"],
                 "output_folder": slides_status["google_drive_output_folder"],
                 "asset_folder": slides_status["google_drive_asset_folder"],
-                "enabled_for_selection": slides_status["native_slides_enabled_for_selection"],
+                "output_sharing": slides_status["google_drive_output_sharing"],
+                "enabled_for_selection": slides_status[
+                    "native_slides_enabled_for_selection"
+                ],
             },
         }
     )
@@ -582,7 +673,11 @@ def _render_source_status(client_id: str, client_config: dict, report_mode: str)
         if not slides_status["template"]["supported"]:
             st.info(slides_status["template"]["message"])
         else:
-            st.info(slides_status["workspace"]["message"] if not slides_status["workspace"]["configured"] else slides_status["template"]["message"])
+            st.info(
+                slides_status["workspace"]["message"]
+                if not slides_status["workspace"]["configured"]
+                else slides_status["template"]["message"]
+            )
 
 
 def _render_generated_outputs(bundle: dict | None) -> None:
@@ -621,19 +716,31 @@ def _render_generated_outputs(bundle: dict | None) -> None:
                 st.json(json.loads(artifacts_path.read_text(encoding="utf-8")))
     slides_result = bundle.get("google_slides_result") or {}
     if slides_result:
-        if slides_result.get("status") == "success" and slides_result.get("google_slides_url"):
+        if slides_result.get("status") == "success" and slides_result.get(
+            "google_slides_url"
+        ):
             st.success("Native Google Slides deck generated.")
-            st.link_button("Open Native Google Slides Deck", slides_result["google_slides_url"])
+            st.link_button(
+                "Open Native Google Slides Deck", slides_result["google_slides_url"]
+            )
         elif slides_result.get("status") == "failed":
-            st.warning(slides_result.get("message", "Native Google Slides generation failed."))
+            st.warning(
+                slides_result.get("message", "Native Google Slides generation failed.")
+            )
         else:
-            st.info(slides_result.get("message", "Native Google Slides generation was skipped."))
+            st.info(
+                slides_result.get(
+                    "message", "Native Google Slides generation was skipped."
+                )
+            )
         manifest_value = slides_result.get("manifest_path")
         if manifest_value:
             slides_manifest_path = Path(manifest_value)
             if slides_manifest_path.exists():
                 with st.expander("google_slides_generation_manifest.json"):
-                    st.json(json.loads(slides_manifest_path.read_text(encoding="utf-8")))
+                    st.json(
+                        json.loads(slides_manifest_path.read_text(encoding="utf-8"))
+                    )
         qa_pdf_value = slides_result.get("qa_pdf_path")
         if qa_pdf_value and Path(qa_pdf_value).exists():
             with open(qa_pdf_value, "rb") as handle:
@@ -664,14 +771,22 @@ def _generated_source_files(request_dir: Path) -> list[str]:
     source_data_dir = request_dir / "source_data"
     if not source_data_dir.exists():
         return []
-    return sorted(str(path.relative_to(request_dir)) for path in source_data_dir.rglob("*") if path.is_file())
+    return sorted(
+        str(path.relative_to(request_dir))
+        for path in source_data_dir.rglob("*")
+        if path.is_file()
+    )
 
 
 def _monthly_without_auction(client_id: str, report_mode: str) -> bool:
-    return report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
+    return report_mode == "monthly" and (
+        client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink"
+    )
 
 
-def _append_package_paths(package_path: Path | None, paths: list[Path], *, arc_base: Path) -> None:
+def _append_package_paths(
+    package_path: Path | None, paths: list[Path], *, arc_base: Path
+) -> None:
     if package_path is None:
         return
     with ZipFile(package_path, "a", compression=ZIP_DEFLATED) as archive:
@@ -690,7 +805,9 @@ def _iter_package_paths(paths: list[Path]) -> list[Path]:
         if candidate.is_file():
             files.append(candidate)
         elif candidate.is_dir():
-            files.extend(sorted(item for item in candidate.rglob("*") if item.is_file()))
+            files.extend(
+                sorted(item for item in candidate.rglob("*") if item.is_file())
+            )
     return files
 
 

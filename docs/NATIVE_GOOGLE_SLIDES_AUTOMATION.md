@@ -15,6 +15,14 @@ Set these in Streamlit Cloud secrets or local `.env`:
 - `GOOGLE_WORKSPACE_OAUTH_TOKEN_URL=https://oauth2.googleapis.com/token`
 - `GOOGLE_DRIVE_OUTPUT_FOLDER_ID`
 - `GOOGLE_DRIVE_ASSET_FOLDER_ID`
+- `GOOGLE_DRIVE_OUTPUT_SHARE_ENABLED=true`
+- `GOOGLE_DRIVE_COPY_TEMPLATE_PERMISSIONS=true`
+- `GOOGLE_DRIVE_LINK_SHARE_FALLBACK_ENABLED=true`
+- `GOOGLE_DRIVE_LINK_SHARE_FALLBACK_ROLE=reader`
+- `GOOGLE_DRIVE_SHARE_DOMAIN=summon.co` (optional; only if Google Workspace domain sharing is enabled)
+- `GOOGLE_DRIVE_SHARE_ROLE=writer` (optional explicit target role)
+- `GOOGLE_DRIVE_SHARE_EMAILS=person@example.com,person2@example.com` (optional)
+- `GOOGLE_DRIVE_SHARE_GROUPS=team@example.com` (optional)
 - `GOOGLE_SLIDES_TEMPLATE_WWT_UK_QBR`
 - `GOOGLE_SLIDES_TEMPLATE_WWT_AUS_QBR`
 - `GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_QBR`
@@ -33,9 +41,13 @@ but setting them explicitly is safer for Streamlit Cloud operations.
 4. Chart PNGs are uploaded to `GOOGLE_DRIVE_ASSET_FOLDER_ID`, temporarily made
    link-readable for Slides insertion, then restricted again in a cleanup step.
 5. The copied deck is updated using Google Slides `batchUpdate`.
-6. The page returns the live Google Slides URL and writes
+6. The generated deck copies the template deck's non-owner Drive sharing
+   permissions, then adds any explicit configured Drive share targets. If neither
+   path yields a share target, the deck falls back to anyone-with-link reader
+   access so non-owner reviewers can open the link.
+7. The page returns the live Google Slides URL and writes
    `google_slides_generation_manifest.json`.
-7. If PDF export works, `google_slides_qa.pdf` is written for visual QA.
+8. If PDF export works, `google_slides_qa.pdf` is written for visual QA.
 
 ## Monthly Template Prototype
 
@@ -50,6 +62,6 @@ The monthly builder overwrites KPI cards, inserts YTD table rows as needed,
 fills/creates native tables from the manifest, and replaces chart slots with
 API-generated PNG charts.
 
-WWT AUS monthly, Wightlink monthly, Olympic monthly, and annual native Google
-Slides generation remain disabled until matching approved template mappings are
-added.
+WWT AUS monthly and Wightlink monthly are also enabled with their approved
+template manifests. Olympic monthly and annual native Google Slides generation
+remain disabled until matching approved template mappings are added.

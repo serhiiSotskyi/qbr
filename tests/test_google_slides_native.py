@@ -24,7 +24,9 @@ from src.google_slides_builder import (
 from src.google_slides_templates import GoogleSlidesTemplateRegistry
 from src.google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
 from src.monthly_google_slides_builder import build_wendy_wu_monthly_slides_payload
-from src.wightlink_monthly_google_slides_builder import build_wightlink_monthly_slides_payload
+from src.wightlink_monthly_google_slides_builder import (
+    build_wightlink_monthly_slides_payload,
+)
 from src.env_utils import load_env_file
 from src.report_artifacts import write_report_artifacts
 
@@ -48,6 +50,78 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertNotIn("client-secret-secret", status_text)
         self.assertNotIn("refresh-token-secret", status_text)
         self.assertIn("GOOGLE_DRIVE_OUTPUT_FOLDER_ID", status["message"])
+        self.assertTrue(status["output_sharing_configured"])
+        self.assertEqual(status["output_sharing_role"], "writer")
+
+    def test_workspace_config_parses_output_sharing_targets(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "GOOGLE_DRIVE_SHARE_DOMAIN": "example.com",
+                "GOOGLE_DRIVE_SHARE_EMAILS": "one@example.com; two@example.com",
+                "GOOGLE_DRIVE_SHARE_GROUPS": "team@example.com",
+                "GOOGLE_DRIVE_SHARE_ROLE": "reader",
+                "GOOGLE_DRIVE_SEND_SHARE_NOTIFICATIONS": "true",
+            },
+            clear=True,
+        ):
+            config = GoogleWorkspaceConfig.from_env()
+
+        targets = config.output_share_targets()
+        self.assertEqual(len(targets), 4)
+        self.assertEqual(config.output_share_role, "reader")
+        self.assertTrue(config.output_share_send_notifications)
+        self.assertEqual(targets[0].permission_body()["domain"], "example.com")
+        self.assertEqual(
+            targets[1].permission_body()["emailAddress"], "one@example.com"
+        )
+        self.assertEqual(targets[3].permission_body()["type"], "group")
+
+    def test_workspace_client_reuses_existing_output_share_permission(self) -> None:
+        session = FakePermissionSession(
+            permissions=[
+                {
+                    "id": "existing-domain-writer",
+                    "type": "domain",
+                    "role": "writer",
+                    "domain": "summon.co",
+                }
+            ]
+        )
+        client = GoogleWorkspaceClient(
+            GoogleWorkspaceConfig(
+                output_share_copy_template_permissions=False,
+                output_share_domain="summon.co",
+            ),
+            session=session,
+        )
+        client._access_token = "test-access-token"
+
+        records = client.share_generated_file("deck-id")
+
+        self.assertEqual(records[0]["status"], "already_shared")
+        self.assertEqual(records[0]["permission_id"], "existing-domain-writer")
+        self.assertFalse(
+            any(request["method"] == "POST" for request in session.requests)
+        )
+
+    def test_workspace_client_uses_link_fallback_when_no_share_targets_exist(
+        self,
+    ) -> None:
+        session = FakePermissionSession(permissions=[])
+        client = GoogleWorkspaceClient(GoogleWorkspaceConfig(), session=session)
+        client._access_token = "test-access-token"
+
+        records = client.share_generated_file("deck-id", source_file_id="template-id")
+
+        self.assertEqual(records[0]["status"], "shared")
+        self.assertEqual(records[0]["source"], "fallback")
+        self.assertEqual(records[0]["type"], "anyone")
+        self.assertEqual(records[0]["role"], "reader")
+        post_request = next(
+            request for request in session.requests if request["method"] == "POST"
+        )
+        self.assertEqual(json.loads(post_request["kwargs"]["data"])["type"], "anyone")
 
     def test_template_registry_supports_quarterly_and_wendy_wu_monthly(self) -> None:
         registry = GoogleSlidesTemplateRegistry()
@@ -108,13 +182,17 @@ Bullets:
 
         self.assertEqual(artifact["period"]["label"], "Q2 2026")
         self.assertGreaterEqual(len(artifact["slides"]), 2)
-        self.assertEqual(artifact["slides"][1]["tables"][0]["headers"], ["Metric", "Current", "YoY"])
+        self.assertEqual(
+            artifact["slides"][1]["tables"][0]["headers"], ["Metric", "Current", "YoY"]
+        )
         self.assertEqual(artifact["charts"][0]["title"], "Overall Performance")
 
 
 class GoogleSlidesRequestTests(unittest.TestCase):
     def test_period_replacement_requests_use_subtitles_before_labels(self) -> None:
-        requests = build_period_replacement_requests({"period": {"label": "Q3 2026", "subtitle": "Q3 2026 (Jul - Sep 2026)"}})
+        requests = build_period_replacement_requests(
+            {"period": {"label": "Q3 2026", "subtitle": "Q3 2026 (Jul - Sep 2026)"}}
+        )
 
         first_replacement = requests[0]["replaceAllText"]
         self.assertIn("(", first_replacement["containsText"]["text"])
@@ -143,7 +221,9 @@ class GoogleSlidesRequestTests(unittest.TestCase):
             table_slots,
             [{"headers": ["Metric", "Value"], "rows": [["Cost", "GBP10"]]}],
         )
-        delete_requests = build_slide_deletion_requests(presentation, keep_slide_count=1)
+        delete_requests = build_slide_deletion_requests(
+            presentation, keep_slide_count=1
+        )
 
         self.assertTrue(any("deleteText" in request for request in table_requests))
         self.assertTrue(any("insertText" in request for request in table_requests))
@@ -169,15 +249,28 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
                 workspace_config=_configured_workspace(),
                 export_pdf=True,
             )
-            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(result.status, "success")
-        self.assertEqual(result.google_slides_url, "https://docs.google.com/presentation/d/copied-deck/edit")
+        self.assertEqual(
+            result.google_slides_url,
+            "https://docs.google.com/presentation/d/copied-deck/edit",
+        )
         self.assertTrue(fake_client.batch_requests)
         self.assertEqual(fake_client.deleted_permissions, [("asset-1", "permission-1")])
         self.assertEqual(manifest["status"], "success")
         self.assertEqual(manifest["permission_cleanup"][0]["cleanup_status"], "removed")
-        self.assertTrue(any("insertText" in request and request["insertText"]["objectId"] == "notes_1" for request in fake_client.batch_requests))
+        self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
+        self.assertEqual(manifest["output_sharing"][0]["domain"], "summon.co")
+        self.assertTrue(
+            any(
+                "insertText" in request
+                and request["insertText"]["objectId"] == "notes_1"
+                for request in fake_client.batch_requests
+            )
+        )
 
     def test_fake_google_client_cleans_permissions_after_batch_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -197,10 +290,13 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
                 workspace_config=_configured_workspace(),
                 export_pdf=False,
             )
-            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(fake_client.deleted_permissions, [("asset-1", "permission-1")])
+        self.assertEqual(fake_client.shared_files, ["copied-deck"])
         self.assertIn("batch failed", manifest["message"])
         self.assertEqual(manifest["permission_cleanup"][0]["cleanup_status"], "removed")
 
@@ -208,7 +304,12 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             artifact = root / "report_artifacts.json"
-            artifact.write_text(json.dumps({"period": {"label": "Q2 2026"}, "slides": [], "charts": []}), encoding="utf-8")
+            artifact.write_text(
+                json.dumps(
+                    {"period": {"label": "Q2 2026"}, "slides": [], "charts": []}
+                ),
+                encoding="utf-8",
+            )
 
             result = generate_native_google_slides(
                 client_id="wightlink",
@@ -225,7 +326,9 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
 
     def test_live_google_slides_smoke_is_gated(self) -> None:
         if os.environ.get("RUN_GOOGLE_SLIDES_LIVE_SMOKE") != "1":
-            self.skipTest("Set RUN_GOOGLE_SLIDES_LIVE_SMOKE=1 to run the live Google Slides smoke test.")
+            self.skipTest(
+                "Set RUN_GOOGLE_SLIDES_LIVE_SMOKE=1 to run the live Google Slides smoke test."
+            )
 
         load_env_file(Path(__file__).resolve().parents[1] / ".env")
         config = GoogleWorkspaceConfig.from_env()
@@ -265,7 +368,10 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
             root = Path(tmpdir)
             artifact_path = _write_wendy_wu_monthly_artifact(root)
 
-            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+            with patch(
+                "src.monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
                 payload = build_wendy_wu_monthly_slides_payload(
                     request_dir=root,
                     artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
@@ -275,9 +381,25 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(payload["replacements"]["{{ALL_LEADS}}"], "60")
         self.assertEqual(payload["replacements"]["{{ALL_SPEND}}"], "£600.00")
         self.assertEqual(payload["replacements"]["{{ALL_LEADS_YOY}}"], "+100.00%")
-        overall = next(section for section in payload["sections"] if section["key"] == "overall")
+        overall = next(
+            section for section in payload["sections"] if section["key"] == "overall"
+        )
         self.assertEqual(len(overall["table_values"]), 10)
-        self.assertEqual(overall["table_values"][0], ["Month", "Impressions", "Clicks", "CTR", "CPC", "Cost", "Sales Leads", "CPL", "CVR", "Revenue"])
+        self.assertEqual(
+            overall["table_values"][0],
+            [
+                "Month",
+                "Impressions",
+                "Clicks",
+                "CTR",
+                "CPC",
+                "Cost",
+                "Sales Leads",
+                "CPL",
+                "CVR",
+                "Revenue",
+            ],
+        )
         self.assertEqual(overall["table_values"][-1][0], "Total")
 
     def test_monthly_payload_supports_wendy_wu_australia_template(self) -> None:
@@ -289,13 +411,18 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                 client_name="Wendy Wu Tours Australia",
             )
 
-            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+            with patch(
+                "src.monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
                 payload = build_wendy_wu_monthly_slides_payload(
                     request_dir=root,
                     artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
                 )
 
-        self.assertEqual(payload["replacements"]["{{CLIENT_NAME}}"], "Wendy Wu Tours Australia")
+        self.assertEqual(
+            payload["replacements"]["{{CLIENT_NAME}}"], "Wendy Wu Tours Australia"
+        )
         self.assertNotIn("{{CA_LEADS}}", payload["replacements"])
         self.assertEqual(payload["replacements"]["{{OTHER_LEADS}}"], "20")
         self.assertEqual(payload["replacements"]["{{ALL_SPEND_MOM}}"], "+0.00%")
@@ -304,9 +431,14 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             artifact_path = _write_wendy_wu_monthly_artifact(root)
-            fake_client = FakeGoogleWorkspaceClient(presentation=_fake_wendy_wu_monthly_presentation())
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wendy_wu_monthly_presentation()
+            )
 
-            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+            with patch(
+                "src.monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
                 result = generate_native_google_slides(
                     client_id="wendy_wu",
                     client_name="Wendy Wu Tours",
@@ -317,11 +449,21 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                     workspace_config=_configured_workspace(),
                     export_pdf=True,
                 )
-            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(result.status, "success")
-        self.assertEqual(result.google_slides_url, "https://docs.google.com/presentation/d/copied-deck/edit")
-        self.assertTrue(any(_is_replace_text(request, "{{MONTH_PERIOD}}", "Aug 2026") for request in fake_client.batch_requests))
+        self.assertEqual(
+            result.google_slides_url,
+            "https://docs.google.com/presentation/d/copied-deck/edit",
+        )
+        self.assertTrue(
+            any(
+                _is_replace_text(request, "{{MONTH_PERIOD}}", "Aug 2026")
+                for request in fake_client.batch_requests
+            )
+        )
         self.assertTrue(
             any(
                 request.get("insertTableRows", {}).get("tableObjectId") == "p3_i202"
@@ -329,16 +471,24 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                 for request in fake_client.batch_requests
             )
         )
-        self.assertTrue(any(request.get("replaceImage", {}).get("imageObjectId") == "p4_i217" for request in fake_client.batch_requests))
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId") == "p4_i217"
+                for request in fake_client.batch_requests
+            )
+        )
         table_row_update = next(
             request["updateTableRowProperties"]
             for request in fake_client.batch_requests
             if request.get("updateTableRowProperties", {}).get("objectId") == "p3_i202"
         )
-        self.assertEqual(table_row_update["tableRowProperties"]["minRowHeight"]["magnitude"], 219460)
+        self.assertEqual(
+            table_row_update["tableRowProperties"]["minRowHeight"]["magnitude"], 219460
+        )
         self.assertTrue(
             any(
-                request.get("updatePageElementTransform", {}).get("objectId") == "p4_i217"
+                request.get("updatePageElementTransform", {}).get("objectId")
+                == "p4_i217"
                 for request in fake_client.batch_requests
             )
         )
@@ -353,26 +503,44 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
-                request.get("updatePageElementTransform", {}).get("objectId") == "all_leads_yoy_placeholder"
+                request.get("updatePageElementTransform", {}).get("objectId")
+                == "all_leads_yoy_placeholder"
                 for request in fake_client.batch_requests
             )
         )
         self.assertFalse(
-            any(request.get("deleteText", {}).get("objectId") == "p3_i202" for request in fake_client.batch_requests)
+            any(
+                request.get("deleteText", {}).get("objectId") == "p3_i202"
+                for request in fake_client.batch_requests
+            )
         )
-        self.assertTrue(any(request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto" for request in fake_client.batch_requests))
+        self.assertTrue(
+            any(
+                request.get("createTable", {}).get("objectId")
+                == "central_asia_monthly_table_auto"
+                for request in fake_client.batch_requests
+            )
+        )
         create_table_request = next(
             request["createTable"]
             for request in fake_client.batch_requests
-            if request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto"
+            if request.get("createTable", {}).get("objectId")
+            == "central_asia_monthly_table_auto"
         )
-        self.assertEqual(create_table_request["elementProperties"]["transform"]["scaleX"], 1)
-        self.assertEqual(create_table_request["elementProperties"]["transform"]["scaleY"], 1)
+        self.assertEqual(
+            create_table_request["elementProperties"]["transform"]["scaleX"], 1
+        )
+        self.assertEqual(
+            create_table_request["elementProperties"]["transform"]["scaleY"], 1
+        )
         self.assertEqual(manifest["builder"], "wendy_wu_monthly_template_manifest")
         self.assertEqual(manifest["client_id"], "wendy_wu")
+        self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
-    def test_monthly_native_slides_generate_for_wendy_wu_australia_without_central_asia(self) -> None:
+    def test_monthly_native_slides_generate_for_wendy_wu_australia_without_central_asia(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             artifact_path = _write_wendy_wu_monthly_artifact(
@@ -380,9 +548,14 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                 client_id="wendy_wu_australia",
                 client_name="Wendy Wu Tours Australia",
             )
-            fake_client = FakeGoogleWorkspaceClient(presentation=_fake_wendy_wu_monthly_presentation())
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wendy_wu_monthly_presentation()
+            )
 
-            with patch("src.monthly_google_slides_builder.detect_latest_complete_month", return_value=MonthInfo(2026, 8)):
+            with patch(
+                "src.monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
                 result = generate_native_google_slides(
                     client_id="wendy_wu_australia",
                     client_name="Wendy Wu Tours Australia",
@@ -393,16 +566,27 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                     workspace_config=_configured_workspace(),
                     export_pdf=True,
                 )
-            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(result.status, "success")
         self.assertEqual(manifest["client_id"], "wendy_wu_australia")
-        self.assertFalse(any(request.get("createTable", {}).get("objectId") == "central_asia_monthly_table_auto" for request in fake_client.batch_requests))
+        self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
+        self.assertFalse(
+            any(
+                request.get("createTable", {}).get("objectId")
+                == "central_asia_monthly_table_auto"
+                for request in fake_client.batch_requests
+            )
+        )
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
 
 class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
-    def test_monthly_payload_uses_current_month_cards_ytd_tables_and_charts(self) -> None:
+    def test_monthly_payload_uses_current_month_cards_ytd_tables_and_charts(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             artifact_path = _write_wightlink_monthly_artifact(root)
@@ -416,17 +600,36 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
             self.assertEqual(payload["replacements"]["{{ALL_PURCHASES}}"], "312")
             self.assertEqual(payload["replacements"]["{{ALL_COST}}"], "£1,092")
             self.assertEqual(payload["replacements"]["{{ALL_COST_PLAN}}"], "n/a")
-            overall = next(section for section in payload["sections"] if section["key"] == "overall")
+            overall = next(
+                section
+                for section in payload["sections"]
+                if section["key"] == "overall"
+            )
             self.assertEqual(len(overall["table_values"]), 8)
-            self.assertEqual(overall["table_values"][0], ["Month", "Cost", "Purchases", "CPA", "Purchase Revenue", "ROAS", "CVR"])
+            self.assertEqual(
+                overall["table_values"][0],
+                [
+                    "Month",
+                    "Cost",
+                    "Purchases",
+                    "CPA",
+                    "Purchase Revenue",
+                    "ROAS",
+                    "CVR",
+                ],
+            )
             self.assertTrue(overall["charts"]["purchases_yoy"].exists())
             self.assertTrue(overall["charts"]["revenue_yoy"].exists())
 
-    def test_monthly_native_slides_generate_table_chart_and_cost_style_requests(self) -> None:
+    def test_monthly_native_slides_generate_table_chart_and_cost_style_requests(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             artifact_path = _write_wightlink_monthly_artifact(root)
-            fake_client = FakeGoogleWorkspaceClient(presentation=_fake_wightlink_monthly_presentation(existing_rows=6))
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wightlink_monthly_presentation(existing_rows=6)
+            )
 
             result = generate_native_google_slides(
                 client_id="wightlink",
@@ -438,14 +641,23 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
                 workspace_config=_configured_workspace(),
                 export_pdf=True,
             )
-            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(result.status, "success")
         self.assertEqual(manifest["builder"], "wightlink_monthly_template_manifest")
-        self.assertTrue(any(_is_replace_text(request, "{{MONTH_PERIOD}}", "Jun 2026") for request in fake_client.batch_requests))
+        self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
         self.assertTrue(
             any(
-                request.get("insertTableRows", {}).get("tableObjectId") == "g3f9e9a7bb65_2_0"
+                _is_replace_text(request, "{{MONTH_PERIOD}}", "Jun 2026")
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("insertTableRows", {}).get("tableObjectId")
+                == "g3f9e9a7bb65_2_0"
                 and request["insertTableRows"]["number"] == 2
                 for request in fake_client.batch_requests
             )
@@ -462,41 +674,71 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
                 for request in fake_client.batch_requests
             )
         )
-        self.assertGreaterEqual(sum(1 for request in fake_client.batch_requests if "createImage" in request), 8)
+        self.assertGreaterEqual(
+            sum(
+                1 for request in fake_client.batch_requests if "createImage" in request
+            ),
+            8,
+        )
         cost_style_updates = [
             request["updateTextStyle"]
             for request in fake_client.batch_requests
-            if request.get("updateTextStyle", {}).get("objectId") in {"p3_i248", "p3_i249"}
+            if request.get("updateTextStyle", {}).get("objectId")
+            in {"p3_i248", "p3_i249"}
         ]
         self.assertEqual(len(cost_style_updates), 2)
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
 
 class FakeGoogleWorkspaceClient:
-    def __init__(self, raise_on_batch: bool = False, presentation: dict | None = None) -> None:
+    def __init__(
+        self, raise_on_batch: bool = False, presentation: dict | None = None
+    ) -> None:
         self.raise_on_batch = raise_on_batch
         self.presentation = presentation
         self.batch_requests: list[dict] = []
         self.deleted_permissions: list[tuple[str, str]] = []
+        self.shared_files: list[str] = []
         self.upload_count = 0
 
-    def copy_file(self, file_id: str, title: str, parent_folder_id: str | None = None) -> dict:
+    def copy_file(
+        self, file_id: str, title: str, parent_folder_id: str | None = None
+    ) -> dict:
         return {"id": "copied-deck", "name": title}
 
     def get_presentation(self, presentation_id: str) -> dict:
         return self.presentation or _fake_presentation(include_sheets_chart=False)
 
-    def upload_file(self, path: Path, name: str, parent_folder_id: str, mime_type: str) -> dict:
+    def upload_file(
+        self, path: Path, name: str, parent_folder_id: str, mime_type: str
+    ) -> dict:
         self.upload_count += 1
         return {"id": f"asset-{self.upload_count}"}
 
     def create_anyone_reader_permission(self, file_id: str) -> dict:
         return {"id": f"permission-{self.upload_count}"}
 
+    def share_generated_file(
+        self, file_id: str, source_file_id: str | None = None
+    ) -> list[dict]:
+        self.shared_files.append(file_id)
+        return [
+            {
+                "status": "shared",
+                "type": "domain",
+                "role": "writer",
+                "domain": "summon.co",
+                "permission_id": "share-permission-1",
+                "drive_file_id": file_id,
+            }
+        ]
+
     def delete_permission(self, file_id: str, permission_id: str) -> None:
         self.deleted_permissions.append((file_id, permission_id))
 
-    def batch_update_presentation(self, presentation_id: str, requests_body: list[dict]) -> dict:
+    def batch_update_presentation(
+        self, presentation_id: str, requests_body: list[dict]
+    ) -> dict:
         self.batch_requests.extend(requests_body)
         if self.raise_on_batch:
             raise RuntimeError("batch failed")
@@ -505,6 +747,49 @@ class FakeGoogleWorkspaceClient:
     def export_file(self, file_id: str, mime_type: str, output_path: Path) -> Path:
         output_path.write_bytes(b"%PDF-1.4")
         return output_path
+
+
+class FakePermissionSession:
+    def __init__(self, permissions: list[dict]) -> None:
+        self.permissions = permissions
+        self.requests: list[dict] = []
+
+    def request(self, method: str, url: str, **kwargs) -> "FakeResponse":
+        self.requests.append({"method": method, "url": url, "kwargs": kwargs})
+        if method == "GET" and url.endswith(
+            "/permissions?supportsAllDrives=true&fields=permissions(id,type,role,emailAddress,domain,deleted,permissionDetails)"
+        ):
+            return FakeResponse({"permissions": self.permissions})
+        if method == "POST":
+            requested = json.loads(kwargs["data"])
+            return FakeResponse({"id": "created-permission", **requested})
+        if method == "PATCH":
+            return FakeResponse(
+                {
+                    "id": "updated-permission",
+                    "type": "domain",
+                    "role": "writer",
+                    "domain": "summon.co",
+                }
+            )
+        raise AssertionError(f"Unexpected request: {method} {url}")
+
+
+class FakeResponse:
+    def __init__(
+        self,
+        payload: dict,
+        status_code: int = 200,
+        text: str = "OK",
+        content: bytes = b"",
+    ) -> None:
+        self._payload = payload
+        self.status_code = status_code
+        self.text = text
+        self.content = content
+
+    def json(self) -> dict:
+        return self._payload
 
 
 def _configured_workspace() -> GoogleWorkspaceConfig:
@@ -528,7 +813,9 @@ def _write_native_artifact(root: Path, chart: Path) -> Path:
                 "slide_number": 1,
                 "title": "All Performance",
                 "subtitle": "Q2 2026 (Apr - Jun 2026)",
-                "tables": [{"headers": ["Metric", "Value"], "rows": [["Cost", "GBP10"]]}],
+                "tables": [
+                    {"headers": ["Metric", "Value"], "rows": [["Cost", "GBP10"]]}
+                ],
                 "editorial_placeholder": True,
                 "editorial_placeholder_reason": "Testing content needs approval.",
             }
@@ -576,7 +863,19 @@ def _write_wendy_wu_monthly_artifact(
     performance_csv.write_text(
         "Date,Campaign Type,Destination,Impressions,Clicks,Cost,Sales Leads,Revenue\n"
         + "\n".join(
-            ",".join(str(row[column]) for column in ["Date", "Campaign Type", "Destination", "Impressions", "Clicks", "Cost", "Sales Leads", "Revenue"])
+            ",".join(
+                str(row[column])
+                for column in [
+                    "Date",
+                    "Campaign Type",
+                    "Destination",
+                    "Impressions",
+                    "Clicks",
+                    "Cost",
+                    "Sales Leads",
+                    "Revenue",
+                ]
+            )
             for row in rows
         ),
         encoding="utf-8",
@@ -618,7 +917,15 @@ def _write_wightlink_monthly_artifact(root: Path) -> Path:
         year_factor = 1.0 if year == 2025 else 1.2
         for month in months:
             month_factor = 1 + month / 20
-            for campaign_type, data_type, purchases, revenue, cost, impressions, clicks in [
+            for (
+                campaign_type,
+                data_type,
+                purchases,
+                revenue,
+                cost,
+                impressions,
+                clicks,
+            ) in [
                 ("Brand", "Ferry", 100, 10000, 200, 2000, 400),
                 ("Generic", "Routes", 80, 8000, 400, 3000, 500),
                 ("Performance Max", "Ferry", 20, 2000, 100, 1000, 120),
@@ -652,23 +959,46 @@ def _write_wightlink_monthly_artifact(root: Path) -> Path:
 
 def _fake_presentation(include_sheets_chart: bool = False) -> dict:
     chart_element = (
-        {"objectId": "chart_1", "sheetsChart": {}, "size": _size(500, 300), "transform": _transform(250, 210)}
+        {
+            "objectId": "chart_1",
+            "sheetsChart": {},
+            "size": _size(500, 300),
+            "transform": _transform(250, 210),
+        }
         if include_sheets_chart
-        else {"objectId": "image_1", "image": {}, "size": _size(500, 300), "transform": _transform(250, 210)}
+        else {
+            "objectId": "image_1",
+            "image": {},
+            "size": _size(500, 300),
+            "transform": _transform(250, 210),
+        }
     )
-    second_chart = {"objectId": "image_2", "image": {}, "size": _size(450, 260), "transform": _transform(260, 250)}
+    second_chart = {
+        "objectId": "image_2",
+        "image": {},
+        "size": _size(450, 260),
+        "transform": _transform(260, 250),
+    }
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
         "slides": [
             {
                 "objectId": "slide_1",
                 "slideProperties": {
-                    "notesPage": {"notesProperties": {"speakerNotesObjectId": "notes_1"}},
+                    "notesPage": {
+                        "notesProperties": {"speakerNotesObjectId": "notes_1"}
+                    },
                 },
                 "pageElements": [
                     {
                         "objectId": "title_1",
-                        "shape": {"text": {"textElements": [{"textRun": {"content": "Old Title\n"}}]}},
+                        "shape": {
+                            "text": {
+                                "textElements": [
+                                    {"textRun": {"content": "Old Title\n"}}
+                                ]
+                            }
+                        },
                         "transform": _transform(50, 50),
                     },
                     {
@@ -684,7 +1014,13 @@ def _fake_presentation(include_sheets_chart: bool = False) -> dict:
                 "pageElements": [
                     {
                         "objectId": "title_2",
-                        "shape": {"text": {"textElements": [{"textRun": {"content": "Second Slide\n"}}]}},
+                        "shape": {
+                            "text": {
+                                "textElements": [
+                                    {"textRun": {"content": "Second Slide\n"}}
+                                ]
+                            }
+                        },
                         "transform": _transform(50, 50),
                     },
                     second_chart,
@@ -719,19 +1055,37 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
         [
             {
                 "objectId": "ca_table_placeholder",
-                "shape": {"text": {"textElements": [{"textRun": {"content": "{{CA_MONTHLY_TABLE}}\n"}}]}},
+                "shape": {
+                    "text": {
+                        "textElements": [
+                            {"textRun": {"content": "{{CA_MONTHLY_TABLE}}\n"}}
+                        ]
+                    }
+                },
                 "size": _size(720, 160),
                 "transform": {**_transform(80, 250), "scaleX": 1.2, "scaleY": 0.8},
             },
             {
                 "objectId": "all_leads_yoy_placeholder",
-                "shape": {"text": {"textElements": [{"textRun": {"content": "{{ALL_LEADS_YOY_CHART}}\n"}}]}},
+                "shape": {
+                    "text": {
+                        "textElements": [
+                            {"textRun": {"content": "{{ALL_LEADS_YOY_CHART}}\n"}}
+                        ]
+                    }
+                },
                 "size": _size(720, 300),
                 "transform": _transform(90, 180),
             },
             {
                 "objectId": "ca_title",
-                "shape": {"text": {"textElements": [{"textRun": {"content": "Central Asia Summary\n"}}]}},
+                "shape": {
+                    "text": {
+                        "textElements": [
+                            {"textRun": {"content": "Central Asia Summary\n"}}
+                        ]
+                    }
+                },
                 "transform": _transform(50, 50),
             },
         ]
@@ -761,13 +1115,25 @@ def _fake_wightlink_monthly_presentation(existing_rows: int = 8) -> dict:
         [
             {
                 "objectId": "all_purchase_chart_placeholder",
-                "shape": {"text": {"textElements": [{"textRun": {"content": "{{ALL_PURCHASES_YOY_CHART}}\n"}}]}},
+                "shape": {
+                    "text": {
+                        "textElements": [
+                            {"textRun": {"content": "{{ALL_PURCHASES_YOY_CHART}}\n"}}
+                        ]
+                    }
+                },
                 "size": _size(320, 250),
                 "transform": _transform(80, 180),
             },
             {
                 "objectId": "all_revenue_chart_placeholder",
-                "shape": {"text": {"textElements": [{"textRun": {"content": "{{ALL_REVENUE_YOY_CHART}}\n"}}]}},
+                "shape": {
+                    "text": {
+                        "textElements": [
+                            {"textRun": {"content": "{{ALL_REVENUE_YOY_CHART}}\n"}}
+                        ]
+                    }
+                },
                 "size": _size(320, 250),
                 "transform": _transform(400, 180),
             },
@@ -796,9 +1162,7 @@ def _transform(x: float, y: float) -> dict:
     return {"translateX": x, "translateY": y, "scaleX": 1, "scaleY": 1, "unit": "PT"}
 
 
-_ONE_PIXEL_PNG_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/yrNX7sAAAAASUVORK5CYII="
-)
+_ONE_PIXEL_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/yrNX7sAAAAASUVORK5CYII="
 
 
 if __name__ == "__main__":

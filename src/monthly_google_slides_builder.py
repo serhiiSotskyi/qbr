@@ -11,16 +11,34 @@ import pandas as pd
 from .chart_builder import ChartBuilder
 from .config_loader import ConfigLoader
 from .data_loader import MonthInfo, detect_latest_complete_month, load_csv
-from .google_slides_builder import DriveChartAssetStore, GoogleSlidesGenerationResult
+from .google_slides_builder import (
+    DriveChartAssetStore,
+    GoogleSlidesGenerationResult,
+    share_copied_presentation,
+)
 from .google_slides_templates import TemplateConfig
-from .google_workspace import PDF_MIME_TYPE, GoogleWorkspaceClient, GoogleWorkspaceConfig
+from .google_workspace import (
+    PDF_MIME_TYPE,
+    GoogleWorkspaceClient,
+    GoogleWorkspaceConfig,
+)
 from .metrics import format_summary_table, prepare_report_data, validate_report_data
 from .narrative_generator import generate_overall_bullets, generate_scope_bullets
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WWT_UK_MONTHLY_TEMPLATE_MANIFEST = PROJECT_ROOT / "docs" / "google_slides_templates" / "wendy_wu_uk_monthly_test_template.json"
-WWT_AUS_MONTHLY_TEMPLATE_MANIFEST = PROJECT_ROOT / "docs" / "google_slides_templates" / "wendy_wu_australia_monthly_test_template.json"
+WWT_UK_MONTHLY_TEMPLATE_MANIFEST = (
+    PROJECT_ROOT
+    / "docs"
+    / "google_slides_templates"
+    / "wendy_wu_uk_monthly_test_template.json"
+)
+WWT_AUS_MONTHLY_TEMPLATE_MANIFEST = (
+    PROJECT_ROOT
+    / "docs"
+    / "google_slides_templates"
+    / "wendy_wu_australia_monthly_test_template.json"
+)
 WWT_MONTHLY_TEMPLATE_MANIFESTS = {
     "wendy_wu": WWT_UK_MONTHLY_TEMPLATE_MANIFEST,
     "wendy_wu_australia": WWT_AUS_MONTHLY_TEMPLATE_MANIFEST,
@@ -90,6 +108,7 @@ def generate_wendy_wu_monthly_google_slides(
         "template_key": template.key,
         "chart_assets": [],
         "permission_cleanup": [],
+        "output_sharing": [],
         "warnings": [],
     }
 
@@ -101,6 +120,7 @@ def generate_wendy_wu_monthly_google_slides(
     copied_url: str | None = None
     qa_pdf_path: Path | None = None
     warnings: list[str] = []
+    output_sharing: list[dict[str, Any]] = []
     status = "success"
     message = "Native monthly Google Slides deck generated."
     batch_update_request_count = 0
@@ -113,34 +133,59 @@ def generate_wendy_wu_monthly_google_slides(
             client_id=client_id,
         )
         title = _output_deck_title(client_name, payload["period"]["label"])
-        copied = client.copy_file(template.template_id, title, workspace_config.output_folder_id)
+        copied = client.copy_file(
+            template.template_id, title, workspace_config.output_folder_id
+        )
         copied_id = str(copied["id"])
         copied_url = f"https://docs.google.com/presentation/d/{copied_id}/edit"
+        output_sharing = share_copied_presentation(
+            client, copied_id, template.template_id, warnings
+        )
         presentation = client.get_presentation(copied_id)
-        asset_store = DriveChartAssetStore(client, str(workspace_config.asset_folder_id))
+        asset_store = DriveChartAssetStore(
+            client, str(workspace_config.asset_folder_id)
+        )
 
         requests_body: list[dict[str, Any]] = []
         requests_body.extend(_build_central_asia_label_requests(presentation))
-        requests_body.extend(_build_scalar_replacement_requests(payload["replacements"]))
+        requests_body.extend(
+            _build_scalar_replacement_requests(payload["replacements"])
+        )
         table_dimensions = _table_dimensions_by_id(presentation)
         table_cell_text = _table_cell_text_by_id(presentation)
-        requests_body.extend(_build_summary_table_requests(payload["sections"], table_dimensions, table_cell_text, presentation))
+        requests_body.extend(
+            _build_summary_table_requests(
+                payload["sections"], table_dimensions, table_cell_text, presentation
+            )
+        )
         uploaded_assets = _upload_chart_assets(asset_store, payload["sections"])
-        requests_body.extend(_build_monthly_chart_requests(payload["sections"], uploaded_assets, presentation))
+        requests_body.extend(
+            _build_monthly_chart_requests(
+                payload["sections"], uploaded_assets, presentation
+            )
+        )
 
         batch_update_request_count = len(requests_body)
         _send_batch_updates(client, copied_id, requests_body)
 
         if export_pdf:
             try:
-                qa_pdf_path = client.export_file(copied_id, PDF_MIME_TYPE, outputs_dir / "google_slides_qa.pdf")
-            except Exception as exc:  # noqa: BLE001 - PDF export is useful QA, not a hard generation dependency
+                qa_pdf_path = client.export_file(
+                    copied_id, PDF_MIME_TYPE, outputs_dir / "google_slides_qa.pdf"
+                )
+            except (
+                Exception
+            ) as exc:  # noqa: BLE001 - PDF export is useful QA, not a hard generation dependency
                 warnings.append(f"QA PDF export failed: {exc}")
-    except Exception as exc:  # noqa: BLE001 - keep PPTX/package output usable if Slides fails
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 - keep PPTX/package output usable if Slides fails
         status = "failed"
         message = f"Native monthly Google Slides generation failed: {exc}"
     finally:
-        cleanup_records = asset_store.cleanup_public_permissions() if asset_store else []
+        cleanup_records = (
+            asset_store.cleanup_public_permissions() if asset_store else []
+        )
         manifest = {
             **base_manifest,
             "status": status,
@@ -148,8 +193,13 @@ def generate_wendy_wu_monthly_google_slides(
             "copied_presentation_id": copied_id,
             "google_slides_url": copied_url,
             "batch_update_request_count": batch_update_request_count,
-            "chart_assets": [asset.to_manifest() for asset in asset_store.assets] if asset_store else [],
+            "chart_assets": (
+                [asset.to_manifest() for asset in asset_store.assets]
+                if asset_store
+                else []
+            ),
             "permission_cleanup": cleanup_records,
+            "output_sharing": output_sharing,
             "qa_pdf_path": str(qa_pdf_path) if qa_pdf_path else None,
             "warnings": warnings,
         }
@@ -165,6 +215,7 @@ def generate_wendy_wu_monthly_google_slides(
         artifact_path=artifact_path,
         qa_pdf_path=qa_pdf_path,
         warnings=warnings,
+        output_sharing=output_sharing,
     )
 
 
@@ -200,8 +251,13 @@ def build_wendy_wu_monthly_slides_payload(
     validate_report_data(report)
 
     chart_styles = config_loader.get_chart_styles(client_config)
-    chart_builder = ChartBuilder(request_path / "outputs" / "native_google_slides_charts", chart_styles=chart_styles)
-    manifest = template_manifest or _read_json(_monthly_template_manifest_path(resolved_client_id))
+    chart_builder = ChartBuilder(
+        request_path / "outputs" / "native_google_slides_charts",
+        chart_styles=chart_styles,
+    )
+    manifest = template_manifest or _read_json(
+        _monthly_template_manifest_path(resolved_client_id)
+    )
     sections = []
 
     for section in _monthly_sections(manifest):
@@ -212,8 +268,12 @@ def build_wendy_wu_monthly_slides_payload(
                     "key": section["key"],
                     "prefix": section["prefix"],
                     "missing": True,
-                    "summary_table_placeholder": section.get("summary_table_placeholder"),
-                    "cpl_cvr_chart_placeholder": section.get("cpl_cvr_chart_placeholder"),
+                    "summary_table_placeholder": section.get(
+                        "summary_table_placeholder"
+                    ),
+                    "cpl_cvr_chart_placeholder": section.get(
+                        "cpl_cvr_chart_placeholder"
+                    ),
                     "leads_yoy_placeholder": section.get("leads_yoy_placeholder"),
                     "revenue_yoy_placeholder": section.get("revenue_yoy_placeholder"),
                 }
@@ -232,7 +292,11 @@ def build_wendy_wu_monthly_slides_payload(
                 "label": section.get("label") or section["key"],
                 "prefix": section["prefix"],
                 "scope": scope,
-                "table_values": _table_values(format_summary_table(scope["monthly"], bool(report["include_revenue"]))),
+                "table_values": _table_values(
+                    format_summary_table(
+                        scope["monthly"], bool(report["include_revenue"])
+                    )
+                ),
                 "summary_table_id": section.get("summary_table_id"),
                 "summary_table_placeholder": section.get("summary_table_placeholder"),
                 "cpl_cvr_chart_image_id": section.get("cpl_cvr_chart_image_id"),
@@ -240,12 +304,15 @@ def build_wendy_wu_monthly_slides_payload(
                 "leads_yoy_placeholder": section.get("leads_yoy_placeholder"),
                 "revenue_yoy_placeholder": section.get("revenue_yoy_placeholder"),
                 "charts": charts,
-                "insights": _scope_insights(section["key"], section.get("label", ""), scope, report),
+                "insights": _scope_insights(
+                    section["key"], section.get("label", ""), scope, report
+                ),
             }
         )
 
     replacements = {
-        "{{CLIENT_NAME}}": str(artifact.get("client_name") or "Wendy Wu Tours").strip() or "Wendy Wu Tours",
+        "{{CLIENT_NAME}}": str(artifact.get("client_name") or "Wendy Wu Tours").strip()
+        or "Wendy Wu Tours",
         "{{MONTH_PERIOD}}": month.label,
         "{{MONTH_PERIOD_WITH_YTD}}": _monthly_period_subtitle(month),
     }
@@ -280,10 +347,14 @@ def _monthly_template_manifest_path(client_id: str) -> Path:
     try:
         return WWT_MONTHLY_TEMPLATE_MANIFESTS[client_id]
     except KeyError as exc:
-        raise ValueError(f"No monthly Google Slides template manifest is configured for client '{client_id}'.") from exc
+        raise ValueError(
+            f"No monthly Google Slides template manifest is configured for client '{client_id}'."
+        ) from exc
 
 
-def _scope_for_section(report: dict[str, Any], section_key: str) -> dict[str, Any] | None:
+def _scope_for_section(
+    report: dict[str, Any], section_key: str
+) -> dict[str, Any] | None:
     scope_type, label = SECTION_SCOPE_MAP.get(section_key, ("", None))
     if scope_type == "overall":
         return report.get("overall")
@@ -291,7 +362,9 @@ def _scope_for_section(report: dict[str, Any], section_key: str) -> dict[str, An
         return report.get("campaigns", {}).get(label)
     if scope_type == "destination" and label:
         if label == CENTRAL_ASIA_CANONICAL_LABEL:
-            return report.get("destinations", {}).get(label) or report.get("destinations", {}).get("Central Asia")
+            return report.get("destinations", {}).get(label) or report.get(
+                "destinations", {}
+            ).get("Central Asia")
         return report.get("destinations", {}).get(label)
     return None
 
@@ -299,7 +372,11 @@ def _scope_for_section(report: dict[str, Any], section_key: str) -> dict[str, An
 def _section_replacements(section: dict[str, Any]) -> dict[str, str]:
     prefix = str(section["prefix"])
     scope = section["scope"]
-    kpis = {str(item.get("key")): item for item in scope.get("kpis", []) if isinstance(item, dict)}
+    kpis = {
+        str(item.get("key")): item
+        for item in scope.get("kpis", [])
+        if isinstance(item, dict)
+    }
     replacements: dict[str, str] = {
         f"{{{{{prefix}_INSIGHTS}}}}": "\n".join(section.get("insights") or []),
     }
@@ -308,8 +385,12 @@ def _section_replacements(section: dict[str, Any]) -> dict[str, str]:
         value = str(item.get("value") if item else "n/a")
         replacements[f"{{{{{prefix}_{field}}}}}"] = value
         if field != "REVENUE":
-            replacements[f"{{{{{prefix}_{field}_MOM}}}}"] = str(item.get("mom_label") if item else "n/a")
-            replacements[f"{{{{{prefix}_{field}_YOY}}}}"] = str(item.get("yoy_label") if item else "n/a")
+            replacements[f"{{{{{prefix}_{field}_MOM}}}}"] = str(
+                item.get("mom_label") if item else "n/a"
+            )
+            replacements[f"{{{{{prefix}_{field}_YOY}}}}"] = str(
+                item.get("yoy_label") if item else "n/a"
+            )
     revenue_item = kpis.get("Revenue")
     if revenue_item:
         replacements[f"{{{{{prefix}_REVENUE_STATUS}}}}"] = (
@@ -344,12 +425,18 @@ def _missing_section_replacements(section: dict[str, Any]) -> dict[str, str]:
     return replacements
 
 
-def _scope_insights(section_key: str, label: str, scope: dict[str, Any], report: dict[str, Any]) -> list[str]:
+def _scope_insights(
+    section_key: str, label: str, scope: dict[str, Any], report: dict[str, Any]
+) -> list[str]:
     if section_key == "overall":
-        return generate_overall_bullets(scope, report.get("mix_overall", pd.DataFrame()))
+        return generate_overall_bullets(
+            scope, report.get("mix_overall", pd.DataFrame())
+        )
     if section_key == "central_asia":
         label = CENTRAL_ASIA_CANONICAL_LABEL
-    return generate_scope_bullets(str(label or section_key).replace("_", " ").title(), scope)
+    return generate_scope_bullets(
+        str(label or section_key).replace("_", " ").title(), scope
+    )
 
 
 def _table_values(table_df: pd.DataFrame) -> list[list[str]]:
@@ -359,7 +446,9 @@ def _table_values(table_df: pd.DataFrame) -> list[list[str]]:
     return values
 
 
-def _build_scalar_replacement_requests(replacements: dict[str, str]) -> list[dict[str, Any]]:
+def _build_scalar_replacement_requests(
+    replacements: dict[str, str]
+) -> list[dict[str, Any]]:
     requests_body = []
     for placeholder, value in replacements.items():
         requests_body.append(
@@ -373,7 +462,9 @@ def _build_scalar_replacement_requests(replacements: dict[str, str]) -> list[dic
     return requests_body
 
 
-def _build_central_asia_label_requests(presentation: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_central_asia_label_requests(
+    presentation: dict[str, Any]
+) -> list[dict[str, Any]]:
     deck_text = _presentation_text(presentation)
     if CENTRAL_ASIA_CANONICAL_LABEL in deck_text or "Central Asia" not in deck_text:
         return []
@@ -402,7 +493,9 @@ def _build_summary_table_requests(
             continue
         table_id = section.get("summary_table_id")
         if table_id:
-            rows, columns = table_dimensions.get(str(table_id), (8, len(table_values[0])))
+            rows, columns = table_dimensions.get(
+                str(table_id), (8, len(table_values[0]))
+            )
             requests_body.extend(
                 _replace_existing_table_requests(
                     table_id=str(table_id),
@@ -458,16 +551,25 @@ def _replace_existing_table_requests(
             {
                 "insertTableColumns": {
                     "tableObjectId": table_id,
-                    "cellLocation": {"rowIndex": 0, "columnIndex": existing_columns - 1},
+                    "cellLocation": {
+                        "rowIndex": 0,
+                        "columnIndex": existing_columns - 1,
+                    },
                     "insertRight": True,
                     "number": target_columns - existing_columns,
                 }
             }
         )
 
-    requests_body.extend(_table_cell_text_requests(table_id, values, final_rows, final_columns, existing_cell_text or {}))
+    requests_body.extend(
+        _table_cell_text_requests(
+            table_id, values, final_rows, final_columns, existing_cell_text or {}
+        )
+    )
     if target_rows > existing_rows:
-        requests_body.append(_table_row_height_request(table_id, existing_rows, target_rows))
+        requests_body.append(
+            _table_row_height_request(table_id, existing_rows, target_rows)
+        )
     return requests_body
 
 
@@ -589,30 +691,48 @@ def _build_monthly_chart_requests(
                         }
                     }
                 )
-                requests_body.append(_chart_frame_transform_request(str(section["cpl_cvr_chart_image_id"])))
+                requests_body.append(
+                    _chart_frame_transform_request(
+                        str(section["cpl_cvr_chart_image_id"])
+                    )
+                )
             elif section.get("cpl_cvr_chart_placeholder"):
                 placeholder = str(section["cpl_cvr_chart_placeholder"])
-                requests_body.append(_replace_placeholder_with_image_request(placeholder, cpl_url))
+                requests_body.append(
+                    _replace_placeholder_with_image_request(placeholder, cpl_url)
+                )
                 if placeholder_ids.get(placeholder):
-                    requests_body.append(_chart_frame_transform_request(placeholder_ids[placeholder]))
+                    requests_body.append(
+                        _chart_frame_transform_request(placeholder_ids[placeholder])
+                    )
 
         leads_url = uploaded_assets.get((section_key, "leads_yoy"))
         if leads_url and section.get("leads_yoy_placeholder"):
             placeholder = str(section["leads_yoy_placeholder"])
-            requests_body.append(_replace_placeholder_with_image_request(placeholder, leads_url))
+            requests_body.append(
+                _replace_placeholder_with_image_request(placeholder, leads_url)
+            )
             if placeholder_ids.get(placeholder):
-                requests_body.append(_chart_frame_transform_request(placeholder_ids[placeholder]))
+                requests_body.append(
+                    _chart_frame_transform_request(placeholder_ids[placeholder])
+                )
 
         revenue_url = uploaded_assets.get((section_key, "revenue_yoy"))
         if revenue_url and section.get("revenue_yoy_placeholder"):
             placeholder = str(section["revenue_yoy_placeholder"])
-            requests_body.append(_replace_placeholder_with_image_request(placeholder, revenue_url))
+            requests_body.append(
+                _replace_placeholder_with_image_request(placeholder, revenue_url)
+            )
             if placeholder_ids.get(placeholder):
-                requests_body.append(_chart_frame_transform_request(placeholder_ids[placeholder]))
+                requests_body.append(
+                    _chart_frame_transform_request(placeholder_ids[placeholder])
+                )
     return requests_body
 
 
-def _replace_placeholder_with_image_request(placeholder: str, url: str) -> dict[str, Any]:
+def _replace_placeholder_with_image_request(
+    placeholder: str, url: str
+) -> dict[str, Any]:
     return {
         "replaceAllShapesWithImage": {
             "containsText": {"text": placeholder, "matchCase": True},
@@ -632,10 +752,14 @@ def _chart_frame_transform_request(object_id: str) -> dict[str, Any]:
     }
 
 
-def _table_row_height_request(object_id: str, base_rows: int, target_rows: int) -> dict[str, Any]:
+def _table_row_height_request(
+    object_id: str, base_rows: int, target_rows: int
+) -> dict[str, Any]:
     row_height = MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU
     if target_rows > 0:
-        row_height = int(round(MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU * base_rows / target_rows))
+        row_height = int(
+            round(MONTHLY_TABLE_BASE_ROW_HEIGHT_EMU * base_rows / target_rows)
+        )
     return {
         "updateTableRowProperties": {
             "objectId": object_id,
@@ -650,7 +774,11 @@ def _table_row_height_request(object_id: str, base_rows: int, target_rows: int) 
     }
 
 
-def _send_batch_updates(client: GoogleWorkspaceClient, presentation_id: str, requests_body: Sequence[dict[str, Any]]) -> None:
+def _send_batch_updates(
+    client: GoogleWorkspaceClient,
+    presentation_id: str,
+    requests_body: Sequence[dict[str, Any]],
+) -> None:
     for index in range(0, len(requests_body), BATCH_UPDATE_CHUNK_SIZE):
         chunk = list(requests_body[index : index + BATCH_UPDATE_CHUNK_SIZE])
         if chunk:
@@ -658,7 +786,9 @@ def _send_batch_updates(client: GoogleWorkspaceClient, presentation_id: str, req
 
 
 def _resolve_performance_csv_path(request_dir: Path, artifact: dict[str, Any]) -> Path:
-    source_manifest_value = (artifact.get("source_files") or {}).get("source_generation_manifest")
+    source_manifest_value = (artifact.get("source_files") or {}).get(
+        "source_generation_manifest"
+    )
     source_manifest_path = _resolve_path(source_manifest_value, request_dir)
     if source_manifest_path and source_manifest_path.exists():
         manifest = _read_json(source_manifest_path)
@@ -674,7 +804,9 @@ def _resolve_performance_csv_path(request_dir: Path, artifact: dict[str, Any]) -
     fallback = request_dir / "source_data" / "performance.csv"
     if fallback.exists():
         return fallback
-    raise FileNotFoundError("Could not find API-generated monthly performance.csv for native Slides generation.")
+    raise FileNotFoundError(
+        "Could not find API-generated monthly performance.csv for native Slides generation."
+    )
 
 
 def _resolve_path(value: Any, request_dir: Path) -> Path | None:
@@ -693,13 +825,17 @@ def _table_dimensions_by_id(presentation: dict[str, Any]) -> dict[str, tuple[int
                 continue
             object_id = str(element.get("objectId") or "")
             rows = int(table.get("rows") or len(table.get("tableRows") or []) or 0)
-            columns = int(table.get("columns") or len(table.get("tableColumns") or []) or 0)
+            columns = int(
+                table.get("columns") or len(table.get("tableColumns") or []) or 0
+            )
             if object_id and rows and columns:
                 dimensions[object_id] = (rows, columns)
     return dimensions
 
 
-def _table_cell_text_by_id(presentation: dict[str, Any]) -> dict[str, dict[tuple[int, int], str]]:
+def _table_cell_text_by_id(
+    presentation: dict[str, Any]
+) -> dict[str, dict[tuple[int, int], str]]:
     cell_text: dict[str, dict[tuple[int, int], str]] = {}
     for slide in presentation.get("slides") or []:
         for element in slide.get("pageElements") or []:
@@ -722,7 +858,9 @@ def _table_cell_text_by_id(presentation: dict[str, Any]) -> dict[str, dict[tuple
     return cell_text
 
 
-def _find_placeholder_element(presentation: dict[str, Any], placeholder: str) -> dict[str, Any] | None:
+def _find_placeholder_element(
+    presentation: dict[str, Any], placeholder: str
+) -> dict[str, Any] | None:
     for slide in presentation.get("slides") or []:
         slide_id = str(slide.get("objectId") or "")
         for element in slide.get("pageElements") or []:
@@ -746,7 +884,11 @@ def _table_creation_transform(transform: dict[str, Any]) -> dict[str, Any]:
 
 
 def _presentation_text(presentation: dict[str, Any]) -> str:
-    return "\n".join(_element_text(element) for slide in presentation.get("slides") or [] for element in slide.get("pageElements") or [])
+    return "\n".join(
+        _element_text(element)
+        for slide in presentation.get("slides") or []
+        for element in slide.get("pageElements") or []
+    )
 
 
 def _placeholder_object_ids(presentation: dict[str, Any]) -> dict[str, str]:
@@ -809,7 +951,9 @@ def _read_json(path: str | Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def _json_safe(value: Any) -> Any:

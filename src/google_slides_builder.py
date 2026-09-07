@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from .google_slides_templates import GoogleSlidesTemplateRegistry, TemplateConfig
-from .google_workspace import PDF_MIME_TYPE, GoogleWorkspaceClient, GoogleWorkspaceConfig
+from .google_workspace import (
+    PDF_MIME_TYPE,
+    GoogleWorkspaceClient,
+    GoogleWorkspaceConfig,
+)
 
 
 OLD_PERIOD_SUBTITLES = (
@@ -35,6 +39,7 @@ class GoogleSlidesGenerationResult:
     artifact_path: Path | None = None
     qa_pdf_path: Path | None = None
     warnings: list[str] = field(default_factory=list)
+    output_sharing: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -47,6 +52,7 @@ class GoogleSlidesGenerationResult:
             "artifact_path": str(self.artifact_path) if self.artifact_path else None,
             "qa_pdf_path": str(self.qa_pdf_path) if self.qa_pdf_path else None,
             "warnings": self.warnings,
+            "output_sharing": self.output_sharing,
         }
 
 
@@ -125,7 +131,9 @@ class DriveChartAssetStore:
             try:
                 self.client.delete_permission(asset.file_id, asset.permission_id)
                 asset.cleanup_status = "removed"
-            except Exception as exc:  # noqa: BLE001 - cleanup must be best-effort and recorded
+            except (
+                Exception
+            ) as exc:  # noqa: BLE001 - cleanup must be best-effort and recorded
                 asset.cleanup_status = f"cleanup_failed: {exc}"
             cleanup_records.append(asset.to_manifest())
         return cleanup_records
@@ -137,14 +145,50 @@ def google_slides_source_status(client_id: str, report_mode: str) -> dict[str, A
     workspace_status = workspace_config.status()
     template_status = registry.status(client_id, report_mode)
     return {
-        "google_workspace_credentials": "configured" if workspace_status["oauth_configured"] else "missing",
-        "google_drive_output_folder": "configured" if workspace_status["output_folder_configured"] else "missing",
-        "google_drive_asset_folder": "configured" if workspace_status["asset_folder_configured"] else "missing",
-        "google_slides_template": "configured" if template_status["configured"] else "missing",
-        "native_slides_enabled_for_selection": bool(workspace_status["configured"] and template_status["supported"] and template_status["configured"]),
+        "google_workspace_credentials": (
+            "configured" if workspace_status["oauth_configured"] else "missing"
+        ),
+        "google_drive_output_folder": (
+            "configured" if workspace_status["output_folder_configured"] else "missing"
+        ),
+        "google_drive_asset_folder": (
+            "configured" if workspace_status["asset_folder_configured"] else "missing"
+        ),
+        "google_drive_output_sharing": (
+            "configured"
+            if workspace_status["output_sharing_configured"]
+            else "not_configured"
+        ),
+        "google_slides_template": (
+            "configured" if template_status["configured"] else "missing"
+        ),
+        "native_slides_enabled_for_selection": bool(
+            workspace_status["configured"]
+            and template_status["supported"]
+            and template_status["configured"]
+        ),
         "workspace": workspace_status,
         "template": template_status,
     }
+
+
+def share_copied_presentation(
+    client: GoogleWorkspaceClient,
+    presentation_id: str,
+    template_id: str,
+    warnings: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    sharing_records = client.share_generated_file(
+        presentation_id, source_file_id=template_id
+    )
+    failed_records = [
+        record for record in sharing_records if record.get("status") == "failed"
+    ]
+    if failed_records and warnings is not None:
+        warnings.append(
+            "One or more generated deck sharing permissions failed; see output_sharing in the manifest."
+        )
+    return sharing_records
 
 
 def generate_native_google_slides(
@@ -181,10 +225,15 @@ def generate_native_google_slides(
         "template_status": template_status,
         "chart_assets": [],
         "permission_cleanup": [],
+        "output_sharing": [],
     }
 
     if not template_status["supported"]:
-        manifest = {**base_manifest, "status": "skipped", "message": template_status["message"]}
+        manifest = {
+            **base_manifest,
+            "status": "skipped",
+            "message": template_status["message"],
+        }
         _write_manifest(manifest_path, manifest)
         return GoogleSlidesGenerationResult(
             enabled=False,
@@ -207,7 +256,9 @@ def generate_native_google_slides(
 
     template = registry.validate(client_id, report_mode)
     if client_id in {"wendy_wu", "wendy_wu_australia"} and report_mode == "monthly":
-        from .monthly_google_slides_builder import generate_wendy_wu_monthly_google_slides
+        from .monthly_google_slides_builder import (
+            generate_wendy_wu_monthly_google_slides,
+        )
 
         return generate_wendy_wu_monthly_google_slides(
             client_id=client_id,
@@ -220,7 +271,9 @@ def generate_native_google_slides(
             export_pdf=export_pdf,
         )
     if client_id == "wightlink" and report_mode == "monthly":
-        from .wightlink_monthly_google_slides_builder import generate_wightlink_monthly_google_slides
+        from .wightlink_monthly_google_slides_builder import (
+            generate_wightlink_monthly_google_slides,
+        )
 
         return generate_wightlink_monthly_google_slides(
             client_id=client_id,
@@ -242,6 +295,7 @@ def generate_native_google_slides(
     copied_url: str | None = None
     qa_pdf_path: Path | None = None
     warnings: list[str] = []
+    output_sharing: list[dict[str, Any]] = []
     status = "success"
     message = "Native Google Slides deck generated."
     batch_update_request_count = 0
@@ -250,41 +304,70 @@ def generate_native_google_slides(
         copied = client.copy_file(template.template_id, title, config.output_folder_id)
         copied_id = str(copied["id"])
         copied_url = f"https://docs.google.com/presentation/d/{copied_id}/edit"
+        output_sharing = share_copied_presentation(
+            client, copied_id, template.template_id, warnings
+        )
         presentation = client.get_presentation(copied_id)
         asset_store = DriveChartAssetStore(client, str(config.asset_folder_id))
         requests_body: list[dict[str, Any]] = []
         requests_body.extend(build_period_replacement_requests(artifact))
-        requests_body.extend(build_title_population_requests(presentation, artifact.get("slides", [])))
-        requests_body.extend(build_review_note_requests(presentation, artifact.get("slides", [])))
+        requests_body.extend(
+            build_title_population_requests(presentation, artifact.get("slides", []))
+        )
+        requests_body.extend(
+            build_review_note_requests(presentation, artifact.get("slides", []))
+        )
 
         table_slots = extract_table_slots(presentation)
         artifact_tables = _artifact_tables(artifact)
-        requests_body.extend(build_table_population_requests(table_slots, artifact_tables))
+        requests_body.extend(
+            build_table_population_requests(table_slots, artifact_tables)
+        )
 
         chart_slots = extract_chart_slots(presentation)
-        chart_specs = _artifact_chart_specs(artifact)[: min(len(chart_slots), max_chart_assets)]
+        chart_specs = _artifact_chart_specs(artifact)[
+            : min(len(chart_slots), max_chart_assets)
+        ]
         if chart_slots and chart_specs:
-            uploaded_assets = [asset_store.upload_chart(chart["path"]) for chart in chart_specs if Path(chart["path"]).exists()]
-            requests_body.extend(build_chart_replacement_requests(chart_slots, uploaded_assets))
+            uploaded_assets = [
+                asset_store.upload_chart(chart["path"])
+                for chart in chart_specs
+                if Path(chart["path"]).exists()
+            ]
+            requests_body.extend(
+                build_chart_replacement_requests(chart_slots, uploaded_assets)
+            )
         elif _artifact_chart_specs(artifact):
-            warnings.append("No chart-like slots were detected in the copied Google Slides template.")
+            warnings.append(
+                "No chart-like slots were detected in the copied Google Slides template."
+            )
 
         batch_update_request_count = len(requests_body)
         if requests_body:
             client.batch_update_presentation(copied_id, requests_body)
         else:
-            warnings.append("No batchUpdate requests were generated; copied template was left structurally unchanged.")
+            warnings.append(
+                "No batchUpdate requests were generated; copied template was left structurally unchanged."
+            )
 
         if export_pdf:
             try:
-                qa_pdf_path = client.export_file(copied_id, PDF_MIME_TYPE, outputs_dir / "google_slides_qa.pdf")
-            except Exception as exc:  # noqa: BLE001 - PDF export is a QA aid, not a generation blocker
+                qa_pdf_path = client.export_file(
+                    copied_id, PDF_MIME_TYPE, outputs_dir / "google_slides_qa.pdf"
+                )
+            except (
+                Exception
+            ) as exc:  # noqa: BLE001 - PDF export is a QA aid, not a generation blocker
                 warnings.append(f"QA PDF export failed: {exc}")
-    except Exception as exc:  # noqa: BLE001 - API Source Test should keep PPTX/handoff output available
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 - API Source Test should keep PPTX/handoff output available
         status = "failed"
         message = f"Native Google Slides generation failed: {exc}"
     finally:
-        cleanup_records = asset_store.cleanup_public_permissions() if asset_store else []
+        cleanup_records = (
+            asset_store.cleanup_public_permissions() if asset_store else []
+        )
         manifest = {
             **base_manifest,
             "status": status,
@@ -294,8 +377,13 @@ def generate_native_google_slides(
             "copied_presentation_id": copied_id,
             "google_slides_url": copied_url,
             "batch_update_request_count": batch_update_request_count,
-            "chart_assets": [asset.to_manifest() for asset in asset_store.assets] if asset_store else [],
+            "chart_assets": (
+                [asset.to_manifest() for asset in asset_store.assets]
+                if asset_store
+                else []
+            ),
             "permission_cleanup": cleanup_records,
+            "output_sharing": output_sharing,
             "qa_pdf_path": str(qa_pdf_path) if qa_pdf_path else None,
             "warnings": warnings,
         }
@@ -311,6 +399,7 @@ def generate_native_google_slides(
         artifact_path=artifact_path,
         qa_pdf_path=qa_pdf_path,
         warnings=warnings,
+        output_sharing=output_sharing,
     )
 
 
@@ -320,7 +409,9 @@ def build_period_replacement_requests(artifact: dict[str, Any]) -> list[dict[str
     subtitle = str(period.get("subtitle") or label).strip()
     replacements: list[tuple[str, str]] = []
     if subtitle:
-        replacements.extend((old, subtitle) for old in OLD_PERIOD_SUBTITLES if old != subtitle)
+        replacements.extend(
+            (old, subtitle) for old in OLD_PERIOD_SUBTITLES if old != subtitle
+        )
     if label:
         replacements.extend((old, label) for old in OLD_PERIOD_LABELS if old != label)
     replacements.extend(
@@ -347,7 +438,9 @@ def build_period_replacement_requests(artifact: dict[str, Any]) -> list[dict[str
     return requests_body
 
 
-def build_title_population_requests(presentation: dict[str, Any], slides: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_title_population_requests(
+    presentation: dict[str, Any], slides: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
     presentation_slides = presentation.get("slides") or []
     for slide_page, artifact_slide in zip(presentation_slides, slides):
@@ -364,7 +457,9 @@ def build_title_population_requests(presentation: dict[str, Any], slides: Sequen
     return requests_body
 
 
-def build_review_note_requests(presentation: dict[str, Any], slides: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_review_note_requests(
+    presentation: dict[str, Any], slides: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
     presentation_slides = presentation.get("slides") or []
     for slide_page, artifact_slide in zip(presentation_slides, slides):
@@ -378,7 +473,10 @@ def build_review_note_requests(presentation: dict[str, Any], slides: Sequence[di
         )
         if not notes_id:
             continue
-        reason = artifact_slide.get("editorial_placeholder_reason") or "Review required before client delivery."
+        reason = (
+            artifact_slide.get("editorial_placeholder_reason")
+            or "Review required before client delivery."
+        )
         requests_body.append(
             {
                 "insertText": {
@@ -393,7 +491,9 @@ def build_review_note_requests(presentation: dict[str, Any], slides: Sequence[di
 
 def extract_chart_slots(presentation: dict[str, Any]) -> list[ChartSlot]:
     page_size = presentation.get("pageSize", {})
-    slide_area = _dimension(page_size.get("width")) * _dimension(page_size.get("height"))
+    slide_area = _dimension(page_size.get("width")) * _dimension(
+        page_size.get("height")
+    )
     slots: list[ChartSlot] = []
     for slide_index, slide in enumerate(presentation.get("slides") or []):
         slide_id = str(slide.get("objectId") or "")
@@ -402,15 +502,46 @@ def extract_chart_slots(presentation: dict[str, Any]) -> list[ChartSlot]:
             size = element.get("size") or {}
             transform = element.get("transform") or {}
             area = _dimension(size.get("width")) * _dimension(size.get("height"))
-            sort_key = (_translate(transform, "translateY"), _translate(transform, "translateX"))
+            sort_key = (
+                _translate(transform, "translateY"),
+                _translate(transform, "translateX"),
+            )
             if element.get("sheetsChart") is not None:
-                slots.append(ChartSlot(slide_id, element_id, "sheets_chart", size, transform, slide_index, sort_key))
-            elif element.get("image") is not None and slide_area and area / slide_area >= 0.08:
-                slots.append(ChartSlot(slide_id, element_id, "image", size, transform, slide_index, sort_key))
-    return sorted(slots, key=lambda slot: (slot.slide_index, slot.sort_key[0], slot.sort_key[1]))
+                slots.append(
+                    ChartSlot(
+                        slide_id,
+                        element_id,
+                        "sheets_chart",
+                        size,
+                        transform,
+                        slide_index,
+                        sort_key,
+                    )
+                )
+            elif (
+                element.get("image") is not None
+                and slide_area
+                and area / slide_area >= 0.08
+            ):
+                slots.append(
+                    ChartSlot(
+                        slide_id,
+                        element_id,
+                        "image",
+                        size,
+                        transform,
+                        slide_index,
+                        sort_key,
+                    )
+                )
+    return sorted(
+        slots, key=lambda slot: (slot.slide_index, slot.sort_key[0], slot.sort_key[1])
+    )
 
 
-def build_chart_replacement_requests(slots: Sequence[ChartSlot], assets: Sequence[DriveChartAsset]) -> list[dict[str, Any]]:
+def build_chart_replacement_requests(
+    slots: Sequence[ChartSlot], assets: Sequence[DriveChartAsset]
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
     for slot, asset in zip(slots, assets):
         if slot.element_type == "image":
@@ -449,7 +580,9 @@ def extract_table_slots(presentation: dict[str, Any]) -> list[TableSlot]:
             if not isinstance(table, dict):
                 continue
             rows = int(table.get("rows") or len(table.get("tableRows") or []) or 0)
-            columns = int(table.get("columns") or len(table.get("tableColumns") or []) or 0)
+            columns = int(
+                table.get("columns") or len(table.get("tableColumns") or []) or 0
+            )
             if not rows or not columns:
                 continue
             transform = element.get("transform") or {}
@@ -460,13 +593,20 @@ def extract_table_slots(presentation: dict[str, Any]) -> list[TableSlot]:
                     rows=rows,
                     columns=columns,
                     slide_index=slide_index,
-                    sort_key=(_translate(transform, "translateY"), _translate(transform, "translateX")),
+                    sort_key=(
+                        _translate(transform, "translateY"),
+                        _translate(transform, "translateX"),
+                    ),
                 )
             )
-    return sorted(slots, key=lambda slot: (slot.slide_index, slot.sort_key[0], slot.sort_key[1]))
+    return sorted(
+        slots, key=lambda slot: (slot.slide_index, slot.sort_key[0], slot.sort_key[1])
+    )
 
 
-def build_table_population_requests(slots: Sequence[TableSlot], tables: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_table_population_requests(
+    slots: Sequence[TableSlot], tables: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
     for slot, table in zip(slots, tables):
         rows = _table_rows(table)
@@ -500,11 +640,17 @@ def build_table_population_requests(slots: Sequence[TableSlot], tables: Sequence
     return requests_body
 
 
-def build_slide_deletion_requests(presentation: dict[str, Any], keep_slide_count: int) -> list[dict[str, Any]]:
+def build_slide_deletion_requests(
+    presentation: dict[str, Any], keep_slide_count: int
+) -> list[dict[str, Any]]:
     slides = presentation.get("slides") or []
     if keep_slide_count >= len(slides):
         return []
-    return [{"deleteObject": {"objectId": slide["objectId"]}} for slide in slides[keep_slide_count:] if slide.get("objectId")]
+    return [
+        {"deleteObject": {"objectId": slide["objectId"]}}
+        for slide in slides[keep_slide_count:]
+        if slide.get("objectId")
+    ]
 
 
 def _read_artifact(path: Path) -> dict[str, Any]:
@@ -532,7 +678,11 @@ def _table_rows(table: dict[str, Any]) -> list[list[Any]]:
         rows.append(headers)
     for row in table.get("rows") or []:
         if isinstance(row, dict):
-            rows.append([row.get(header, "") for header in headers] if isinstance(headers, list) else list(row.values()))
+            rows.append(
+                [row.get(header, "") for header in headers]
+                if isinstance(headers, list)
+                else list(row.values())
+            )
         elif isinstance(row, (list, tuple)):
             rows.append(list(row))
         else:
@@ -552,7 +702,13 @@ def _title_shape_candidate(slide: dict[str, Any]) -> dict[str, Any] | None:
         if lower.startswith("source:") or lower in {"summon", "review required"}:
             continue
         transform = element.get("transform") or {}
-        candidates.append((_translate(transform, "translateY"), _translate(transform, "translateX"), element))
+        candidates.append(
+            (
+                _translate(transform, "translateY"),
+                _translate(transform, "translateX"),
+                element,
+            )
+        )
     if not candidates:
         return None
     return sorted(candidates, key=lambda item: (item[0], item[1]))[0][2]
@@ -596,9 +752,15 @@ def _output_deck_title(client_name: str, period_label: str, report_mode: str) ->
     return f"{client_name}{cleaned_period} {mode_label} - API Source Test"
 
 
-def _missing_native_slides_message(workspace_status: dict[str, Any], template_status: dict[str, Any]) -> str:
+def _missing_native_slides_message(
+    workspace_status: dict[str, Any], template_status: dict[str, Any]
+) -> str:
     missing = list(workspace_status.get("missing") or [])
-    if template_status.get("supported") and not template_status.get("configured") and template_status.get("template_env_key"):
+    if (
+        template_status.get("supported")
+        and not template_status.get("configured")
+        and template_status.get("template_env_key")
+    ):
         missing.append(str(template_status["template_env_key"]))
     if missing:
         return f"Native Google Slides skipped: missing {', '.join(dict.fromkeys(missing))}."
@@ -607,7 +769,9 @@ def _missing_native_slides_message(workspace_status: dict[str, Any], template_st
 
 def _write_manifest(path: Path, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(manifest), indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(manifest), indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def _json_safe(value: Any) -> Any:
@@ -640,4 +804,5 @@ __all__ = [
     "extract_table_slots",
     "generate_native_google_slides",
     "google_slides_source_status",
+    "share_copied_presentation",
 ]

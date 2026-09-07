@@ -5,13 +5,26 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from report_generator.builders.wightlink_pptx_builder import WightlinkPptxBuilder
-from report_generator.parsers.wightlink_monthly_performance_parser import parse_wightlink_monthly_performance_csv
+from report_generator.parsers.wightlink_monthly_performance_parser import (
+    parse_wightlink_monthly_performance_csv,
+)
 from report_generator.parsers.wightlink_plan_parser import parse_wightlink_plan_workbook
-from report_generator.pipelines.wightlink_monthly_pipeline import _build_monthly_slides, _select_month_plan_section
+from report_generator.pipelines.wightlink_monthly_pipeline import (
+    _build_monthly_slides,
+    _select_month_plan_section,
+)
 
-from .google_slides_builder import DriveChartAssetStore, GoogleSlidesGenerationResult
+from .google_slides_builder import (
+    DriveChartAssetStore,
+    GoogleSlidesGenerationResult,
+    share_copied_presentation,
+)
 from .google_slides_templates import TemplateConfig
-from .google_workspace import PDF_MIME_TYPE, GoogleWorkspaceClient, GoogleWorkspaceConfig
+from .google_workspace import (
+    PDF_MIME_TYPE,
+    GoogleWorkspaceClient,
+    GoogleWorkspaceConfig,
+)
 from .monthly_google_slides_builder import (
     _build_scalar_replacement_requests,
     _read_json,
@@ -27,7 +40,10 @@ from .monthly_google_slides_builder import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WIGHTLINK_MONTHLY_TEMPLATE_MANIFEST = (
-    PROJECT_ROOT / "docs" / "google_slides_templates" / "wightlink_monthly_test_template.json"
+    PROJECT_ROOT
+    / "docs"
+    / "google_slides_templates"
+    / "wightlink_monthly_test_template.json"
 )
 BATCH_UPDATE_CHUNK_SIZE = 400
 WIGHTLINK_TABLE_BASE_ROW_HEIGHT_EMU = 173725
@@ -40,7 +56,15 @@ FOOTER_RGB = {"red": 0.48, "green": 0.48, "blue": 0.48}
 WIGHTLINK_RED_RGB = {"red": 0.78, "green": 0.16, "blue": 0.13}
 POSITIVE_RGB = {"red": 0.03, "green": 0.47, "blue": 0.22}
 NEGATIVE_RGB = {"red": 0.78, "green": 0.16, "blue": 0.13}
-WIGHTLINK_TABLE_HEADERS = ("Month", "Cost", "Purchases", "CPA", "Purchase Revenue", "ROAS", "CVR")
+WIGHTLINK_TABLE_HEADERS = (
+    "Month",
+    "Cost",
+    "Purchases",
+    "CPA",
+    "Purchase Revenue",
+    "ROAS",
+    "CVR",
+)
 SUMMARY_TABLE_TRANSFORMS = {
     "g3f9e9a7bb65_2_0": {
         "scaleX": 1,
@@ -69,7 +93,7 @@ SUMMARY_TABLE_TRANSFORMS = {
         "translateX": 320040,
         "translateY": 3000000,
         "unit": "EMU",
-    }
+    },
 }
 HEADER_SUBTITLE_OBJECT_IDS = (
     "p3_i240",
@@ -155,6 +179,7 @@ def generate_wightlink_monthly_google_slides(
         "template_key": template.key,
         "chart_assets": [],
         "permission_cleanup": [],
+        "output_sharing": [],
         "warnings": [],
     }
 
@@ -166,6 +191,7 @@ def generate_wightlink_monthly_google_slides(
     copied_url: str | None = None
     qa_pdf_path: Path | None = None
     warnings: list[str] = []
+    output_sharing: list[dict[str, Any]] = []
     status = "success"
     message = "Native Wightlink monthly Google Slides deck generated."
     batch_update_request_count = 0
@@ -178,19 +204,34 @@ def generate_wightlink_monthly_google_slides(
         )
         warnings.extend(payload.get("warnings") or [])
         title = _output_deck_title(client_name, payload["period"]["label"])
-        copied = client.copy_file(template.template_id, title, workspace_config.output_folder_id)
+        copied = client.copy_file(
+            template.template_id, title, workspace_config.output_folder_id
+        )
         copied_id = str(copied["id"])
         copied_url = f"https://docs.google.com/presentation/d/{copied_id}/edit"
+        output_sharing = share_copied_presentation(
+            client, copied_id, template.template_id, warnings
+        )
         presentation = client.get_presentation(copied_id)
-        asset_store = DriveChartAssetStore(client, str(workspace_config.asset_folder_id))
+        asset_store = DriveChartAssetStore(
+            client, str(workspace_config.asset_folder_id)
+        )
 
         requests_body: list[dict[str, Any]] = []
-        requests_body.extend(_build_scalar_replacement_requests(payload["replacements"]))
+        requests_body.extend(
+            _build_scalar_replacement_requests(payload["replacements"])
+        )
         table_dimensions = _table_dimensions_by_id(presentation)
         table_cell_text = _table_cell_text_by_id(presentation)
-        requests_body.extend(_build_summary_table_requests(payload["sections"], table_dimensions, table_cell_text))
+        requests_body.extend(
+            _build_summary_table_requests(
+                payload["sections"], table_dimensions, table_cell_text
+            )
+        )
         uploaded_assets = _upload_chart_assets(asset_store, payload["sections"])
-        requests_body.extend(_build_chart_requests(payload["sections"], uploaded_assets))
+        requests_body.extend(
+            _build_chart_requests(payload["sections"], uploaded_assets)
+        )
         requests_body.extend(_build_template_text_style_requests(payload["sections"]))
 
         batch_update_request_count = len(requests_body)
@@ -198,14 +239,22 @@ def generate_wightlink_monthly_google_slides(
 
         if export_pdf:
             try:
-                qa_pdf_path = client.export_file(copied_id, PDF_MIME_TYPE, outputs_dir / "google_slides_qa.pdf")
-            except Exception as exc:  # noqa: BLE001 - PDF export is useful QA, not a hard generation dependency
+                qa_pdf_path = client.export_file(
+                    copied_id, PDF_MIME_TYPE, outputs_dir / "google_slides_qa.pdf"
+                )
+            except (
+                Exception
+            ) as exc:  # noqa: BLE001 - PDF export is useful QA, not a hard generation dependency
                 warnings.append(f"QA PDF export failed: {exc}")
-    except Exception as exc:  # noqa: BLE001 - keep PPTX/package output usable if Slides fails
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 - keep PPTX/package output usable if Slides fails
         status = "failed"
         message = f"Native Wightlink monthly Google Slides generation failed: {exc}"
     finally:
-        cleanup_records = asset_store.cleanup_public_permissions() if asset_store else []
+        cleanup_records = (
+            asset_store.cleanup_public_permissions() if asset_store else []
+        )
         manifest = {
             **base_manifest,
             "status": status,
@@ -213,8 +262,13 @@ def generate_wightlink_monthly_google_slides(
             "copied_presentation_id": copied_id,
             "google_slides_url": copied_url,
             "batch_update_request_count": batch_update_request_count,
-            "chart_assets": [asset.to_manifest() for asset in asset_store.assets] if asset_store else [],
+            "chart_assets": (
+                [asset.to_manifest() for asset in asset_store.assets]
+                if asset_store
+                else []
+            ),
             "permission_cleanup": cleanup_records,
+            "output_sharing": output_sharing,
             "qa_pdf_path": str(qa_pdf_path) if qa_pdf_path else None,
             "warnings": warnings,
         }
@@ -230,6 +284,7 @@ def generate_wightlink_monthly_google_slides(
         artifact_path=artifact_path,
         qa_pdf_path=qa_pdf_path,
         warnings=warnings,
+        output_sharing=output_sharing,
     )
 
 
@@ -249,15 +304,29 @@ def build_wightlink_monthly_slides_payload(
     plan_workbook = _resolve_plan_workbook_path(request_path)
     if plan_workbook:
         try:
-            quarter_plan = parse_wightlink_plan_workbook(plan_workbook, performance["quarter"], performance["quarter_scope"])
-            plan_section = _select_month_plan_section(quarter_plan, performance["month"].start.strftime("%B"))
+            quarter_plan = parse_wightlink_plan_workbook(
+                plan_workbook, performance["quarter"], performance["quarter_scope"]
+            )
+            plan_section = _select_month_plan_section(
+                quarter_plan, performance["month"].start.strftime("%B")
+            )
         except Exception as exc:  # noqa: BLE001 - plan is optional on API Source Test
-            warnings.append(f"Wightlink plan workbook could not be parsed for native Slides: {exc}")
+            warnings.append(
+                f"Wightlink plan workbook could not be parsed for native Slides: {exc}"
+            )
 
-    charts_dir = request_path / "outputs" / "native_google_slides_charts" / "wightlink_monthly"
-    ppt_builder = WightlinkPptxBuilder(request_path / "outputs" / "wightlink_monthly_native_placeholder.pptx", charts_dir)
+    charts_dir = (
+        request_path / "outputs" / "native_google_slides_charts" / "wightlink_monthly"
+    )
+    ppt_builder = WightlinkPptxBuilder(
+        request_path / "outputs" / "wightlink_monthly_native_placeholder.pptx",
+        charts_dir,
+    )
     slides = _build_monthly_slides(performance, ppt_builder, plan_section)
-    slides_by_title = {str(slide.get("section_title") or slide.get("title") or ""): slide for slide in slides}
+    slides_by_title = {
+        str(slide.get("section_title") or slide.get("title") or ""): slide
+        for slide in slides
+    }
 
     sections: list[dict[str, Any]] = []
     for section in _data_sections(manifest):
@@ -267,7 +336,8 @@ def build_wightlink_monthly_slides_payload(
 
     month = performance["month"]
     replacements = {
-        "{{CLIENT_NAME}}": str(artifact.get("client_name") or "Wightlink").strip() or "Wightlink",
+        "{{CLIENT_NAME}}": str(artifact.get("client_name") or "Wightlink").strip()
+        or "Wightlink",
         "{{MONTH_PERIOD}}": month.label,
         "{{MONTH_PERIOD_WITH_YTD}}": _monthly_subtitle(month),
     }
@@ -309,24 +379,38 @@ def _section_payload(
         "summary_slide_id": template_section.get("summary_slide_id"),
         "summary_table_id": template_section.get("summary_table_id"),
         "ytd_slide_id": template_section.get("ytd_slide_id"),
-        "cost_delta_shape_ids": list(template_section.get("cost_delta_shape_ids") or []),
+        "cost_delta_shape_ids": list(
+            template_section.get("cost_delta_shape_ids") or []
+        ),
         "purchase_yoy_placeholder": template_section.get("purchase_yoy_placeholder"),
-        "purchase_yoy_placeholder_id": template_section.get("purchase_yoy_placeholder_id"),
+        "purchase_yoy_placeholder_id": template_section.get(
+            "purchase_yoy_placeholder_id"
+        ),
         "revenue_yoy_placeholder": template_section.get("revenue_yoy_placeholder"),
-        "revenue_yoy_placeholder_id": template_section.get("revenue_yoy_placeholder_id"),
+        "revenue_yoy_placeholder_id": template_section.get(
+            "revenue_yoy_placeholder_id"
+        ),
         "missing": summary_slide is None,
         "table_values": _empty_table_values(),
         "kpis": [],
-        "month_bullets": ["No monthly performance rows were available for this section."],
+        "month_bullets": [
+            "No monthly performance rows were available for this section."
+        ],
         "ytd_bullets": ["No YTD performance rows were available for this section."],
         "charts": {},
     }
     if summary_slide:
         section["kpis"] = list(summary_slide.get("kpis") or [])
-        section["table_values"] = _table_values(summary_slide.get("table", {}).get("rows") or [])
-        section["month_bullets"] = _listify(summary_slide.get("bullets")) or section["month_bullets"]
+        section["table_values"] = _table_values(
+            summary_slide.get("table", {}).get("rows") or []
+        )
+        section["month_bullets"] = (
+            _listify(summary_slide.get("bullets")) or section["month_bullets"]
+        )
     if ytd_slide:
-        section["ytd_bullets"] = _listify(ytd_slide.get("bullets")) or section["ytd_bullets"]
+        section["ytd_bullets"] = (
+            _listify(ytd_slide.get("bullets")) or section["ytd_bullets"]
+        )
         section["charts"] = _chart_paths_by_role(ytd_slide.get("charts") or [])
     return section
 
@@ -334,15 +418,25 @@ def _section_payload(
 def _section_replacements(section: dict[str, Any]) -> dict[str, str]:
     prefix = str(section["prefix"])
     replacements: dict[str, str] = {
-        f"{{{{{prefix}_MONTH_INSIGHTS}}}}": "\n".join(section.get("month_bullets") or []),
+        f"{{{{{prefix}_MONTH_INSIGHTS}}}}": "\n".join(
+            section.get("month_bullets") or []
+        ),
         f"{{{{{prefix}_YTD_INSIGHTS}}}}": "\n".join(section.get("ytd_bullets") or []),
     }
-    kpis = {str(item.get("key")): item for item in section.get("kpis") or [] if isinstance(item, dict)}
+    kpis = {
+        str(item.get("key")): item
+        for item in section.get("kpis") or []
+        if isinstance(item, dict)
+    }
     for key, token in KPI_TOKEN_MAP.items():
         kpi = kpis.get(key)
         replacements[f"{{{{{prefix}_{token}}}}}"] = _card_value_label(key, kpi)
-        replacements[f"{{{{{prefix}_{token}_MOM}}}}"] = str(kpi.get("mom_label") if kpi else "n/a")
-        replacements[f"{{{{{prefix}_{token}_YOY}}}}"] = str(kpi.get("yoy_label") if kpi else "n/a")
+        replacements[f"{{{{{prefix}_{token}_MOM}}}}"] = str(
+            kpi.get("mom_label") if kpi else "n/a"
+        )
+        replacements[f"{{{{{prefix}_{token}_YOY}}}}"] = str(
+            kpi.get("yoy_label") if kpi else "n/a"
+        )
         replacements[f"{{{{{prefix}_{token}_PLAN}}}}"] = _plan_delta_label(kpi)
     return replacements
 
@@ -374,7 +468,9 @@ def _plan_delta_label(kpi: dict[str, Any] | None) -> str:
     for item in kpi.get("context_items") or []:
         if str(item.get("label") or "").lower() == "plan":
             text = str(item.get("text") or "")
-            return text.split(":", 1)[1].strip() if ":" in text else text.strip() or "n/a"
+            return (
+                text.split(":", 1)[1].strip() if ":" in text else text.strip() or "n/a"
+            )
     return "n/a"
 
 
@@ -438,7 +534,9 @@ def _build_summary_table_requests(
                     }
                 }
             )
-        requests_body.extend(_table_text_style_requests(str(table_id), final_rows, final_columns))
+        requests_body.extend(
+            _table_text_style_requests(str(table_id), final_rows, final_columns)
+        )
     return requests_body
 
 
@@ -473,22 +571,35 @@ def _replace_existing_table_requests(
             {
                 "insertTableColumns": {
                     "tableObjectId": table_id,
-                    "cellLocation": {"rowIndex": 0, "columnIndex": existing_columns - 1},
+                    "cellLocation": {
+                        "rowIndex": 0,
+                        "columnIndex": existing_columns - 1,
+                    },
                     "insertRight": True,
                     "number": target_columns - existing_columns,
                 }
             }
         )
 
-    requests_body.extend(_table_cell_text_requests(table_id, values, final_rows, final_columns, existing_cell_text or {}))
-    requests_body.append(_table_row_height_request(table_id, existing_rows, target_rows))
+    requests_body.extend(
+        _table_cell_text_requests(
+            table_id, values, final_rows, final_columns, existing_cell_text or {}
+        )
+    )
+    requests_body.append(
+        _table_row_height_request(table_id, existing_rows, target_rows)
+    )
     return requests_body
 
 
-def _table_row_height_request(object_id: str, base_rows: int, target_rows: int) -> dict[str, Any]:
+def _table_row_height_request(
+    object_id: str, base_rows: int, target_rows: int
+) -> dict[str, Any]:
     row_height = WIGHTLINK_TABLE_BASE_ROW_HEIGHT_EMU
     if target_rows > 0:
-        row_height = int(round(WIGHTLINK_TABLE_BASE_ROW_HEIGHT_EMU * base_rows / target_rows))
+        row_height = int(
+            round(WIGHTLINK_TABLE_BASE_ROW_HEIGHT_EMU * base_rows / target_rows)
+        )
     row_height = min(row_height, WIGHTLINK_TABLE_MAX_ROW_HEIGHT_EMU)
     return {
         "updateTableRowProperties": {
@@ -547,7 +658,9 @@ def _build_chart_requests(
             url = uploaded_assets.get((section_key, chart_key))
             if url:
                 if placeholder_id and section.get("ytd_slide_id"):
-                    requests_body.append({"deleteObject": {"objectId": str(placeholder_id)}})
+                    requests_body.append(
+                        {"deleteObject": {"objectId": str(placeholder_id)}}
+                    )
                     requests_body.append(
                         {
                             "createImage": {
@@ -561,12 +674,17 @@ def _build_chart_requests(
                         }
                     )
                 else:
-                    requests_body.append(_replace_placeholder_with_image_request(str(placeholder), url))
+                    requests_body.append(
+                        _replace_placeholder_with_image_request(str(placeholder), url)
+                    )
             else:
                 requests_body.append(
                     {
                         "replaceAllText": {
-                            "containsText": {"text": str(placeholder), "matchCase": True},
+                            "containsText": {
+                                "text": str(placeholder),
+                                "matchCase": True,
+                            },
                             "replaceText": "No chart data available.",
                         }
                     }
@@ -574,18 +692,28 @@ def _build_chart_requests(
     return requests_body
 
 
-def _build_template_text_style_requests(sections: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_template_text_style_requests(
+    sections: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
-    requests_body.extend(_shape_text_style_requests(COVER_WHITE_OBJECT_IDS, WHITE_RGB, bold=True))
-    requests_body.extend(_shape_text_style_requests(COVER_RED_OBJECT_IDS, WIGHTLINK_RED_RGB))
-    requests_body.extend(_shape_text_style_requests(HEADER_SUBTITLE_OBJECT_IDS, MUTED_ON_DARK_RGB))
+    requests_body.extend(
+        _shape_text_style_requests(COVER_WHITE_OBJECT_IDS, WHITE_RGB, bold=True)
+    )
+    requests_body.extend(
+        _shape_text_style_requests(COVER_RED_OBJECT_IDS, WIGHTLINK_RED_RGB)
+    )
+    requests_body.extend(
+        _shape_text_style_requests(HEADER_SUBTITLE_OBJECT_IDS, MUTED_ON_DARK_RGB)
+    )
     requests_body.extend(_shape_text_style_requests(FOOTER_OBJECT_IDS, FOOTER_RGB))
     for section in sections:
         requests_body.extend(_section_delta_style_requests(section))
     return requests_body
 
 
-def _shape_text_style_requests(object_ids: Sequence[str], rgb: dict[str, float], *, bold: bool | None = None) -> list[dict[str, Any]]:
+def _shape_text_style_requests(
+    object_ids: Sequence[str], rgb: dict[str, float], *, bold: bool | None = None
+) -> list[dict[str, Any]]:
     style: dict[str, Any] = {"foregroundColor": {"opaqueColor": {"rgbColor": rgb}}}
     fields = ["foregroundColor"]
     if bold is not None:
@@ -604,7 +732,9 @@ def _shape_text_style_requests(object_ids: Sequence[str], rgb: dict[str, float],
     ]
 
 
-def _table_text_style_requests(table_id: str, row_count: int, column_count: int) -> list[dict[str, Any]]:
+def _table_text_style_requests(
+    table_id: str, row_count: int, column_count: int
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
     font_size = {"magnitude": WIGHTLINK_TABLE_FONT_SIZE_PT, "unit": "PT"}
     for row_index in range(row_count):
@@ -614,10 +744,21 @@ def _table_text_style_requests(table_id: str, row_count: int, column_count: int)
                 {
                     "updateTextStyle": {
                         "objectId": table_id,
-                        "cellLocation": {"rowIndex": row_index, "columnIndex": column_index},
+                        "cellLocation": {
+                            "rowIndex": row_index,
+                            "columnIndex": column_index,
+                        },
                         "textRange": {"type": "ALL"},
                         "style": {
-                            "foregroundColor": {"opaqueColor": {"rgbColor": WHITE_RGB if header else {"red": 0, "green": 0, "blue": 0}}},
+                            "foregroundColor": {
+                                "opaqueColor": {
+                                    "rgbColor": (
+                                        WHITE_RGB
+                                        if header
+                                        else {"red": 0, "green": 0, "blue": 0}
+                                    )
+                                }
+                            },
                             "bold": header,
                             "fontSize": font_size,
                         },
@@ -632,7 +773,11 @@ def _section_delta_style_requests(section: dict[str, Any]) -> list[dict[str, Any
     summary_slide_id = str(section.get("summary_slide_id") or "")
     if not summary_slide_id:
         return []
-    kpis = {str(item.get("key")): item for item in section.get("kpis") or [] if isinstance(item, dict)}
+    kpis = {
+        str(item.get("key")): item
+        for item in section.get("kpis") or []
+        if isinstance(item, dict)
+    }
     suffixes = {
         "cost": ("248", "249"),
         "purchases": ("254", "255"),
