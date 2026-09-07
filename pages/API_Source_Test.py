@@ -184,6 +184,12 @@ def main() -> None:
                     client_id,
                     report_mode,
                 )
+                _validate_parser_against_source(
+                    client_id=client_id,
+                    report_mode=report_mode,
+                    performance_csv_path=perf_path,
+                    source_validation=source_validation,
+                )
                 generated_pptx = Path(
                     fresh_run_report(
                         performance_csv=perf_path,
@@ -406,6 +412,60 @@ def _validate_report_artifacts_against_source(
 
     if errors:
         raise RuntimeError("Report artifact totals do not match validated GA4 source: " + "; ".join(errors))
+
+
+def _validate_parser_against_source(
+    *,
+    client_id: str,
+    report_mode: str,
+    performance_csv_path: str | Path,
+    source_validation: dict,
+) -> None:
+    if client_id != "wightlink" or report_mode != "monthly":
+        return
+
+    parser_module = sys.modules.get("report_generator.parsers.wightlink_monthly_performance_parser")
+    if parser_module is not None:
+        parser_module = importlib.reload(parser_module)
+    else:
+        parser_module = importlib.import_module("report_generator.parsers.wightlink_monthly_performance_parser")
+    parsed = parser_module.parse_wightlink_monthly_performance_csv(performance_csv_path)
+    parser_totals = parsed.get("current", {}).get("totals", {})
+    source_totals = source_validation.get("source_totals", {})
+    errors = _compare_totals(
+        actual=parser_totals,
+        expected=source_totals,
+        metrics=("cost", "purchases", "purchase_revenue"),
+        actual_label="parser",
+        expected_label="validated source",
+    )
+    if errors:
+        raise RuntimeError("Wightlink monthly parser totals do not match validated GA4 source: " + "; ".join(errors))
+
+
+def _compare_totals(
+    *,
+    actual: dict,
+    expected: dict,
+    metrics: tuple[str, ...],
+    actual_label: str,
+    expected_label: str,
+) -> list[str]:
+    errors: list[str] = []
+    for metric in metrics:
+        expected_value = _safe_float(expected.get(metric))
+        actual_value = _safe_float(actual.get(metric))
+        if expected_value is None or actual_value is None:
+            errors.append(f"{metric} missing {expected_label} or {actual_label} value")
+            continue
+        tolerance = max(abs(expected_value) * 0.001, 0.05)
+        delta = abs(actual_value - expected_value)
+        if delta > tolerance:
+            errors.append(
+                f"{metric} {actual_label} {actual_value:.2f} vs {expected_label} {expected_value:.2f} "
+                f"(delta {delta:.2f}, tolerance {tolerance:.2f})"
+            )
+    return errors
 
 
 def _safe_float(value) -> float | None:
