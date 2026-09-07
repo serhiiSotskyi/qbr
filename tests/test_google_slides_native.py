@@ -9,10 +9,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
+import requests
 
 from src.data_loader import MonthInfo
 from src.google_slides_builder import (
     DriveChartAsset,
+    DriveChartAssetStore,
     build_chart_replacement_requests,
     build_period_replacement_requests,
     build_slide_deletion_requests,
@@ -689,6 +691,37 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(len(cost_style_updates), 2)
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
+    def test_drive_chart_asset_upload_retries_transient_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch(
+            "src.google_slides_builder.time.sleep", return_value=None
+        ):
+            chart_path = Path(tmpdir) / "chart.png"
+            chart_path.write_bytes(b"png")
+            fake_client = FlakyChartAssetClient(upload_failures=1)
+            store = DriveChartAssetStore(fake_client, "asset-folder")
+
+            asset = store.upload_chart(chart_path)
+
+        self.assertEqual(asset.file_id, "asset-2")
+        self.assertEqual(fake_client.upload_attempts, 2)
+        self.assertEqual(fake_client.permission_attempts, 1)
+
+    def test_drive_chart_asset_permission_retries_transient_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch(
+            "src.google_slides_builder.time.sleep", return_value=None
+        ):
+            chart_path = Path(tmpdir) / "chart.png"
+            chart_path.write_bytes(b"png")
+            fake_client = FlakyChartAssetClient(permission_failures=1)
+            store = DriveChartAssetStore(fake_client, "asset-folder")
+
+            asset = store.upload_chart(chart_path)
+
+        self.assertEqual(asset.file_id, "asset-1")
+        self.assertEqual(asset.permission_id, "permission-2")
+        self.assertEqual(fake_client.upload_attempts, 1)
+        self.assertEqual(fake_client.permission_attempts, 2)
+
 
 class FakeGoogleWorkspaceClient:
     def __init__(
@@ -747,6 +780,28 @@ class FakeGoogleWorkspaceClient:
     def export_file(self, file_id: str, mime_type: str, output_path: Path) -> Path:
         output_path.write_bytes(b"%PDF-1.4")
         return output_path
+
+
+class FlakyChartAssetClient:
+    def __init__(self, upload_failures: int = 0, permission_failures: int = 0) -> None:
+        self.upload_failures = upload_failures
+        self.permission_failures = permission_failures
+        self.upload_attempts = 0
+        self.permission_attempts = 0
+
+    def upload_file(
+        self, path: Path, name: str, parent_folder_id: str, mime_type: str
+    ) -> dict:
+        self.upload_attempts += 1
+        if self.upload_attempts <= self.upload_failures:
+            raise requests.exceptions.ReadTimeout("temporary upload timeout")
+        return {"id": f"asset-{self.upload_attempts}"}
+
+    def create_anyone_reader_permission(self, file_id: str) -> dict:
+        self.permission_attempts += 1
+        if self.permission_attempts <= self.permission_failures:
+            raise requests.exceptions.ReadTimeout("temporary permission timeout")
+        return {"id": f"permission-{self.permission_attempts}"}
 
 
 class FakePermissionSession:

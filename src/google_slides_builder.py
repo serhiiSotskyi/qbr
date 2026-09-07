@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
+
+import requests
 
 from .google_slides_templates import GoogleSlidesTemplateRegistry, TemplateConfig
 from .google_workspace import (
     PDF_MIME_TYPE,
     GoogleWorkspaceClient,
     GoogleWorkspaceConfig,
+    GoogleWorkspaceError,
 )
 
 
@@ -26,6 +30,9 @@ OLD_PERIOD_SUBTITLES = (
     "Q4 2026 (Oct – Dec 2026)",
 )
 OLD_PERIOD_LABELS = ("Q1 2026", "Q2 2026", "Q3 2026", "Q4 2026")
+DRIVE_ASSET_RETRY_ATTEMPTS = 3
+DRIVE_ASSET_RETRY_DELAY_SECONDS = 1.0
+RETRYABLE_GOOGLE_STATUS_RE = re.compile(r"\b(408|429|500|502|503|504)\b")
 
 
 @dataclass
@@ -103,14 +110,18 @@ class DriveChartAssetStore:
 
     def upload_chart(self, path: str | Path) -> DriveChartAsset:
         local_path = Path(path)
-        uploaded = self.client.upload_file(
-            local_path,
-            name=local_path.name,
-            parent_folder_id=self.asset_folder_id,
-            mime_type="image/png",
+        uploaded = _retry_drive_asset_call(
+            lambda: self.client.upload_file(
+                local_path,
+                name=local_path.name,
+                parent_folder_id=self.asset_folder_id,
+                mime_type="image/png",
+            )
         )
         file_id = str(uploaded["id"])
-        permission = self.client.create_anyone_reader_permission(file_id)
+        permission = _retry_drive_asset_call(
+            lambda: self.client.create_anyone_reader_permission(file_id)
+        )
         permission_id = str(permission.get("id") or "")
         asset = DriveChartAsset(
             local_path=local_path,
@@ -137,6 +148,32 @@ class DriveChartAssetStore:
                 asset.cleanup_status = f"cleanup_failed: {exc}"
             cleanup_records.append(asset.to_manifest())
         return cleanup_records
+
+
+def _retry_drive_asset_call(operation: Callable[[], Any]) -> Any:
+    for attempt in range(1, DRIVE_ASSET_RETRY_ATTEMPTS + 1):
+        try:
+            return operation()
+        except Exception as exc:
+            if attempt >= DRIVE_ASSET_RETRY_ATTEMPTS or not _is_retryable_drive_asset_error(
+                exc
+            ):
+                raise
+            time.sleep(DRIVE_ASSET_RETRY_DELAY_SECONDS * attempt)
+
+
+def _is_retryable_drive_asset_error(exc: Exception) -> bool:
+    if isinstance(
+        exc,
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ),
+    ):
+        return True
+    if isinstance(exc, GoogleWorkspaceError):
+        return bool(RETRYABLE_GOOGLE_STATUS_RE.search(str(exc)))
+    return False
 
 
 def google_slides_source_status(client_id: str, report_mode: str) -> dict[str, Any]:
