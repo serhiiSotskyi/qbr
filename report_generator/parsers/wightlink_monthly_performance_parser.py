@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -40,11 +41,14 @@ def parse_wightlink_monthly_performance_csv(csv_path: str | Path) -> dict[str, A
         prior_ytd_rows,
     )
 
+    current_scope = build_performance_scope(current_rows)
+    _validate_scope_matches_rows(current_rows, current_scope, month.label)
+
     return {
         "raw": working,
         "month": month,
         "quarter": month.quarter,
-        "current": build_performance_scope(current_rows),
+        "current": current_scope,
         "previous_month": build_performance_scope(previous_rows) if not previous_rows.empty else None,
         "prior_year": build_performance_scope(prior_rows) if not prior_rows.empty else None,
         "ytd": build_performance_scope(ytd_rows),
@@ -82,6 +86,41 @@ def _build_data_type_scopes(current_rows, previous_rows, prior_rows, ytd_rows, p
     ytd = {data_type: build_performance_scope(ytd_rows[ytd_rows["data_type"] == data_type]) for data_type in WIGHTLINK_DATA_TYPES}
     prior_ytd = {data_type: build_performance_scope(prior_ytd_rows[prior_ytd_rows["data_type"] == data_type]) for data_type in WIGHTLINK_DATA_TYPES}
     return current, previous, prior, ytd, prior_ytd
+
+
+def _validate_scope_matches_rows(rows, scope: dict[str, Any], period_label: str) -> None:
+    totals = scope.get("totals", {})
+    errors: list[str] = []
+    for metric in ("cost", "purchases", "purchase_revenue"):
+        expected = _safe_float(rows[metric].sum(min_count=1)) if metric in rows.columns else None
+        actual = _safe_float(totals.get(metric))
+        if expected is None and actual is None:
+            continue
+        if expected is None or actual is None:
+            errors.append(f"{metric} missing row or scope total")
+            continue
+        tolerance = max(abs(expected) * 0.001, 0.05)
+        delta = abs(actual - expected)
+        if delta > tolerance:
+            errors.append(
+                f"{metric} scope {actual:.2f} vs source rows {expected:.2f} "
+                f"(delta {delta:.2f}, tolerance {tolerance:.2f})"
+            )
+
+    if errors:
+        raise ValueError(f"Wightlink monthly all-performance totals do not match source rows for {period_label}: {'; '.join(errors)}")
+
+
+def _safe_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric):
+        return None
+    return numeric
 
 
 __all__ = ["parse_wightlink_monthly_performance_csv"]
