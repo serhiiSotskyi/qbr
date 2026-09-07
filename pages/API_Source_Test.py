@@ -654,11 +654,24 @@ def _render_source_status(
             },
             "trends_api_enabled_for_selection": trends_enabled,
             "native_google_slides": {
-                "workspace_credentials": slides_status["google_workspace_credentials"],
-                "template": slides_status["google_slides_template"],
-                "output_folder": slides_status["google_drive_output_folder"],
-                "asset_folder": slides_status["google_drive_asset_folder"],
-                "output_sharing": slides_status["google_drive_output_sharing"],
+                "workspace_credentials": slides_status.get(
+                    "google_workspace_credentials", "missing"
+                ),
+                "template": slides_status.get("google_slides_template", "missing"),
+                "output_folder": slides_status.get(
+                    "google_drive_output_folder", "missing"
+                ),
+                "asset_folder": slides_status.get(
+                    "google_drive_asset_folder", "missing"
+                ),
+                "output_sharing": slides_status.get(
+                    "google_drive_output_sharing",
+                    "configured"
+                    if slides_status.get("workspace", {}).get(
+                        "output_sharing_configured"
+                    )
+                    else "not_configured",
+                ),
                 "enabled_for_selection": slides_status[
                     "native_slides_enabled_for_selection"
                 ],
