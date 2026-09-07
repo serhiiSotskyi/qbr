@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import importlib
 import json
+import math
+import sys
 import time
 import traceback
 from pathlib import Path
@@ -20,7 +23,6 @@ from app import (
     load_client_options,
 )
 from claude_handoff import is_olympic_holidays_report, is_wightlink_report
-from main import run_report, run_text_report
 from presentation_prompt_builder import build_presentation_prompt
 from src.automated_sources import (
     AutomatedSourceError,
@@ -34,7 +36,7 @@ from src.automated_sources import (
     validate_generated_ga4_performance_source,
 )
 from src.config_loader import ConfigLoader
-from src.google_slides_builder import generate_native_google_slides, google_slides_source_status
+from src.google_slides_builder import google_slides_source_status
 from src.report_artifacts import artifact_companion_json_path, write_report_artifacts
 
 
@@ -157,7 +159,7 @@ def main() -> None:
 
         source_validation_path = Path(perf_path).parent / "SOURCE_VALIDATION.json"
         try:
-            validate_generated_ga4_performance_source(
+            source_validation = validate_generated_ga4_performance_source(
                 client_config=client_config,
                 report_mode=report_mode,
                 performance_csv_path=perf_path,
@@ -178,8 +180,12 @@ def main() -> None:
 
         try:
             with st.spinner("Generating API source CSVs, PPTX, TXT, Claude handoff package, and native Google Slides if configured..."):
+                fresh_run_report, fresh_run_text_report, fresh_generate_native_google_slides = _fresh_generation_functions(
+                    client_id,
+                    report_mode,
+                )
                 generated_pptx = Path(
-                    run_report(
+                    fresh_run_report(
                         performance_csv=perf_path,
                         client_id=client_id,
                         trends_dir=trends_dir,
@@ -195,7 +201,7 @@ def main() -> None:
                     )
                 )
                 generated_txt = Path(
-                    run_text_report(
+                    fresh_run_text_report(
                         performance_csv=perf_path,
                         client_id=client_id,
                         trends_dir=trends_dir,
@@ -223,6 +229,12 @@ def main() -> None:
                     companion_json_path=artifact_companion_json_path(generated_pptx),
                     chart_search_roots=[outputs_dir, BASE_DIR / "charts" / client_id],
                     generated_after=generation_started_at,
+                )
+                _validate_report_artifacts_against_source(
+                    client_id=client_id,
+                    report_mode=report_mode,
+                    report_artifacts_path=report_artifacts_path,
+                    source_validation=source_validation,
                 )
                 package_path = create_package_bundle(
                     client_id,
@@ -280,7 +292,7 @@ def main() -> None:
                         source_generation_manifest=source_manifest,
                     )
                     _append_package_paths(claude_handoff_path, [request_dir / "source_data"], arc_base=request_dir)
-                native_slides_result = generate_native_google_slides(
+                native_slides_result = fresh_generate_native_google_slides(
                     client_id=client_id,
                     client_name=selected_client["name"],
                     report_mode=report_mode,
@@ -312,6 +324,100 @@ def main() -> None:
         st.success("API source test files generated successfully.")
 
     _render_generated_outputs(st.session_state.api_source_generated_bundle)
+
+
+def _fresh_generation_functions(client_id: str, report_mode: str):
+    """Reload report modules so Streamlit Cloud hot-reloads do not reuse stale generators."""
+    module_names = [
+        "main",
+        "src.google_slides_builder",
+    ]
+    if client_id == "wightlink" and report_mode == "monthly":
+        module_names = [
+            "src.source_normalizers",
+            "report_generator.parsers.wightlink_performance_common",
+            "report_generator.parsers.wightlink_monthly_performance_parser",
+            "report_generator.pipelines.wightlink_pipeline",
+            "report_generator.pipelines.wightlink_monthly_pipeline",
+            "src.monthly_google_slides_builder",
+            "src.wightlink_monthly_google_slides_builder",
+            "src.google_slides_builder",
+            "main",
+        ]
+
+    for module_name in module_names:
+        module = sys.modules.get(module_name)
+        if module is not None:
+            importlib.reload(module)
+
+    import main as report_main
+    import src.google_slides_builder as slides_module
+
+    return report_main.run_report, report_main.run_text_report, slides_module.generate_native_google_slides
+
+
+def _validate_report_artifacts_against_source(
+    *,
+    client_id: str,
+    report_mode: str,
+    report_artifacts_path: str | Path,
+    source_validation: dict,
+) -> None:
+    if client_id != "wightlink" or report_mode != "monthly":
+        return
+
+    artifacts = json.loads(Path(report_artifacts_path).read_text(encoding="utf-8"))
+    summary = next(
+        (
+            slide
+            for slide in artifacts.get("slides", [])
+            if slide.get("title") == "All Performance Month Summary"
+        ),
+        None,
+    )
+    if not summary:
+        raise RuntimeError("Report artifact validation failed: missing All Performance Month Summary slide.")
+
+    kpis = {
+        str(card.get("key")): card.get("value_raw")
+        for card in summary.get("kpi_cards", [])
+        if card.get("key")
+    }
+    source_totals = source_validation.get("source_totals", {})
+    checks = {
+        "cost": "cost",
+        "purchases": "purchases",
+        "purchase_revenue": "purchase_revenue",
+    }
+    errors: list[str] = []
+    for artifact_key, source_key in checks.items():
+        expected = _safe_float(source_totals.get(source_key))
+        actual = _safe_float(kpis.get(artifact_key))
+        if expected is None or actual is None:
+            errors.append(f"{artifact_key} missing expected or artifact value")
+            continue
+        tolerance = max(abs(expected) * 0.001, 0.05)
+        delta = abs(actual - expected)
+        if delta > tolerance:
+            errors.append(
+                f"{artifact_key} artifact {actual:.2f} vs validated source {expected:.2f} "
+                f"(delta {delta:.2f}, tolerance {tolerance:.2f})"
+            )
+
+    if errors:
+        raise RuntimeError("Report artifact totals do not match validated GA4 source: " + "; ".join(errors))
+
+
+def _safe_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric):
+        return None
+    return numeric
 
 
 def _report_mode_selector(client_id: str) -> str:
