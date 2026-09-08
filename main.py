@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
         "--report-mode",
         choices=["quarterly", "monthly", "annual"],
         default="quarterly",
-        help="Report mode selector. Wightlink supports quarterly/monthly/annual; Wendy Wu UK/Australia support quarterly/monthly.",
+        help="Report mode selector. Wightlink supports quarterly/monthly/annual; Wendy Wu UK/Australia and Olympic Holidays support quarterly/monthly.",
     )
     parser.add_argument(
         "--output",
@@ -90,6 +90,7 @@ def run_report(
             manual_inputs=manual_inputs,
             trends_dir=trends_dir,
             auction_csv=auction_csv,
+            report_mode=report_mode,
         )
         return str(result["pptx_path"])
 
@@ -177,6 +178,7 @@ def run_text_report(
             manual_inputs=manual_inputs,
             trends_dir=trends_dir,
             auction_csv=auction_csv,
+            report_mode=report_mode,
         )
         return str(result["text_path"])
 

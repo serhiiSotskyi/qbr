@@ -15,10 +15,12 @@ def generate_executive_summary(data: dict[str, Any]) -> dict[str, Any]:
     purchases_total = summary["overall_purchases"]
     atc_total = summary["overall_atc"]
     quarter_label = summary["quarter_label"]
+    period_noun = summary.get("period_noun", "quarter")
+    period_noun_title = period_noun.title()
 
     bullets = [
         f"{quarter_label} delivered {_currency(revenue_total)} revenue from {purchases_total:.1f} purchases on {_currency(cost_total)} spend.",
-        f"Quarter efficiency closed at {_currency(summary['overall_cpa'])} CPA, {_currency(summary['overall_cpatc'])} cost per ATC, and {_currency(summary['overall_aov'])} AOV.",
+        f"{period_noun_title} efficiency closed at {_currency(summary['overall_cpa'])} CPA, {_currency(summary['overall_cpatc'])} cost per ATC, and {_currency(summary['overall_aov'])} AOV.",
     ]
 
     best_revenue_month = monthly.loc[monthly["revenue"].idxmax()]
@@ -28,11 +30,10 @@ def generate_executive_summary(data: dict[str, Any]) -> dict[str, Any]:
     )
 
     if yoy:
-        bullets.append(
-            f"Versus Q{int(yoy['prior_quarter'])} {int(yoy['prior_year'])}, revenue moved {_signed_pct(yoy['revenue_change_pct'])}, cost moved {_signed_pct(yoy['cost_change_pct'])}, and purchases moved {_signed_pct(yoy['purchases_change_pct'])}."
-        )
+        prior_label = yoy.get("prior_label") or f"Q{int(yoy['prior_quarter'])} {int(yoy['prior_year'])}"
+        bullets.append(f"Versus {prior_label}, revenue moved {_signed_pct(yoy['revenue_change_pct'])}, cost moved {_signed_pct(yoy['cost_change_pct'])}, and purchases moved {_signed_pct(yoy['purchases_change_pct'])}.")
     else:
-        bullets.append(f"Add-to-cart volume totalled {atc_total:.1f} across the quarter.")
+        bullets.append(f"Add-to-cart volume totalled {atc_total:.1f} across the {period_noun}.")
 
     return {"bullets": _limit_bullets(bullets)}
 
@@ -45,8 +46,8 @@ def analyze_overall_performance(data: dict[str, Any]) -> dict[str, Any]:
     bullets = [
         f"Revenue moved {_signed_pct(_pct_change(start['revenue'], end['revenue']))} from {start['month_label']} to {end['month_label']}.",
         f"Spend moved {_signed_pct(_pct_change(start['cost'], end['cost']))} over the same period, while purchases moved {_signed_pct(_pct_change(start['purchases'], end['purchases']))}.",
-        f"CPA moved {_signed_pct(_pct_change(start['cpa'], end['cpa']))}, and AOV closed the quarter at {_currency(data['summary']['overall_aov'])}.",
-        f"Add-to-cart volume reached {data['summary']['overall_atc']:.1f}, with quarter cost per ATC at {_currency(data['summary']['overall_cpatc'])}.",
+        f"CPA moved {_signed_pct(_pct_change(start['cpa'], end['cpa']))}, and AOV closed the period at {_currency(data['summary']['overall_aov'])}.",
+        f"Add-to-cart volume reached {data['summary']['overall_atc']:.1f}, with period cost per ATC at {_currency(data['summary']['overall_cpatc'])}.",
     ]
     return {"bullets": _limit_bullets(bullets)}
 
@@ -54,11 +55,13 @@ def analyze_overall_performance(data: dict[str, Any]) -> dict[str, Any]:
 def analyze_yoy(data: dict[str, Any]) -> dict[str, Any]:
     yoy = data.get("yoy_summary")
     if not yoy:
-        return {"bullets": ["No prior-year quarter was available for a matched-month YoY comparison."]}
+        return {"bullets": ["No prior-year period was available for a matched-month YoY comparison."]}
 
+    prior_label = yoy.get("prior_label") or f"Q{int(yoy['prior_quarter'])} {int(yoy['prior_year'])}"
+    coverage_label = "YTD period" if yoy.get("comparison_type") == "ytd" else "quarter"
     bullets = [
-        f"The comparison covers {int(yoy['matched_months'])} of {int(yoy.get('expected_months', yoy['matched_months']))} month(s) in the quarter.",
-        f"Revenue was {_signed_pct(yoy['revenue_change_pct'])} versus Q{int(yoy['prior_quarter'])} {int(yoy['prior_year'])}.",
+        f"The comparison covers {int(yoy['matched_months'])} of {int(yoy.get('expected_months', yoy['matched_months']))} month(s) in the {coverage_label}.",
+        f"Revenue was {_signed_pct(yoy['revenue_change_pct'])} versus {prior_label}.",
         f"Spend was {_signed_pct(yoy['cost_change_pct'])} and purchases were {_signed_pct(yoy['purchases_change_pct'])} on matched months.",
         f"CPA moved {_signed_pct(yoy['cpa_change_pct'])}, cost per ATC moved {_signed_pct(yoy['cpatc_change_pct'])}, and AOV moved {_signed_pct(yoy['aov_change_pct'])}.",
     ]
@@ -96,7 +99,7 @@ def analyze_channels(data: dict[str, Any]) -> dict[str, Any]:
         )
     if weakest is not None:
         bullets.append(
-            f"{weakest['channel']} was the least efficient campaign type on quarter CPA at {_currency(weakest['cpa'])}."
+            f"{weakest['channel']} was the least efficient campaign type on period CPA at {_currency(weakest['cpa'])}."
         )
 
     branded = channels[channels["channel"].str.lower() == "brand"]
@@ -115,7 +118,7 @@ def analyze_generic_performance(data: dict[str, Any]) -> dict[str, Any]:
     monthly = data["generic_monthly"]
     summary = data["generic_summary"]
     if monthly.empty or summary is None:
-        return {"bullets": ["No Generic rows were available for the selected quarter."]}
+        return {"bullets": ["No Generic rows were available for the selected period."]}
 
     start = monthly.iloc[0]
     end = monthly.iloc[-1]
@@ -123,7 +126,7 @@ def analyze_generic_performance(data: dict[str, Any]) -> dict[str, Any]:
 
     bullets = [
         f"Generic delivered {_currency(summary['revenue'])} revenue from {_currency(summary['cost'])} spend at {_currency(summary['cpa'])} CPA.",
-        f"{best_revenue['month_label']} was the strongest generic revenue month in the quarter.",
+        f"{best_revenue['month_label']} was the strongest generic revenue month in the period.",
         f"From {start['month_label']} to {end['month_label']}, generic revenue moved {_signed_pct(_pct_change(start['revenue'], end['revenue']))} and CPA moved {_signed_pct(_pct_change(start['cpa'], end['cpa']))}.",
         f"Generic add-to-cart volume totalled {summary['atc']:.1f}, with {_currency(summary['cpatc'])} cost per ATC and {_currency(summary['aov'])} AOV.",
     ]
@@ -138,7 +141,7 @@ def analyze_atc(data: dict[str, Any]) -> dict[str, Any]:
     bullets = [
         f"Add-to-cart volume moved {_signed_pct(_pct_change(start['atc'], end['atc']))} from {start['month_label']} to {end['month_label']}.",
         f"Cost per ATC moved {_signed_pct(_pct_change(start['cpatc'], end['cpatc']))} across the same period.",
-        f"The quarter delivered {atc['atc'].sum():.1f} total add-to-cart actions from {_currency(data['summary']['overall_cost'])} spend.",
+        f"The period delivered {atc['atc'].sum():.1f} total add-to-cart actions from {_currency(data['summary']['overall_cost'])} spend.",
         f"Purchases totalled {atc['purchases'].sum():.1f}, providing the downstream conversion context for ATC performance.",
     ]
     return {"bullets": _limit_bullets(bullets)}

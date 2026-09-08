@@ -28,6 +28,7 @@ DEFAULT_TEMPLATE_IDS = {
     "GOOGLE_SLIDES_TEMPLATE_WWT_UK_QBR": "1P5L_zODZ1D81QZK5Z8nuZ41ygON3D8GqTjYEeeDqMec",
     "GOOGLE_SLIDES_TEMPLATE_WWT_UK_MONTHLY": "1864ehY6EwTpneAnh0sTe9xtL6A7bWtLlmTMwqidsX2Q",
     "GOOGLE_SLIDES_TEMPLATE_OLYMPIC_QBR": "1F2pL0nW0RvWU-CaDuXLiYuO9ZL67hXqKt0_m9GSUhAQ",
+    "GOOGLE_SLIDES_TEMPLATE_OLYMPIC_MONTHLY": "1laLtT2MLrpDNjL63JU23OC0L6v3IvVTl3vt8yLxjZZo",
 }
 
 DEFAULT_REQUIRED_ROLES = (
@@ -94,6 +95,19 @@ TEMPLATE_REGISTRY: dict[tuple[str, str], dict[str, str]] = {
     ("olympic_holidays", "quarterly"): {
         "key": "olympic_qbr",
         "env_key": "GOOGLE_SLIDES_TEMPLATE_OLYMPIC_QBR",
+    },
+    ("olympic_holidays", "monthly"): {
+        "key": "olympic_monthly",
+        "env_key": "GOOGLE_SLIDES_TEMPLATE_OLYMPIC_MONTHLY",
+        "required_roles": (
+            "cover",
+            "monthly_summary",
+            "monthly_ytd_table_chart",
+            "ytd_yoy",
+            "campaign_mix",
+            "campaign_summary",
+            "review_required_island_detail",
+        ),
     },
 }
 

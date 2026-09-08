@@ -311,10 +311,15 @@ def main() -> None:
         report_mode = st.selectbox("Wightlink report mode", ["quarterly", "monthly", "annual"], index=0)
     elif client_id in WENDY_WU_CLIENT_IDS:
         report_mode = st.selectbox("Wendy Wu report mode", ["quarterly", "monthly"], index=0)
+    elif client_id == "olympic_holidays":
+        report_mode = st.selectbox("Olympic Holidays report mode", ["quarterly", "monthly"], index=0)
 
     st.subheader("File Uploads")
     performance_file = st.file_uploader("Performance CSV", type=["csv"])
-    is_monthly_performance_only = report_mode == "monthly" and (client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink")
+    is_monthly_performance_only = report_mode == "monthly" and (
+        client_id in WENDY_WU_CLIENT_IDS
+        or client_id in {"wightlink", "olympic_holidays"}
+    )
     auction_file = None if is_monthly_performance_only else st.file_uploader("Auction CSV", type=["csv"])
     use_wendy_wu_ytd_trends = client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly"
     trends_files = (

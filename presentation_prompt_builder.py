@@ -932,9 +932,33 @@ MONTHLY_WIGHTLINK_PROMPT = dedent(
 ).strip()
 
 
+MONTHLY_OLYMPIC_PROMPT = dedent(
+    """
+    You are preparing an Olympic Holidays monthly paid search report.
+
+    This monthly workflow is performance-data only. The native Google Slides
+    output is generated directly from the API-normalized performance CSV.
+
+    PERIOD RULES
+    - KPI cards use the selected month only.
+    - KPI cards include MoM and YoY comparisons where a comparison period exists.
+    - Tables and charts show YTD through the selected month.
+    - There are no Google Trends or Auction Insights sections in monthly mode.
+
+    CONTENT RULES
+    - Preserve numbers exactly from the generated performance source.
+    - Use Revenue, Cost, Purchases, Add to Cart, CPA, Cost per ATC, and AOV.
+    - Campaign sections should include Generic and Performance Max.
+    - Island Hopping slides must be treated as review-required unless the
+      performance source contains an Island Hopping campaign type.
+    """
+).strip()
+
+
 MONTHLY_PROMPTS = {
     **MONTHLY_WENDY_WU_PROMPTS,
     "wightlink": MONTHLY_WIGHTLINK_PROMPT,
+    "olympic_holidays": MONTHLY_OLYMPIC_PROMPT,
 }
 
 

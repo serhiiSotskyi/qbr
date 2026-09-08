@@ -27,6 +27,7 @@ import matplotlib
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
+from src.data_loader import detect_latest_complete_month
 
 
 def generate_olympic_report(
@@ -36,6 +37,7 @@ def generate_olympic_report(
     manual_inputs=None,
     trends_dir=None,
     auction_csv=None,
+    report_mode="quarterly",
 ):
     config = dict(client_config or {})
     project_root = Path(config.get("_project_root", Path.cwd()))
@@ -45,11 +47,19 @@ def generate_olympic_report(
     manual_content = _normalize_manual_inputs(manual_inputs)
 
     df = _coerce_rows_to_dataframe(rows)
-    data = _prepare_datasets(df)
+    data = _prepare_datasets(df, report_mode=report_mode)
     insights = _build_performance_insights(data)
 
-    trend_sections = _build_trend_sections(trends_dir, data, project_root, client_id, chart_styles)
-    auction_section = _build_auction_section(auction_csv, config)
+    trend_sections = (
+        []
+        if report_mode == "monthly"
+        else _build_trend_sections(trends_dir, data, project_root, client_id, chart_styles)
+    )
+    auction_section = (
+        None
+        if report_mode == "monthly"
+        else _build_auction_section(auction_csv, config)
+    )
 
     requested_output = Path(output_path)
     if requested_output.suffix.lower() == ".txt":
@@ -59,7 +69,7 @@ def generate_olympic_report(
         pptx_path = requested_output if requested_output.suffix.lower() == ".pptx" else requested_output.with_suffix(".pptx")
         text_path = project_root / "reports" / f"{client_id}_report.txt"
 
-    charts_dir = project_root / "charts" / client_id / "qbr"
+    charts_dir = project_root / "charts" / client_id / ("monthly" if report_mode == "monthly" else "qbr")
     charts_dir.mkdir(parents=True, exist_ok=True)
     chart_paths = _build_performance_charts(data, charts_dir, chart_styles)
 
@@ -110,7 +120,7 @@ def _coerce_rows_to_dataframe(rows) -> pd.DataFrame:
     return df
 
 
-def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
+def _prepare_datasets(df: pd.DataFrame, report_mode: str = "quarterly") -> dict[str, Any]:
     working_df = df.rename(
         columns={
             "Date": "date",
@@ -150,6 +160,91 @@ def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
     all_monthly["month_label"] = all_monthly["month_start"].dt.strftime("%b %Y")
     all_monthly["year"] = all_monthly["month_start"].dt.year
     all_monthly["quarter"] = all_monthly["month_start"].dt.quarter
+    all_monthly["month"] = all_monthly["month_start"].dt.month
+
+    if report_mode == "monthly":
+        selected_month = detect_latest_complete_month(all_monthly)
+        ytd_monthly = all_monthly[
+            (all_monthly["year"] == selected_month.year)
+            & (all_monthly["month"] <= selected_month.month)
+        ].copy()
+        ytd_monthly = ytd_monthly.reset_index(drop=True)
+        current_monthly = all_monthly[
+            (all_monthly["year"] == selected_month.year)
+            & (all_monthly["month"] == selected_month.month)
+        ].copy()
+
+        ytd_rows = working_df[
+            (working_df["year"] == selected_month.year)
+            & (working_df["month_start"].dt.month <= selected_month.month)
+        ].copy()
+
+        channel_breakdown = _aggregate_period_metrics(ytd_rows, ["channel"])
+        channel_breakdown["cost_share"] = _share(channel_breakdown["cost"])
+        channel_breakdown["revenue_share"] = _share(channel_breakdown["revenue"])
+        channel_breakdown = channel_breakdown.sort_values(
+            ["revenue", "cost"], ascending=False
+        ).reset_index(drop=True)
+
+        generic_rows = ytd_rows[ytd_rows["channel"].str.lower() == "generic"].copy()
+        generic_monthly = (
+            _aggregate_period_metrics(generic_rows, ["month_start"])
+            if not generic_rows.empty
+            else pd.DataFrame()
+        )
+        if not generic_monthly.empty:
+            generic_monthly["month_label"] = generic_monthly["month_start"].dt.strftime("%b %Y")
+            generic_monthly = generic_monthly.sort_values("month_start").reset_index(drop=True)
+
+        atc_trends = ytd_monthly[["month_start", "month_label", "add_to_cart", "cpatc", "purchases"]].copy()
+        atc_trends = atc_trends.rename(columns={"add_to_cart": "atc"})
+
+        selected_label = selected_month.label
+        yoy = _build_ytd_yoy_summary(all_monthly, selected_month.year, selected_month.month)
+        selected_frame = current_monthly if not current_monthly.empty else ytd_monthly.tail(1)
+        summary = {
+            "report_mode": "monthly",
+            "period_noun": "month",
+            "selected_year": selected_month.year,
+            "selected_quarter": int(selected_frame.iloc[-1]["quarter"]) if not selected_frame.empty else None,
+            "selected_month": selected_month.month,
+            "quarter_label": selected_label,
+            "period_label": selected_label,
+            "period_start": ytd_monthly.iloc[0]["month_label"],
+            "period_end": ytd_monthly.iloc[-1]["month_label"],
+            "overall_revenue": float(selected_frame["revenue"].sum()),
+            "overall_cost": float(selected_frame["cost"].sum()),
+            "overall_purchases": float(selected_frame["purchases"].sum()),
+            "overall_atc": float(selected_frame["add_to_cart"].sum()),
+            "overall_cpa": float(_safe_scalar(selected_frame["cost"].sum(), selected_frame["purchases"].sum())),
+            "overall_cpatc": float(_safe_scalar(selected_frame["cost"].sum(), selected_frame["add_to_cart"].sum())),
+            "overall_aov": float(_safe_scalar(selected_frame["revenue"].sum(), selected_frame["purchases"].sum())),
+        }
+
+        generic_summary = None
+        if not generic_monthly.empty:
+            generic_summary = {
+                "revenue": float(generic_monthly["revenue"].sum()),
+                "cost": float(generic_monthly["cost"].sum()),
+                "purchases": float(generic_monthly["purchases"].sum()),
+                "atc": float(generic_monthly["add_to_cart"].sum()),
+                "cpa": float(_safe_scalar(generic_monthly["cost"].sum(), generic_monthly["purchases"].sum())),
+                "cpatc": float(_safe_scalar(generic_monthly["cost"].sum(), generic_monthly["add_to_cart"].sum())),
+                "aov": float(_safe_scalar(generic_monthly["revenue"].sum(), generic_monthly["purchases"].sum())),
+            }
+
+        return {
+            "raw_performance": working_df,
+            "all_monthly": all_monthly,
+            "monthly_performance": ytd_monthly,
+            "channel_breakdown": channel_breakdown,
+            "generic_monthly": generic_monthly,
+            "generic_summary": generic_summary,
+            "atc_trends": atc_trends,
+            "end_period": ytd_monthly.tail(min(2, len(ytd_monthly))).reset_index(drop=True),
+            "yoy_summary": yoy,
+            "summary": summary,
+        }
 
     selected_year, selected_quarter = _detect_latest_complete_quarter(all_monthly)
     quarter_monthly = all_monthly[(all_monthly["year"] == selected_year) & (all_monthly["quarter"] == selected_quarter)].copy()
@@ -175,6 +270,8 @@ def _prepare_datasets(df: pd.DataFrame) -> dict[str, Any]:
 
     yoy = _build_quarter_yoy_summary(all_monthly, selected_year, selected_quarter)
     summary = {
+        "report_mode": "quarterly",
+        "period_noun": "quarter",
         "selected_year": selected_year,
         "selected_quarter": selected_quarter,
         "quarter_label": f"Q{selected_quarter} {selected_year}",
@@ -810,6 +907,71 @@ def _build_quarter_yoy_summary(all_monthly: pd.DataFrame, selected_year: int, se
     }
 
 
+def _build_ytd_yoy_summary(all_monthly: pd.DataFrame, selected_year: int, selected_month: int) -> dict[str, Any] | None:
+    current = all_monthly[
+        (all_monthly["year"] == selected_year)
+        & (all_monthly["month"] <= selected_month)
+    ].copy()
+    prior = all_monthly[
+        (all_monthly["year"] == selected_year - 1)
+        & (all_monthly["month"] <= selected_month)
+    ].copy()
+    if current.empty or prior.empty:
+        return None
+    current["month_num"] = current["month_start"].dt.month
+    prior["month_num"] = prior["month_start"].dt.month
+    matched = current.merge(prior, on="month_num", suffixes=("_current", "_prior"))
+    if matched.empty:
+        return None
+
+    revenue_current = matched["revenue_current"].sum()
+    revenue_prior = matched["revenue_prior"].sum()
+    cost_current = matched["cost_current"].sum()
+    cost_prior = matched["cost_prior"].sum()
+    purchases_current = matched["purchases_current"].sum()
+    purchases_prior = matched["purchases_prior"].sum()
+    atc_current = matched["add_to_cart_current"].sum()
+    atc_prior = matched["add_to_cart_prior"].sum()
+    cpa_current = _safe_scalar(cost_current, purchases_current)
+    cpa_prior = _safe_scalar(cost_prior, purchases_prior)
+    cpatc_current = _safe_scalar(cost_current, atc_current)
+    cpatc_prior = _safe_scalar(cost_prior, atc_prior)
+    aov_current = _safe_scalar(revenue_current, purchases_current)
+    aov_prior = _safe_scalar(revenue_prior, purchases_prior)
+    current_label = f"YTD Jan-{pd.Timestamp(selected_year, selected_month, 1).strftime('%b')} {selected_year}"
+    prior_label = f"YTD Jan-{pd.Timestamp(selected_year - 1, selected_month, 1).strftime('%b')} {selected_year - 1}"
+    return {
+        "comparison_type": "ytd",
+        "current_year": selected_year,
+        "prior_year": selected_year - 1,
+        "current_quarter": None,
+        "prior_quarter": None,
+        "current_label": current_label,
+        "prior_label": prior_label,
+        "matched_months": len(matched),
+        "expected_months": int(len(current)),
+        "is_full_quarter_match": False,
+        "revenue_change_pct": _pct_change(revenue_prior, revenue_current),
+        "cost_change_pct": _pct_change(cost_prior, cost_current),
+        "purchases_change_pct": _pct_change(purchases_prior, purchases_current),
+        "atc_change_pct": _pct_change(atc_prior, atc_current),
+        "cpa_change_pct": _pct_change(cpa_prior, cpa_current),
+        "cpatc_change_pct": _pct_change(cpatc_prior, cpatc_current),
+        "aov_change_pct": _pct_change(aov_prior, aov_current),
+        "table": pd.DataFrame(
+            [
+                {"Metric": "Revenue", prior_label: _currency(revenue_prior), current_label: _currency(revenue_current), "Change": _fmt_signed_pct(_pct_change(revenue_prior, revenue_current))},
+                {"Metric": "Cost", prior_label: _currency(cost_prior), current_label: _currency(cost_current), "Change": _fmt_signed_pct(_pct_change(cost_prior, cost_current))},
+                {"Metric": "Purchases", prior_label: f"{purchases_prior:.1f}", current_label: f"{purchases_current:.1f}", "Change": _fmt_signed_pct(_pct_change(purchases_prior, purchases_current))},
+                {"Metric": "Add to Cart", prior_label: f"{atc_prior:.1f}", current_label: f"{atc_current:.1f}", "Change": _fmt_signed_pct(_pct_change(atc_prior, atc_current))},
+                {"Metric": "CPA", prior_label: _currency(cpa_prior), current_label: _currency(cpa_current), "Change": _fmt_signed_pct(_pct_change(cpa_prior, cpa_current))},
+                {"Metric": "Cost per ATC", prior_label: _currency(cpatc_prior), current_label: _currency(cpatc_current), "Change": _fmt_signed_pct(_pct_change(cpatc_prior, cpatc_current))},
+                {"Metric": "AOV", prior_label: _currency(aov_prior), current_label: _currency(aov_current), "Change": _fmt_signed_pct(_pct_change(aov_prior, aov_current))},
+            ]
+        ),
+    }
+
+
 def _normalize_manual_inputs(manual_inputs) -> dict[str, list[str]]:
     payload = manual_inputs if isinstance(manual_inputs, dict) else {}
     normalized = {"actions": [], "opportunities": []}
@@ -995,15 +1157,19 @@ def _yoy_table_to_text(yoy_summary: dict[str, Any] | None) -> str | None:
 
 def _yoy_section_title(yoy_summary: dict[str, Any] | None) -> str:
     if not yoy_summary:
-        return "YoY Quarter Comparison"
+        return "YoY Period Comparison"
+    if yoy_summary.get("comparison_type") == "ytd":
+        return "YoY YTD Comparison"
     return "YoY Quarter Comparison" if yoy_summary.get("is_full_quarter_match") else "YoY Matched-Month Comparison"
 
 
 def _yoy_section_subtitle(yoy_summary: dict[str, Any] | None) -> str:
     if not yoy_summary:
-        return "No prior-year quarter available"
+        return "No prior-year period available"
     matched = int(yoy_summary.get("matched_months", 0))
     expected = int(yoy_summary.get("expected_months", 0))
+    if yoy_summary.get("comparison_type") == "ytd":
+        return f"Matched YTD months versus prior year ({matched} of {expected} months matched)"
     if yoy_summary.get("is_full_quarter_match"):
         return "Full quarter matched versus prior-year quarter"
     return f"Matched months versus prior-year quarter ({matched} of {expected} months matched)"

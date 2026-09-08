@@ -26,6 +26,10 @@ from src.google_slides_builder import (
 from src.google_slides_templates import GoogleSlidesTemplateRegistry
 from src.google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
 from src.monthly_google_slides_builder import build_wendy_wu_monthly_slides_payload
+from src.olympic_monthly_google_slides_builder import (
+    OLYMPIC_MONTHLY_TEMPLATE_MANIFEST,
+    build_olympic_monthly_slides_payload,
+)
 from src.wightlink_monthly_google_slides_builder import (
     build_wightlink_monthly_slides_payload,
 )
@@ -132,6 +136,7 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         wwt_uk_monthly = registry.status("wendy_wu", "monthly")
         wwt_aus_monthly = registry.status("wendy_wu_australia", "monthly")
         wightlink_monthly = registry.status("wightlink", "monthly")
+        olympic_monthly = registry.status("olympic_holidays", "monthly")
 
         self.assertTrue(quarterly["supported"])
         self.assertTrue(quarterly["configured"])
@@ -141,6 +146,8 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertTrue(wwt_aus_monthly["configured"])
         self.assertTrue(wightlink_monthly["supported"])
         self.assertTrue(wightlink_monthly["configured"])
+        self.assertTrue(olympic_monthly["supported"])
+        self.assertTrue(olympic_monthly["configured"])
 
 
 class ReportArtifactTests(unittest.TestCase):
@@ -753,6 +760,105 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(fake_client.permission_attempts, 2)
 
 
+class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
+    def test_monthly_payload_uses_current_month_cards_ytd_tables_and_review_placeholders(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_olympic_monthly_artifact(root)
+
+            with patch(
+                "src.olympic_monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
+                payload = build_olympic_monthly_slides_payload(
+                    request_dir=root,
+                    artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+                )
+
+        self.assertEqual(payload["period"]["label"], "Aug 2026")
+        self.assertEqual(
+            payload["shape_text"]["g3faba7ffb95_2_17"], "£20,000"
+        )
+        self.assertEqual(
+            payload["shape_text"]["g3faba7ffb95_2_85"], "£10,000"
+        )
+        self.assertIn("MoM:", payload["shape_text"]["g3faba7ffb95_2_87"])
+        overall_table = payload["tables"]["g3faba7ffb95_2_112"]["values"]
+        self.assertEqual(len(overall_table), 10)
+        self.assertEqual(
+            overall_table[0],
+            ["Month", "Revenue", "Spend", "Purchases", "CPA", "Cost/ATC"],
+        )
+        self.assertEqual(
+            payload["tables"]["g3faba7ffb95_2_332"]["values"][1][0],
+            "No API source",
+        )
+        self.assertTrue(
+            any("Island Hopping campaign type" in item for item in payload["warnings"])
+        )
+
+    def test_monthly_native_slides_generate_table_chart_and_cost_style_requests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_olympic_monthly_artifact(root)
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_olympic_monthly_presentation(existing_rows=4)
+            )
+
+            with patch(
+                "src.olympic_monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
+                result = generate_native_google_slides(
+                    client_id="olympic_holidays",
+                    client_name="Olympic Holidays",
+                    report_mode="monthly",
+                    request_dir=root,
+                    report_artifacts_path=artifact_path,
+                    google_client=fake_client,
+                    workspace_config=_configured_workspace(),
+                    export_pdf=True,
+                )
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(manifest["builder"], "olympic_holidays_monthly_template_manifest")
+        self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
+        self.assertTrue(
+            any(
+                request.get("insertTableRows", {}).get("tableObjectId")
+                == "g3faba7ffb95_2_112"
+                and request["insertTableRows"]["number"] == 6
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId")
+                == "g3faba7ffb95_2_113"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId")
+                == "g3faba7ffb95_2_87"
+                and request["updateTextStyle"]["style"]["foregroundColor"][
+                    "opaqueColor"
+                ]["rgbColor"]
+                == {"red": 0.42, "green": 0.42, "blue": 0.42}
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+
 class FakeGoogleWorkspaceClient:
     def __init__(
         self, raise_on_batch: bool = False, presentation: dict | None = None
@@ -1042,6 +1148,69 @@ def _write_wightlink_monthly_artifact(root: Path) -> Path:
     return artifact_path
 
 
+def _write_olympic_monthly_artifact(root: Path) -> Path:
+    source_data = root / "source_data"
+    source_data.mkdir(parents=True, exist_ok=True)
+    performance_csv = source_data / "performance.csv"
+    rows = []
+    month_rows = [
+        ("Brand", 8000, 2000, 8, 20),
+        ("Generic", 7000, 5000, 10, 30),
+        ("Performance Max", 3000, 2000, 4, 20),
+        ("Demand Gen", 2000, 1000, 3, 20),
+    ]
+    for year in (2025, 2026):
+        year_factor = 0.75 if year == 2025 else 1.0
+        for month in range(1, 9):
+            month_factor = 0.8 + month / 40
+            if year == 2026 and month == 8:
+                month_factor = 1.0
+            for campaign_type, revenue, cost, purchases, atc in month_rows:
+                adjusted_revenue = revenue * year_factor * month_factor
+                adjusted_cost = cost * year_factor * month_factor
+                adjusted_purchases = purchases * year_factor * month_factor
+                adjusted_atc = atc * year_factor * month_factor
+                rows.append(
+                    {
+                        "Date": f"{year}-{month:02d}-15",
+                        "Campaign Type": campaign_type,
+                        "Purchases": adjusted_purchases,
+                        "Revenue": adjusted_revenue,
+                        "Cost": adjusted_cost,
+                        "Add to cart": adjusted_atc,
+                        "CPA": adjusted_cost / adjusted_purchases,
+                        "Cost per ATC": adjusted_cost / adjusted_atc,
+                        "AOV": adjusted_revenue / adjusted_purchases,
+                    }
+                )
+    pd.DataFrame(rows).to_csv(performance_csv, index=False)
+    source_manifest = source_data / "SOURCE_GENERATION_MANIFEST.json"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "source_generation": {
+                    "generated_files": {
+                        "performance_csv": "source_data/performance.csv",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifact = {
+        "client_id": "olympic_holidays",
+        "client_name": "Olympic Holidays",
+        "report_mode": "monthly",
+        "period": {"label": "Aug 2026", "subtitle": "Aug 2026"},
+        "source_files": {"source_generation_manifest": str(source_manifest)},
+        "slides": [],
+        "charts": [],
+    }
+    artifact_path = root / "report_artifacts.json"
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    return artifact_path
+
+
 def _fake_presentation(include_sheets_chart: bool = False) -> dict:
     chart_element = (
         {
@@ -1235,6 +1404,55 @@ def _fake_wightlink_monthly_presentation(existing_rows: int = 8) -> dict:
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
         "slides": [{"objectId": "p3", "pageElements": page_elements}],
+    }
+
+
+def _fake_olympic_monthly_presentation(existing_rows: int = 4) -> dict:
+    manifest = json.loads(OLYMPIC_MONTHLY_TEMPLATE_MANIFEST.read_text(encoding="utf-8"))
+    shape_ids = set(manifest["global_text_ids"].values())
+    table_ids = set()
+    image_ids = set()
+    for slide in manifest["slides"].values():
+        for key in ("title_id", "subtitle_id", "coverage_id", "insights_id"):
+            if slide.get(key):
+                shape_ids.add(slide[key])
+        for kpi_ids in (slide.get("kpi_ids") or {}).values():
+            shape_ids.update(kpi_ids)
+        if slide.get("table_id"):
+            table_ids.add(slide["table_id"])
+        image_ids.update((slide.get("chart_ids") or {}).values())
+
+    page_elements = []
+    page_elements.extend(
+        {
+            "objectId": shape_id,
+            "shape": {
+                "text": {"textElements": [{"textRun": {"content": "Old text\n"}}]}
+            },
+            "transform": _transform(50, 50),
+        }
+        for shape_id in sorted(shape_ids)
+    )
+    page_elements.extend(
+        {
+            "objectId": table_id,
+            "table": {"rows": existing_rows, "columns": 10},
+            "transform": _transform(100, 130),
+        }
+        for table_id in sorted(table_ids)
+    )
+    page_elements.extend(
+        {
+            "objectId": image_id,
+            "image": {},
+            "size": _size(320, 200),
+            "transform": _transform(100, 220),
+        }
+        for image_id in sorted(image_ids)
+    )
+    return {
+        "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
+        "slides": [{"objectId": "olympic", "pageElements": page_elements}],
     }
 
 

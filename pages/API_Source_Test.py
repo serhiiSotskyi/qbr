@@ -419,6 +419,14 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
             "src.google_slides_builder",
             "main",
         ]
+    if client_id == "olympic_holidays" and report_mode == "monthly":
+        module_names = [
+            "src.automated_sources",
+            "report_generator.pipelines.olympic_pipeline",
+            "src.olympic_monthly_google_slides_builder",
+            "src.google_slides_builder",
+            "main",
+        ]
 
     for module_name in module_names:
         module = sys.modules.get(module_name)
@@ -622,6 +630,10 @@ def _report_mode_selector(client_id: str) -> str:
         )
     if client_id in WENDY_WU_CLIENT_IDS:
         return st.selectbox("Wendy Wu report mode", ["quarterly", "monthly"], index=0)
+    if client_id == "olympic_holidays":
+        return st.selectbox(
+            "Olympic Holidays report mode", ["quarterly", "monthly"], index=0
+        )
     return "quarterly"
 
 
@@ -793,7 +805,8 @@ def _generated_source_files(request_dir: Path) -> list[str]:
 
 def _monthly_without_auction(client_id: str, report_mode: str) -> bool:
     return report_mode == "monthly" and (
-        client_id in WENDY_WU_CLIENT_IDS or client_id == "wightlink"
+        client_id in WENDY_WU_CLIENT_IDS
+        or client_id in {"wightlink", "olympic_holidays"}
     )
 
 

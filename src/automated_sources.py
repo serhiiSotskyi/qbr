@@ -694,6 +694,25 @@ def detect_period_from_performance(client_id: str, performance_csv: str | Path, 
         quarter = detect_latest_wightlink_quarter(working)
         return SourcePeriod("quarterly", quarter.year, quarter.quarter, quarter.start, quarter.end)
 
+    if client_id == "olympic_holidays":
+        normalized = normalize_olympic_performance_export(performance_csv)
+        df = normalized.copy()
+        df["date"] = _coerce_date_column(df["Date"])
+        df = df.dropna(subset=["date"]).copy()
+        if df.empty:
+            raise ValueError("Olympic Holidays generated performance CSV has no valid dates.")
+        df["year"] = df["date"].dt.year
+        df["month"] = df["date"].dt.month
+        df["quarter"] = df["date"].dt.quarter
+        df["month_start"] = df["date"].dt.to_period("M").dt.to_timestamp()
+        if report_mode == "monthly":
+            month = detect_latest_complete_month(df)
+            return SourcePeriod("monthly", month.year, None, month.start, month.end)
+        if report_mode == "annual":
+            return default_source_period("annual")
+        quarter = detect_latest_complete_quarter(df)
+        return SourcePeriod("quarterly", quarter.year, quarter.quarter, quarter.start, quarter.end)
+
     df = load_csv(performance_csv)
     if report_mode == "monthly":
         month = detect_latest_complete_month(df)
