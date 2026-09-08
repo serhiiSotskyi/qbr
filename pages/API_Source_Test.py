@@ -65,7 +65,8 @@ def main() -> None:
 
     st.subheader("Manual Uploads")
     st.caption(
-        "Performance and Trends uploads are intentionally hidden on this test page."
+        "Performance and Trends uploads are intentionally hidden on this test page. "
+        "Auction Insights remains a manual Google Ads UI CSV export for QBRs."
     )
     auction_file = (
         None
@@ -404,6 +405,16 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
             "src.report_pipeline",
             "utils.text_report",
             "src.monthly_google_slides_builder",
+            "src.google_slides_builder",
+            "main",
+        ]
+    if client_id == "wendy_wu" and report_mode == "quarterly":
+        module_names = [
+            "src.data_loader",
+            "src.metrics",
+            "utils.text_report",
+            "src.report_pipeline",
+            "src.wendy_wu_qbr_google_slides_builder",
             "src.google_slides_builder",
             "main",
         ]

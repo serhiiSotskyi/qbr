@@ -307,6 +307,21 @@ def generate_native_google_slides(
             google_client=google_client,
             export_pdf=export_pdf,
         )
+    if client_id == "wendy_wu" and report_mode == "quarterly":
+        from .wendy_wu_qbr_google_slides_builder import (
+            generate_wendy_wu_qbr_google_slides,
+        )
+
+        return generate_wendy_wu_qbr_google_slides(
+            client_id=client_id,
+            client_name=client_name,
+            request_dir=request_path,
+            report_artifacts_path=artifact_path,
+            template=template,
+            workspace_config=config,
+            google_client=google_client,
+            export_pdf=export_pdf,
+        )
     if client_id == "wightlink" and report_mode == "monthly":
         from .wightlink_monthly_google_slides_builder import (
             generate_wightlink_monthly_google_slides,

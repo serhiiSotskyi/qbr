@@ -30,6 +30,9 @@ from src.olympic_monthly_google_slides_builder import (
     OLYMPIC_MONTHLY_TEMPLATE_MANIFEST,
     build_olympic_monthly_slides_payload,
 )
+from src.wendy_wu_qbr_google_slides_builder import (
+    build_wendy_wu_qbr_slides_payload,
+)
 from src.wightlink_monthly_google_slides_builder import (
     build_wightlink_monthly_slides_payload,
 )
@@ -622,6 +625,107 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
 
+class WendyWuQbrNativeSlidesTests(unittest.TestCase):
+    def test_qbr_payload_uses_central_asia_and_inline_yoy_mix_values(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_qbr_artifact(root)
+
+            payload = build_wendy_wu_qbr_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+            )
+
+        self.assertEqual(payload["period"]["label"], "Q2 2026")
+        ca_table = payload["tables"]["SLIDES_API1312704722_38"]["values"]
+        self.assertEqual(
+            ca_table[0],
+            ["Campaign Type", "Cost", "Sales Leads", "Cost Share", "Lead Share", "CPL"],
+        )
+        self.assertIn("Central Asia & Mongolia", payload["shape_text"]["SLIDES_API1312704722_3"])
+        self.assertTrue(any("(+" in row[1] for row in ca_table[1:]))
+        self.assertTrue(any("(+" in row[2] for row in ca_table[1:]))
+        self.assertTrue(any("(+" in row[3] or "(-" in row[3] for row in ca_table[1:]))
+        self.assertTrue(any("(+" in row[4] or "(-" in row[4] for row in ca_table[1:]))
+        self.assertTrue(any("(+" in row[5] or "(-" in row[5] for row in ca_table[1:]))
+        other_table_text = "\n".join(
+            " ".join(row) for row in payload["tables"]["p26_i682"]["values"]
+        )
+        self.assertNotIn("Central Asia", other_table_text)
+        self.assertEqual(
+            payload["tables"]["p29_i720"]["values"][1][0],
+            "Manual upload required",
+        )
+
+    def test_qbr_native_slides_generate_expected_table_chart_and_style_requests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_qbr_artifact(root)
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wendy_wu_qbr_presentation()
+            )
+
+            result = generate_native_google_slides(
+                client_id="wendy_wu",
+                client_name="Wendy Wu Tours",
+                report_mode="quarterly",
+                request_dir=root,
+                report_artifacts_path=artifact_path,
+                google_client=fake_client,
+                workspace_config=_configured_workspace(),
+                export_pdf=True,
+            )
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(manifest["builder"], "wendy_wu_uk_qbr_template_manifest")
+        self.assertEqual(manifest["manual_inputs"]["auction_insights_csv"], None)
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId") == "p3_i57"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId")
+                == "SLIDES_API1312704722_51"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("deleteTableColumn", {}).get("tableObjectId")
+                == "p26_i682"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("insertText", {}).get("objectId") == "p29_i720"
+                and request["insertText"].get("cellLocation")
+                == {"rowIndex": 1, "columnIndex": 0}
+                and request["insertText"]["text"] == "Manual upload required"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId") == "p7_i121"
+                and request["updateTextStyle"]["style"]["foregroundColor"][
+                    "opaqueColor"
+                ]["rgbColor"]
+                == {"red": 0.42, "green": 0.42, "blue": 0.42}
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+
 class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
     def test_monthly_payload_uses_current_month_cards_ytd_tables_and_charts(
         self,
@@ -1098,6 +1202,89 @@ def _write_wendy_wu_monthly_artifact(
     return artifact_path
 
 
+def _write_wendy_wu_qbr_artifact(root: Path) -> Path:
+    source_data = root / "source_data"
+    source_data.mkdir(parents=True, exist_ok=True)
+    performance_csv = source_data / "performance.csv"
+    rows = []
+    section_rows = [
+        ("Brand", "Other", 9, 90, 900),
+        ("Generic", "China", 6, 240, 1200),
+        ("Performance Max", "China", 2, 80, 400),
+        ("Generic", "Japan", 7, 210, 1050),
+        ("Generic", "SE Asia", 4, 180, 900),
+        ("Demand Gen", "India", 3, 150, 750),
+        ("Generic", "Central Asia", 5, 160, 800),
+        ("Generic", "Mongolia", 4, 140, 700),
+        ("Generic", "Peru", 2, 120, 600),
+    ]
+    for year, multiplier in ((2025, 0.5), (2026, 1.0)):
+        for month in range(1, 7):
+            for campaign_type, destination, leads, cost, revenue in section_rows:
+                rows.append(
+                    {
+                        "Date": f"{year}-{month:02d}-15",
+                        "Campaign Type": campaign_type,
+                        "Destination": destination,
+                        "Impressions": 1000,
+                        "Clicks": 100,
+                        "Cost": cost * multiplier,
+                        "Sales Leads": leads * multiplier,
+                        "Revenue": revenue * multiplier,
+                    }
+                )
+    pd.DataFrame(rows).to_csv(performance_csv, index=False)
+
+    trends_current = source_data / "trends_ytd_current"
+    trends_previous = source_data / "trends_ytd_previous"
+    trends_current.mkdir()
+    trends_previous.mkdir()
+    for term in ("wendy wu tours", "japan tours", "china tours"):
+        current = pd.DataFrame(
+            {
+                "Week": [f"2026-{month:02d}-01" for month in range(1, 7)],
+                term: [50 + month for month in range(1, 7)],
+            }
+        )
+        previous = pd.DataFrame(
+            {
+                "Week": [f"2025-{month:02d}-01" for month in range(1, 7)],
+                term: [30 + month for month in range(1, 7)],
+            }
+        )
+        safe_term = term.replace(" ", "_")
+        current.to_csv(trends_current / f"{safe_term}_current_ytd.csv", index=False)
+        previous.to_csv(trends_previous / f"{safe_term}_previous_ytd.csv", index=False)
+
+    source_manifest = source_data / "SOURCE_GENERATION_MANIFEST.json"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "source_generation": {
+                    "generated_files": {
+                        "performance_csv": "source_data/performance.csv",
+                        "trends_ytd_current_dir": "source_data/trends_ytd_current",
+                        "trends_ytd_previous_dir": "source_data/trends_ytd_previous",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifact = {
+        "client_id": "wendy_wu",
+        "client_name": "Wendy Wu Tours",
+        "report_mode": "quarterly",
+        "period": {"label": "Q2 2026", "subtitle": "Q2 2026 (Apr - Jun 2026)"},
+        "source_files": {"source_generation_manifest": str(source_manifest)},
+        "slides": [],
+        "charts": [],
+    }
+    artifact_path = root / "report_artifacts.json"
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    return artifact_path
+
+
 def _write_wightlink_monthly_artifact(root: Path) -> Path:
     source_data = root / "source_data"
     source_data.mkdir(parents=True, exist_ok=True)
@@ -1355,6 +1542,102 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
         "slides": [{"objectId": "p3", "pageElements": page_elements}],
+    }
+
+
+def _fake_wendy_wu_qbr_presentation() -> dict:
+    shape_ids = {
+        "p1_i20",
+        "p1_i21",
+        "p1_i22",
+        "p1_i23",
+        "p1_i25",
+        "p1_i28",
+        "p1_i31",
+        "p1_i34",
+        "p3_i58",
+        "p3_i59",
+        "p4_i73",
+        "p4_i74",
+        "p5_i88",
+        "p5_i89",
+        "p7_i109",
+        "p7_i111",
+        "p7_i114",
+        "p7_i119",
+        "p7_i124",
+        "p7_i129",
+        "p7_i134",
+        "p7_i139",
+        "p7_i116",
+        "p7_i121",
+        "p7_i126",
+        "p7_i131",
+        "p7_i136",
+        "p7_i141",
+        "p7_i142",
+        "SLIDES_API1312704722_3",
+        "SLIDES_API1312704722_4",
+        "SLIDES_API1312704722_6",
+        "SLIDES_API1312704722_9",
+        "SLIDES_API1312704722_14",
+        "SLIDES_API1312704722_19",
+        "SLIDES_API1312704722_24",
+        "SLIDES_API1312704722_29",
+        "SLIDES_API1312704722_34",
+        "SLIDES_API1312704722_11",
+        "SLIDES_API1312704722_16",
+        "SLIDES_API1312704722_21",
+        "SLIDES_API1312704722_26",
+        "SLIDES_API1312704722_31",
+        "SLIDES_API1312704722_36",
+        "SLIDES_API1312704722_37",
+        "p29_i715",
+        "p29_i718",
+        "p29_i719",
+    }
+    table_ids = {
+        "p9_i202": (5, 9),
+        "p11_i260": (5, 9),
+        "p13_i318": (5, 9),
+        "p15_i376": (5, 9),
+        "p18_i445": (4, 6),
+        "p20_i504": (4, 6),
+        "p22_i564": (4, 6),
+        "p24_i622": (4, 6),
+        "SLIDES_API1312704722_38": (4, 6),
+        "p26_i682": (4, 9),
+        "p29_i720": (9, 7),
+    }
+    page_elements = []
+    page_elements.extend(
+        {
+            "objectId": shape_id,
+            "shape": {
+                "text": {"textElements": [{"textRun": {"content": "Old text\n"}}]}
+            },
+            "transform": _transform(50, 50),
+        }
+        for shape_id in sorted(shape_ids)
+    )
+    for table_id, (rows, columns) in table_ids.items():
+        page_elements.append(
+            {
+                "objectId": table_id,
+                "table": {
+                    "rows": rows,
+                    "columns": columns,
+                    "tableColumns": [
+                        {"columnWidth": {"magnitude": 600000, "unit": "EMU"}}
+                        for _ in range(columns)
+                    ],
+                },
+                "transform": _transform(100, 130),
+            }
+        )
+    return {
+        "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
+        "slides": [{"objectId": "p1", "pageElements": page_elements}],
     }
 
 
