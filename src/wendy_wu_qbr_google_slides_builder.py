@@ -11,6 +11,7 @@ import pandas as pd
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 from .auction_loader import load_auction_csv
 from .auction_metrics import summarize_auction_insights
@@ -72,6 +73,7 @@ OBSOLETE_WWT_UK_QBR_TEMPLATE_IDS = {
 
 NEUTRAL_DELTA_RGB = {"red": 0.42, "green": 0.42, "blue": 0.42}
 BLACK_RGB = {"red": 0.0, "green": 0.0, "blue": 0.0}
+WHITE_RGB = {"red": 1.0, "green": 1.0, "blue": 1.0}
 POSITIVE_RGB = {"red": 0.03, "green": 0.47, "blue": 0.22}
 NEGATIVE_RGB = {"red": 0.78, "green": 0.16, "blue": 0.13}
 CARD_METRIC_ORDER = ("Sales Leads", "Cost", "CPL", "CVR", "Clicks", "CTR")
@@ -367,6 +369,11 @@ def generate_wendy_wu_qbr_google_slides(
 
         uploaded_assets = _upload_chart_assets(asset_store, payload["charts"])
         requests_body.extend(_build_chart_requests(uploaded_assets))
+        requests_body.extend(
+            _build_template_white_text_style_requests(
+                presentation, payload["template_manifest"]
+            )
+        )
         requests_body.extend(_build_cost_delta_style_requests())
 
         batch_update_request_count = len(requests_body)
@@ -661,9 +668,13 @@ def _populate_summary_sections(
 
         chart_ids = section.get("chart_ids") or {}
         if "cpl_cvr" in chart_ids and "cost_leads" in chart_ids:
-            built = chart_builder.build_scope_trend_charts(_chart_scope_key(key), scope["monthly"])
-            charts[(str(chart_ids["cpl_cvr"]), "cpl_cvr")] = built["cpl_cvr"]
-            charts[(str(chart_ids["cost_leads"]), "cost_leads")] = built["cost_leads"]
+            scope_key = _chart_scope_key(key)
+            charts[(str(chart_ids["cpl_cvr"]), "cpl_cvr")] = chart_builder._plot_cpl_cvr(
+                scope_key, scope["monthly"]
+            )
+            charts[(str(chart_ids["cost_leads"]), "cost_leads")] = _build_cost_leads_bar_chart(
+                chart_builder, scope_key, scope["monthly"]
+            )
         if "campaign_mix" in chart_ids:
             destination = str(section["scope"][1])
             charts[(str(chart_ids["campaign_mix"]), "campaign_mix")] = _build_combined_mix_chart(
@@ -690,9 +701,13 @@ def _populate_monthly_chart_sections(
         scope = _scope_for_section(report, section)
         if not scope:
             continue
-        built = chart_builder.build_scope_trend_charts(_chart_scope_key(key), scope["monthly"])
-        charts[(str(section["chart_ids"]["cpl_cvr"]), f"{key}_cpl_cvr")] = built["cpl_cvr"]
-        charts[(str(section["chart_ids"]["cost_leads"]), f"{key}_cost_leads")] = built["cost_leads"]
+        scope_key = _chart_scope_key(key)
+        charts[(str(section["chart_ids"]["cpl_cvr"]), f"{key}_cpl_cvr")] = (
+            chart_builder._plot_cpl_cvr(scope_key, scope["monthly"])
+        )
+        charts[(str(section["chart_ids"]["cost_leads"]), f"{key}_cost_leads")] = _build_cost_leads_bar_chart(
+            chart_builder, scope_key, scope["monthly"]
+        )
 
 
 def _populate_trend_sections(
@@ -1180,6 +1195,73 @@ def _build_chart_requests(uploaded_assets: Mapping[str, str]) -> list[dict[str, 
     return requests_body
 
 
+def _build_template_white_text_style_requests(
+    presentation: Mapping[str, Any], template_manifest: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    page_height = _page_height_magnitude(presentation)
+    header_limit = page_height * 0.095
+    footer_start = page_height * 0.94
+    force_white_slide_ids = _full_black_slide_ids(template_manifest)
+    requests_body: list[dict[str, Any]] = []
+    styled_ids: set[str] = set()
+
+    for slide in presentation.get("slides") or []:
+        slide_id = str(slide.get("objectId") or "")
+        force_slide = slide_id in force_white_slide_ids
+        for element in slide.get("pageElements") or []:
+            object_id = str(element.get("objectId") or "")
+            if (
+                not object_id
+                or object_id in styled_ids
+                or not _element_has_shape_text(element)
+            ):
+                continue
+            y_position = _element_translate_y(element)
+            if force_slide or y_position <= header_limit or y_position >= footer_start:
+                requests_body.append(_text_color_request(object_id, WHITE_RGB))
+                styled_ids.add(object_id)
+    return requests_body
+
+
+def _full_black_slide_ids(template_manifest: Mapping[str, Any]) -> set[str]:
+    slide_ids: set[str] = set()
+    for section in template_manifest.get("sections") or []:
+        if not isinstance(section, Mapping):
+            continue
+        role = str(section.get("role") or "")
+        slide_id = str(section.get("slide_id") or "")
+        if slide_id and (role in {"cover", "closing"} or role.endswith("_divider")):
+            slide_ids.add(slide_id)
+    return slide_ids
+
+
+def _element_has_shape_text(element: Mapping[str, Any]) -> bool:
+    shape = element.get("shape")
+    if not isinstance(shape, Mapping):
+        return False
+    text = shape.get("text")
+    return isinstance(text, Mapping) and bool(text.get("textElements"))
+
+
+def _element_translate_y(element: Mapping[str, Any]) -> float:
+    transform = element.get("transform")
+    if not isinstance(transform, Mapping):
+        return 0.0
+    value = transform.get("translateY", 0)
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
+def _page_height_magnitude(presentation: Mapping[str, Any]) -> float:
+    page_size = presentation.get("pageSize")
+    if isinstance(page_size, Mapping):
+        height = page_size.get("height")
+        if isinstance(height, Mapping):
+            magnitude = height.get("magnitude")
+            if isinstance(magnitude, (int, float)) and magnitude > 0:
+                return float(magnitude)
+    return 5_143_500.0
+
+
 def _build_cost_delta_style_requests() -> list[dict[str, Any]]:
     requests_body = []
     for section in SUMMARY_SLIDES.values():
@@ -1201,6 +1283,111 @@ def _text_color_request(object_id: str, rgb: Mapping[str, float]) -> dict[str, A
             "fields": "foregroundColor",
         }
     }
+
+
+def _build_cost_leads_bar_chart(
+    chart_builder: ChartBuilder, scope_key: str, monthly_table: pd.DataFrame
+) -> Path:
+    out_path = chart_builder.charts_dir / f"{scope_key}_cost_leads_bars.png"
+    if (
+        not isinstance(monthly_table, pd.DataFrame)
+        or monthly_table.empty
+        or "Month" not in monthly_table.columns
+        or "Cost" not in monthly_table.columns
+        or "Sales Leads" not in monthly_table.columns
+    ):
+        return chart_builder._plot_empty_state(out_path, "No cost or lead data")
+
+    df = monthly_table[monthly_table["Month"] != "Total"].copy()
+    if df.empty:
+        return chart_builder._plot_empty_state(out_path, "No cost or lead data")
+
+    months = df["Month"].astype(str).tolist()
+    cost = pd.to_numeric(df["Cost"], errors="coerce").fillna(0).tolist()
+    leads = pd.to_numeric(df["Sales Leads"], errors="coerce").fillna(0).tolist()
+    x_positions = list(range(len(months)))
+    width = 0.34
+
+    fig, ax_leads = plt.subplots(figsize=chart_builder.figure_size)
+    ax_cost = ax_leads.twinx()
+
+    lead_bars = ax_leads.bar(
+        [position - width / 2 for position in x_positions],
+        leads,
+        width=width,
+        color=chart_builder.colors.get("leads", "#111111"),
+        alpha=0.92,
+        label="Sales Leads",
+        zorder=3,
+    )
+    cost_bars = ax_cost.bar(
+        [position + width / 2 for position in x_positions],
+        cost,
+        width=width,
+        color=chart_builder.colors.get("cost", "#D83A40"),
+        alpha=0.9,
+        label="Cost (£)",
+        zorder=2,
+    )
+
+    ax_leads.set_title("Cost vs Sales Leads", fontsize=chart_builder.title_size)
+    ax_leads.set_xlabel("Month", fontsize=chart_builder.body_size)
+    ax_leads.set_ylabel("Sales Leads", fontsize=chart_builder.body_size)
+    ax_cost.set_ylabel("Cost (£)", fontsize=chart_builder.body_size)
+    ax_leads.set_xticks(x_positions, months)
+    ax_leads.tick_params(axis="both", labelsize=chart_builder.body_size)
+    ax_cost.tick_params(axis="y", labelsize=chart_builder.body_size)
+    ax_leads.grid(axis="y", alpha=0.2)
+    ax_leads.set_axisbelow(True)
+    ax_cost.yaxis.set_major_formatter(
+        FuncFormatter(lambda value, _: chart_builder._format_currency_axis(value))
+    )
+    ax_leads.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+
+    max_leads = max([float(value) for value in leads] + [0.0])
+    max_cost = max([float(value) for value in cost] + [0.0])
+    ax_leads.set_ylim(top=max_leads * 1.18 if max_leads > 0 else 1)
+    ax_cost.set_ylim(top=max_cost * 1.18 if max_cost > 0 else 1)
+
+    for bar, value in zip(lead_bars, leads):
+        if not value:
+            continue
+        ax_leads.annotate(
+            f"{int(round(float(value))):,}",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 5),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=chart_builder.body_size - 1,
+            color=chart_builder.colors.get("leads", "#111111"),
+        )
+
+    for bar, value in zip(cost_bars, cost):
+        if not value:
+            continue
+        ax_cost.annotate(
+            chart_builder._format_currency_label(float(value), abbreviated=True),
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 5),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=chart_builder.body_size - 1,
+            color=chart_builder.colors.get("cost", "#D83A40"),
+        )
+
+    ax_leads.legend(
+        [lead_bars[0], cost_bars[0]],
+        ["Sales Leads", "Cost (£)"],
+        loc="upper left",
+        fontsize=chart_builder.body_size,
+        frameon=False,
+    )
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=180, facecolor="white")
+    plt.close(fig)
+    return out_path
 
 
 def _build_combined_mix_chart(

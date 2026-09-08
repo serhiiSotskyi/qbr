@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -27,6 +28,7 @@ from .narrative_generator import generate_overall_bullets, generate_scope_bullet
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BATCH_UPDATE_IMAGE_FETCH_RETRY_DELAYS_SECONDS = (2.0, 5.0, 10.0)
 WWT_UK_MONTHLY_TEMPLATE_MANIFEST = (
     PROJECT_ROOT
     / "docs"
@@ -954,8 +956,24 @@ def _send_batch_updates(
 ) -> None:
     for index in range(0, len(requests_body), BATCH_UPDATE_CHUNK_SIZE):
         chunk = list(requests_body[index : index + BATCH_UPDATE_CHUNK_SIZE])
-        if chunk:
-            client.batch_update_presentation(presentation_id, chunk)
+        if not chunk:
+            continue
+        for delay in (*BATCH_UPDATE_IMAGE_FETCH_RETRY_DELAYS_SECONDS, None):
+            try:
+                client.batch_update_presentation(presentation_id, chunk)
+                break
+            except Exception as exc:  # noqa: BLE001
+                if delay is None or not _is_slides_image_fetch_error(exc):
+                    raise
+                time.sleep(delay)
+
+
+def _is_slides_image_fetch_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        "replaceimage" in message
+        and "problem retrieving the image" in message
+    )
 
 
 def _resolve_performance_csv_path(request_dir: Path, artifact: dict[str, Any]) -> Path:

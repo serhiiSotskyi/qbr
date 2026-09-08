@@ -14,14 +14,15 @@
     "data_sources": {
       "performance": "GA4 API generated performance.csv on API Source Test.",
       "trends": "DataForSEO Google Trends YTD current and previous-year CSVs on API Source Test.",
-      "auction_insights": "Manual Google Ads Auction Insights CSV upload for the QBR period.",
+      "auction_insights": "Manual Google Ads and Microsoft Ads Auction Insights CSV uploads for the same QBR period.",
       "other_campaigns": "Optional manual Google/MS campaign exports; GA4 campaign data is used as fallback."
     },
     "original_deck_rule": "The source presentation is never edited. The app copies this template deck and edits the copy.",
     "period_rule": "The overall deck remains quarter-led. Trend slides show current YTD against prior-year YTD.",
     "destination_rule": "Central Asia & Mongolia is its own UK destination section and is excluded from Other.",
     "destination_mix_rule": "Destination campaign mix tables include inline YoY for cost, leads, cost share, lead share, and CPL.",
-    "chart_rule": "Charts are rendered locally as high-resolution PNGs and inserted into existing native image slots.",
+    "chart_rule": "Charts are rendered locally as high-resolution PNGs and inserted into existing native image slots. Cost vs Sales Leads charts are grouped bars for both metrics.",
+    "style_rule": "Generated decks explicitly restyle cover, divider, closing, header, and footer text white so black template bands remain readable after text replacement.",
     "auction_rule": "If the manual Auction Insights CSV is missing, keep the auction slide with review-required content."
   },
   "slide_count": 40,

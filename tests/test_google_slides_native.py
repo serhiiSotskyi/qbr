@@ -26,6 +26,7 @@ from src.google_slides_builder import (
 from src.google_slides_templates import GoogleSlidesTemplateRegistry
 from src.google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
 from src.monthly_google_slides_builder import build_wendy_wu_monthly_slides_payload
+from src.monthly_google_slides_builder import _send_batch_updates
 from src.olympic_monthly_google_slides_builder import (
     OLYMPIC_MONTHLY_TEMPLATE_MANIFEST,
     build_olympic_monthly_slides_payload,
@@ -240,6 +241,28 @@ class GoogleSlidesRequestTests(unittest.TestCase):
         self.assertTrue(any("deleteText" in request for request in table_requests))
         self.assertTrue(any("insertText" in request for request in table_requests))
         self.assertEqual(delete_requests, [{"deleteObject": {"objectId": "slide_2"}}])
+
+    def test_batch_update_retries_transient_slides_image_fetch_error(self) -> None:
+        client = ImageFetchRetryClient()
+
+        with patch(
+            "src.monthly_google_slides_builder.time.sleep", return_value=None
+        ) as sleep:
+            _send_batch_updates(
+                client,
+                "deck-id",
+                [
+                    {
+                        "replaceImage": {
+                            "imageObjectId": "chart_1",
+                            "url": "https://drive.google.com/uc?export=download&id=asset",
+                        }
+                    }
+                ],
+            )
+
+        self.assertEqual(client.calls, 2)
+        sleep.assert_called_once_with(2.0)
 
 
 class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
@@ -648,6 +671,18 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
         self.assertTrue(any("(+" in row[3] or "(-" in row[3] for row in ca_table[1:]))
         self.assertTrue(any("(+" in row[4] or "(-" in row[4] for row in ca_table[1:]))
         self.assertTrue(any("(+" in row[5] or "(-" in row[5] for row in ca_table[1:]))
+        self.assertTrue(
+            str(payload["charts"][("p7_i106", "cost_leads")]).endswith(
+                "_cost_leads_bars.png"
+            )
+        )
+        self.assertTrue(
+            str(
+                payload["charts"][
+                    ("SLIDES_API1312704722_51", "central_asia_mongolia_cost_leads")
+                ]
+            ).endswith("_cost_leads_bars.png")
+        )
         other_table_text = "\n".join(
             " ".join(row) for row in payload["tables"]["p26_i682"]["values"]
         )
@@ -777,6 +812,26 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
                     "opaqueColor"
                 ]["rgbColor"]
                 == {"red": 0.42, "green": 0.42, "blue": 0.42}
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                _is_text_color_request(
+                    request,
+                    "p29_i714",
+                    {"red": 1.0, "green": 1.0, "blue": 1.0},
+                )
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                _is_text_color_request(
+                    request,
+                    "p2_i45",
+                    {"red": 1.0, "green": 1.0, "blue": 1.0},
+                )
                 for request in fake_client.batch_requests
             )
         )
@@ -1131,6 +1186,22 @@ class FakeGoogleWorkspaceClient:
     def export_file(self, file_id: str, mime_type: str, output_path: Path) -> Path:
         output_path.write_bytes(b"%PDF-1.4")
         return output_path
+
+
+class ImageFetchRetryClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def batch_update_presentation(
+        self, presentation_id: str, requests_body: list[dict]
+    ) -> dict:
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError(
+                "Google Workspace API request failed: 400 "
+                "Invalid requests[0].replaceImage: There was a problem retrieving the image."
+            )
+        return {"replies": [{} for _ in requests_body]}
 
 
 class FlakyChartAssetClient:
@@ -1759,9 +1830,65 @@ def _fake_wendy_wu_qbr_presentation() -> dict:
                 "transform": _transform(100, 130),
             }
         )
+    divider_elements = [
+        {
+            "objectId": "p2_i44",
+            "shape": {
+                "text": {"textElements": [{"textRun": {"content": "Google Trends\n"}}]}
+            },
+            "transform": _transform(50, 300),
+        },
+        {
+            "objectId": "p2_i45",
+            "shape": {
+                "text": {
+                    "textElements": [
+                        {
+                            "textRun": {
+                                "content": "Wendy Wu Tours UK | Q2 2026 | Summon\n"
+                            }
+                        }
+                    ]
+                }
+            },
+            "transform": _transform(50, 300),
+        },
+    ]
+    auction_elements = [
+        {
+            "objectId": "p29_i714",
+            "shape": {
+                "text": {
+                    "textElements": [
+                        {"textRun": {"content": "Non-Brand Auction Insights\n"}}
+                    ]
+                }
+            },
+            "transform": _transform(50, 50),
+        },
+        {
+            "objectId": "p29_i717",
+            "shape": {
+                "text": {
+                    "textElements": [
+                        {
+                            "textRun": {
+                                "content": "Q2 2026 | Summon Digital | Confidential\n"
+                            }
+                        }
+                    ]
+                }
+            },
+            "transform": _transform(50, 570),
+        },
+    ]
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
-        "slides": [{"objectId": "p1", "pageElements": page_elements}],
+        "slides": [
+            {"objectId": "p1", "pageElements": page_elements},
+            {"objectId": "p2", "pageElements": divider_elements},
+            {"objectId": "p29", "pageElements": auction_elements},
+        ],
     }
 
 
@@ -1870,6 +1997,19 @@ def _is_replace_text(request: dict, placeholder: str, value: str) -> bool:
         and replacement.get("containsText", {}).get("text") == placeholder
         and replacement.get("replaceText") == value
     )
+
+
+def _is_text_color_request(request: dict, object_id: str, rgb_color: dict) -> bool:
+    style_update = request.get("updateTextStyle")
+    if not style_update or style_update.get("objectId") != object_id:
+        return False
+    color = (
+        style_update.get("style", {})
+        .get("foregroundColor", {})
+        .get("opaqueColor", {})
+        .get("rgbColor")
+    )
+    return color == rgb_color
 
 
 def _size(width: float, height: float) -> dict:
