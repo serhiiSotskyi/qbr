@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -27,6 +28,10 @@ from src.google_slides_templates import GoogleSlidesTemplateRegistry
 from src.google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
 from src.monthly_google_slides_builder import build_wendy_wu_monthly_slides_payload
 from src.monthly_google_slides_builder import _send_batch_updates
+from src.automated_sources import (
+    generate_wightlink_plan_sheet_csv,
+    write_source_generation_manifest,
+)
 from src.olympic_monthly_google_slides_builder import (
     OLYMPIC_MONTHLY_TEMPLATE_MANIFEST,
     build_olympic_monthly_slides_payload,
@@ -41,6 +46,7 @@ from src.wendy_wu_qbr_google_slides_builder import (
 from src.wightlink_monthly_google_slides_builder import (
     build_wightlink_monthly_slides_payload,
 )
+from src.wightlink_qbr_google_slides_builder import build_wightlink_qbr_slides_payload
 from src.env_utils import load_env_file
 from src.report_artifacts import write_report_artifacts
 
@@ -137,6 +143,22 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         )
         self.assertEqual(json.loads(post_request["kwargs"]["data"])["type"], "anyone")
 
+    def test_workspace_client_reads_sheet_values_by_gid(self) -> None:
+        session = FakeSheetsSession()
+        client = GoogleWorkspaceClient(GoogleWorkspaceConfig(), session=session)
+        client._access_token = "test-access-token"
+
+        rows = client.read_sheet_values_by_gid("spreadsheet-id", "596378878", "A1:B2")
+
+        self.assertEqual(rows[0], ["Month", "Cost"])
+        self.assertTrue(
+            any(
+                "/values/%272026%2F27%20Middle%20Scenario%20Plan%27%21A1%3AB2"
+                in request["url"]
+                for request in session.requests
+            )
+        )
+
     def test_template_registry_supports_quarterly_and_wendy_wu_monthly(self) -> None:
         registry = GoogleSlidesTemplateRegistry()
 
@@ -144,6 +166,7 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         wwt_aus_quarterly = registry.status("wendy_wu_australia", "quarterly")
         wwt_uk_monthly = registry.status("wendy_wu", "monthly")
         wwt_aus_monthly = registry.status("wendy_wu_australia", "monthly")
+        wightlink_qbr = registry.status("wightlink", "quarterly")
         wightlink_monthly = registry.status("wightlink", "monthly")
         olympic_qbr = registry.status("olympic_holidays", "quarterly")
         olympic_monthly = registry.status("olympic_holidays", "monthly")
@@ -156,12 +179,57 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertTrue(wwt_uk_monthly["configured"])
         self.assertTrue(wwt_aus_monthly["supported"])
         self.assertTrue(wwt_aus_monthly["configured"])
+        self.assertTrue(wightlink_qbr["supported"])
+        self.assertTrue(wightlink_qbr["configured"])
         self.assertTrue(wightlink_monthly["supported"])
         self.assertTrue(wightlink_monthly["configured"])
         self.assertTrue(olympic_qbr["supported"])
         self.assertTrue(olympic_qbr["configured"])
         self.assertTrue(olympic_monthly["supported"])
         self.assertTrue(olympic_monthly["configured"])
+
+
+class WightlinkPlanSourceTests(unittest.TestCase):
+    def test_wightlink_plan_google_sheet_csv_updates_source_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_data = root / "source_data"
+            source_data.mkdir()
+            performance_csv = source_data / "performance.csv"
+            performance_csv.write_text("Date,Campaign Type,Data Type,Cost\n", encoding="utf-8")
+            manifest_path = write_source_generation_manifest(
+                request_dir=root,
+                client_config={"id": "wightlink", "name": "Wightlink"},
+                report_mode="quarterly",
+                period=None,
+                performance_csv_path=performance_csv,
+                trends_dir=None,
+                trends_ytd_current_dir=None,
+                trends_ytd_previous_dir=None,
+                other_campaigns_dir=None,
+                use_ga4_performance=True,
+                use_dataforseo_trends=False,
+            )
+
+            plan_path = generate_wightlink_plan_sheet_csv(
+                request_dir=root,
+                google_client=FakePlanGoogleClient(),
+                source_manifest_path=manifest_path,
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertTrue(plan_path.exists())
+            self.assertIn(
+                "PPC Middle Plan Scenario", plan_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["source_generation"]["generated_files"]["plan_workbook"],
+                "source_data/wightlink_plan_google_sheet.csv",
+            )
+            self.assertEqual(
+                manifest["source_generation"]["wightlink_plan"]["source"],
+                "google_sheets",
+            )
 
 
 class ReportArtifactTests(unittest.TestCase):
@@ -285,13 +353,14 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
             fake_client = FakeGoogleWorkspaceClient()
 
             result = generate_native_google_slides(
-                client_id="wightlink",
-                client_name="Wightlink",
+                client_id="generic_native_test",
+                client_name="Generic Native Test",
                 report_mode="quarterly",
                 request_dir=root,
                 report_artifacts_path=artifact_path,
                 google_client=fake_client,
                 workspace_config=_configured_workspace(),
+                template_registry=_generic_native_test_registry(),
                 export_pdf=True,
             )
             manifest = json.loads(
@@ -326,13 +395,14 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
             fake_client = FakeGoogleWorkspaceClient(raise_on_batch=True)
 
             result = generate_native_google_slides(
-                client_id="wightlink",
-                client_name="Wightlink",
+                client_id="generic_native_test",
+                client_name="Generic Native Test",
                 report_mode="quarterly",
                 request_dir=root,
                 report_artifacts_path=artifact_path,
                 google_client=fake_client,
                 workspace_config=_configured_workspace(),
+                template_registry=_generic_native_test_registry(),
                 export_pdf=False,
             )
             manifest = json.loads(
@@ -389,13 +459,14 @@ class NativeGoogleSlidesIntegrationTests(unittest.TestCase):
             artifact_path = _write_native_artifact(root, chart)
             try:
                 result = generate_native_google_slides(
-                    client_id="wightlink",
-                    client_name="Wightlink",
+                    client_id="generic_native_test",
+                    client_name="Generic Native Test",
                     report_mode="quarterly",
                     request_dir=root,
                     report_artifacts_path=artifact_path,
                     google_client=client,
                     workspace_config=config,
+                    template_registry=_generic_native_test_registry(),
                     export_pdf=True,
                     max_chart_assets=1,
                 )
@@ -1131,6 +1202,122 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(fake_client.permission_attempts, 2)
 
 
+class WightlinkQBRNativeSlidesTests(unittest.TestCase):
+    def test_qbr_payload_uses_ytd_trends_auction_and_google_sheet_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wightlink_qbr_artifact(root)
+
+            payload = build_wightlink_qbr_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+            )
+
+        self.assertEqual(payload["period"]["label"], "Q2 2026")
+        self.assertIn("Plan:", payload["shape_text"]["p12_i248"])
+        self.assertEqual(payload["tables"]["p8_i176"]["values"][0][0], "Source")
+        auction_sources = [
+            row[0] for row in payload["tables"]["p8_i176"]["values"][1:]
+        ]
+        self.assertIn("Google Ads", auction_sources)
+        self.assertIn("Microsoft Ads", auction_sources)
+        self.assertEqual(payload["tables"]["p9_i192"]["values"][0][3], "Change")
+        self.assertIn("DataForSEO", payload["shape_text"]["p4_i95"])
+        chart_ids = {image_id for image_id, _chart_key in payload["charts"]}
+        self.assertIn("p4_i103", chart_ids)
+        self.assertIn("p14_i341", chart_ids)
+        self.assertIn("p17_i440", chart_ids)
+        self.assertIn("PMax will naturally lose", payload["shape_text"]["p17_i441"])
+
+    def test_qbr_payload_finds_combined_auction_in_source_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wightlink_qbr_artifact(root)
+            shutil.copy(
+                root / "auction" / "combined_google_microsoft_auction_insights.csv",
+                root / "source_data" / "auction_insights_combined.csv",
+            )
+            shutil.rmtree(root / "auction")
+
+            payload = build_wightlink_qbr_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+            )
+
+        red_funnel_rows = payload["tables"]["p9_i192"]["values"]
+        self.assertEqual(red_funnel_rows[1][0], "Impression Share")
+        self.assertNotIn(
+            "Review required",
+            "\n".join(" ".join(row) for row in red_funnel_rows),
+        )
+
+    def test_qbr_native_slides_generate_table_chart_and_style_requests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wightlink_qbr_artifact(root)
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wightlink_qbr_presentation()
+            )
+
+            result = generate_native_google_slides(
+                client_id="wightlink",
+                client_name="Wightlink",
+                report_mode="quarterly",
+                request_dir=root,
+                report_artifacts_path=artifact_path,
+                google_client=fake_client,
+                workspace_config=_configured_workspace(),
+                export_pdf=True,
+            )
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(manifest["builder"], "wightlink_qbr_template_manifest")
+        self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId") == "p4_i103"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("insertText", {}).get("objectId") == "p8_i176"
+                and request["insertText"].get("cellLocation")
+                == {"rowIndex": 0, "columnIndex": 0}
+                and request["insertText"]["text"] == "Source"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId") == "p8_i176"
+                and request["updateTextStyle"].get("cellLocation")
+                == {"rowIndex": 0, "columnIndex": 0}
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId") == "p12_i248"
+                and request["updateTextStyle"]["style"]["foregroundColor"][
+                    "opaqueColor"
+                ]["rgbColor"]["red"]
+                == 0.42
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("deleteObject", {}).get("objectId") == "p9_i196"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+
 class OlympicQBRNativeSlidesTests(unittest.TestCase):
     def test_qbr_payload_uses_ytd_trends_and_cross_platform_auction(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1504,6 +1691,57 @@ class FakePermissionSession:
         raise AssertionError(f"Unexpected request: {method} {url}")
 
 
+class FakeSheetsSession:
+    def __init__(self) -> None:
+        self.requests: list[dict] = []
+
+    def request(self, method: str, url: str, **kwargs) -> "FakeResponse":
+        self.requests.append({"method": method, "url": url, "kwargs": kwargs})
+        if method == "GET" and url.endswith("/spreadsheets/spreadsheet-id"):
+            return FakeResponse(
+                {
+                    "sheets": [
+                        {
+                            "properties": {
+                                "sheetId": 596378878,
+                                "title": "2026/27 Middle Scenario Plan",
+                            }
+                        }
+                    ]
+                }
+            )
+        if method == "GET" and "/values/" in url:
+            return FakeResponse({"values": [["Month", "Cost"], ["April", "1000"]]})
+        raise AssertionError(f"Unexpected sheets request: {method} {url}")
+
+
+class FakePlanGoogleClient:
+    def read_sheet_values_by_gid(
+        self,
+        spreadsheet_id: str,
+        sheet_gid: str | int,
+        range_a1: str,
+    ) -> list[list[str]]:
+        return [
+            ["2026/27 Plan"],
+            ["PPC Middle Plan Scenario"],
+            [
+                "Month",
+                "Impressions",
+                "Clicks",
+                "CTR",
+                "CPC",
+                "Cost",
+                "Sales",
+                "CVR",
+                "CPA",
+                "Revenue",
+                "AOV",
+            ],
+            ["April", "100", "10", "10%", "£1", "10", "2", "20%", "£5", "100", "£50"],
+        ]
+
+
 class FakeResponse:
     def __init__(
         self,
@@ -1528,6 +1766,17 @@ def _configured_workspace() -> GoogleWorkspaceConfig:
         refresh_token="refresh",
         output_folder_id="output-folder",
         asset_folder_id="asset-folder",
+    )
+
+
+def _generic_native_test_registry() -> GoogleSlidesTemplateRegistry:
+    return GoogleSlidesTemplateRegistry(
+        {
+            ("generic_native_test", "quarterly"): {
+                "key": "generic_native_test",
+                "env_key": "GOOGLE_SLIDES_TEMPLATE_WIGHTLINK_QBR",
+            }
+        }
     )
 
 
@@ -1890,6 +2139,86 @@ def _write_wightlink_monthly_artifact(root: Path) -> Path:
         "report_mode": "monthly",
         "period": {"label": "Jun 2026", "subtitle": "Jun 2026 (YTD Jan - Jun 2026)"},
         "source_files": {},
+        "slides": [],
+        "charts": [],
+    }
+    artifact_path = root / "report_artifacts.json"
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    return artifact_path
+
+
+def _write_wightlink_qbr_artifact(root: Path) -> Path:
+    fixture = Path(__file__).resolve().parent / "fixtures" / "wightlink_v2_sample_inputs"
+    source_data = root / "source_data"
+    trends_current = source_data / "trends_ytd_current"
+    trends_previous = source_data / "trends_ytd_previous"
+    auction_google = root / "auction" / "google_ads"
+    auction_microsoft = root / "auction" / "microsoft_ads"
+    plan_dir = root / "plan"
+    trends_current.mkdir(parents=True, exist_ok=True)
+    trends_previous.mkdir(parents=True, exist_ok=True)
+    auction_google.mkdir(parents=True, exist_ok=True)
+    auction_microsoft.mkdir(parents=True, exist_ok=True)
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    performance_csv = source_data / "performance.csv"
+    shutil.copy(fixture / "performance_daily_over_year_sample.csv", performance_csv)
+
+    term_files = {
+        "Wightlink Ferries": "wightlink_ferries",
+        "Isle of Wight Ferry": "isle_of_wight_ferry",
+        "Isle of Wight Holidays": "isle_of_wight_holidays",
+    }
+    current_template = (
+        fixture / "google_trends_wightlink_ferries_current_ytd_sample.csv"
+    ).read_text(encoding="utf-8")
+    previous_template = (
+        fixture / "google_trends_wightlink_ferries_previous_ytd_sample.csv"
+    ).read_text(encoding="utf-8")
+    for term, slug in term_files.items():
+        (trends_current / f"{slug}.csv").write_text(
+            current_template.replace("Wightlink Ferries", term),
+            encoding="utf-8",
+        )
+        (trends_previous / f"{slug}.csv").write_text(
+            previous_template.replace("Wightlink Ferries", term),
+            encoding="utf-8",
+        )
+
+    shutil.copy(fixture / "auction_insights.csv", auction_google / "google.csv")
+    shutil.copy(fixture / "auction_insights.csv", auction_microsoft / "microsoft.csv")
+    from src.auction_sources import write_cross_platform_auction_csv
+
+    write_cross_platform_auction_csv(
+        {
+            "Google Ads": auction_google / "google.csv",
+            "Microsoft Ads": auction_microsoft / "microsoft.csv",
+        },
+        root / "auction" / "combined_google_microsoft_auction_insights.csv",
+    )
+    plan_path = plan_dir / "wightlink_plan.csv"
+    shutil.copy(fixture / "wightlink_plan_2026_27_middle_scenario.csv", plan_path)
+    manifest_path = write_source_generation_manifest(
+        request_dir=root,
+        client_config={"id": "wightlink", "name": "Wightlink"},
+        report_mode="quarterly",
+        period=None,
+        performance_csv_path=performance_csv,
+        trends_dir=None,
+        trends_ytd_current_dir=trends_current,
+        trends_ytd_previous_dir=trends_previous,
+        plan_workbook_path=plan_path,
+        other_campaigns_dir=None,
+        use_ga4_performance=True,
+        use_dataforseo_trends=True,
+    )
+    artifact = {
+        "client_id": "wightlink",
+        "client_name": "Wightlink",
+        "report_mode": "quarterly",
+        "period": {"label": "Q2 2026", "subtitle": "Q2 2026 (Apr - Jun 2026)"},
+        "source_files": {
+            "source_generation_manifest": str(manifest_path.relative_to(root))
+        },
         "slides": [],
         "charts": [],
     }
@@ -2312,6 +2641,77 @@ def _fake_wightlink_monthly_presentation(existing_rows: int = 8) -> dict:
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
         "slides": [{"objectId": "p3", "pageElements": page_elements}],
+    }
+
+
+def _fake_wightlink_qbr_presentation(existing_rows: int = 7) -> dict:
+    manifest_path = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "google_slides_templates"
+        / "wightlink_qbr_test_template.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    text_ids: set[str] = set(manifest.get("force_white_text_ids") or [])
+    text_ids.update(str(item) for item in manifest.get("muted_dark_text_ids") or [])
+    text_ids.update(str(item) for item in manifest.get("delete_object_ids") or [])
+    table_ids = set(manifest.get("table_header_ids") or [])
+    image_ids: set[str] = set()
+    for slide in manifest.get("slides", {}).values():
+        if not isinstance(slide, dict):
+            continue
+        for key, value in slide.items():
+            if key.endswith("_id") and isinstance(value, str):
+                if key == "table_id":
+                    table_ids.add(value)
+                elif key == "chart_id":
+                    image_ids.add(value)
+                else:
+                    text_ids.add(value)
+            elif key.endswith("_ids") and isinstance(value, list):
+                if key == "chart_ids":
+                    image_ids.update(str(item) for item in value)
+                else:
+                    text_ids.update(str(item) for item in value)
+    page_elements = []
+    for object_id in sorted(text_ids):
+        page_elements.append(
+            {
+                "objectId": object_id,
+                "shape": {
+                    "text": {"textElements": [{"textRun": {"content": "old\n"}}]}
+                },
+                "size": _size(160, 30),
+                "transform": _transform(40, 30),
+            }
+        )
+    for table_id in sorted(table_ids):
+        page_elements.append(
+            {
+                "objectId": table_id,
+                "table": {
+                    "rows": existing_rows,
+                    "columns": 7,
+                    "tableColumns": [
+                        {"columnWidth": {"magnitude": 600000, "unit": "EMU"}}
+                        for _ in range(7)
+                    ],
+                },
+                "transform": _transform(100, 140),
+            }
+        )
+    for image_id in sorted(image_ids):
+        page_elements.append(
+            {
+                "objectId": image_id,
+                "image": {"contentUrl": "https://example.com/old.png"},
+                "size": _size(320, 180),
+                "transform": _transform(120, 190),
+            }
+        )
+    return {
+        "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
+        "slides": [{"objectId": "p1", "pageElements": page_elements}],
     }
 
 

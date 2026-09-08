@@ -30,9 +30,11 @@ from src.automated_sources import (
     dataforseo_source_status,
     default_source_period,
     ga4_source_status,
+    generate_wightlink_plan_sheet_csv,
     prepare_automated_source_inputs,
     resolve_ga4_property_id,
     supports_ga4_source,
+    update_source_generation_manifest_with_plan,
     validate_generated_ga4_performance_source,
 )
 from src.config_loader import ConfigLoader
@@ -70,7 +72,10 @@ def main() -> None:
     )
     use_cross_platform_auction = (
         report_mode == "quarterly"
-        and (client_id in WENDY_WU_CLIENT_IDS or client_id == "olympic_holidays")
+        and (
+            client_id in WENDY_WU_CLIENT_IDS
+            or client_id in {"wightlink", "olympic_holidays"}
+        )
     )
     auction_file = None
     google_auction_file = None
@@ -79,6 +84,8 @@ def main() -> None:
         if use_cross_platform_auction:
             if client_id == "olympic_holidays":
                 upload_label = "Olympic Holidays"
+            elif client_id == "wightlink":
+                upload_label = "Wightlink"
             else:
                 market_label = "UK" if client_id == "wendy_wu" else "Australia"
                 upload_label = f"Wendy Wu {market_label}"
@@ -104,13 +111,18 @@ def main() -> None:
         plan_workbook_file = st.file_uploader(
             "Wightlink Plan Sheet CSV or Workbook",
             type=["csv", "xlsx"],
-            help="Manual plan workbook remains required where plan comparisons are needed.",
+            help="Optional fallback. If omitted on Wightlink QBR, the app reads the 2026/27 Middle Scenario Plan from Google Sheets.",
         )
         if report_mode == "quarterly":
-            red_funnel_auction_file = st.file_uploader(
-                "Wightlink Red Funnel quarter Auction Insights CSV",
-                type=["csv"],
-            )
+            if use_cross_platform_auction:
+                st.caption(
+                    "The Red Funnel current-quarter slide uses the combined Google Ads + Microsoft Ads auction source above."
+                )
+            else:
+                red_funnel_auction_file = st.file_uploader(
+                    "Wightlink Red Funnel quarter Auction Insights CSV",
+                    type=["csv"],
+                )
             red_funnel_prior_auction_file = st.file_uploader(
                 "Wightlink Red Funnel prior-year quarter Auction Insights CSV",
                 type=["csv"],
@@ -187,6 +199,27 @@ def main() -> None:
             st.error(str(exc))
             st.code(traceback.format_exc(), language="python")
             return
+
+        source_manifest = automated_paths.source_manifest_path
+        if client_id == "wightlink":
+            if plan_workbook_path:
+                update_source_generation_manifest_with_plan(
+                    manifest_path=source_manifest or request_dir / "source_data" / "SOURCE_GENERATION_MANIFEST.json",
+                    request_dir=request_dir,
+                    plan_workbook_path=plan_workbook_path,
+                    source="manual_upload",
+                )
+            else:
+                try:
+                    generated_plan_path = generate_wightlink_plan_sheet_csv(
+                        request_dir=request_dir,
+                        source_manifest_path=source_manifest,
+                    )
+                    plan_workbook_path = str(generated_plan_path)
+                except AutomatedSourceError as exc:
+                    st.warning(str(exc))
+            if report_mode == "quarterly" and auction_path and not red_funnel_auction_path:
+                red_funnel_auction_path = auction_path
 
         perf_path = (
             str(automated_paths.performance_csv_path)
@@ -292,7 +325,6 @@ def main() -> None:
                     build_presentation_prompt(client_id, report_mode=report_mode),
                     encoding="utf-8",
                 )
-                source_manifest = automated_paths.source_manifest_path
                 report_artifacts_path = write_report_artifacts(
                     client_id=client_id,
                     client_name=selected_client["name"],
@@ -460,6 +492,21 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
             "report_generator.pipelines.wightlink_monthly_pipeline",
             "src.monthly_google_slides_builder",
             "src.wightlink_monthly_google_slides_builder",
+            "src.google_slides_builder",
+            "main",
+        ]
+    if client_id == "wightlink" and report_mode == "quarterly":
+        module_names = [
+            "src.automated_sources",
+            "src.auction_sources",
+            "src.source_normalizers",
+            "report_generator.parsers.wightlink_performance_common",
+            "report_generator.parsers.wightlink_performance_parser",
+            "report_generator.parsers.wightlink_ytd_parser",
+            "report_generator.parsers.wightlink_auction_parser",
+            "report_generator.parsers.wightlink_plan_parser",
+            "report_generator.pipelines.wightlink_pipeline",
+            "src.wightlink_qbr_google_slides_builder",
             "src.google_slides_builder",
             "main",
         ]
@@ -719,6 +766,11 @@ def _render_source_status(
                 "end": period.end.strftime("%Y-%m-%d"),
             },
             "trends_api_enabled_for_selection": trends_enabled,
+            "wightlink_plan_source": (
+                "Google Sheets 2026/27 Middle Scenario Plan, with manual CSV/XLSX fallback"
+                if client_id == "wightlink"
+                else "not_applicable"
+            ),
             "native_google_slides": {
                 "workspace_credentials": slides_status.get(
                     "google_workspace_credentials", "missing"

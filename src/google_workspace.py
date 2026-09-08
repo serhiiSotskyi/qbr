@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
@@ -391,6 +392,51 @@ class GoogleWorkspaceClient:
             timeout=60,
         )
         return response.json()
+
+    def get_spreadsheet_metadata(self, spreadsheet_id: str) -> dict[str, Any]:
+        response = self._request(
+            "GET",
+            f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}",
+            headers=self._headers(content_type=None),
+            params={"fields": "sheets(properties(sheetId,title,index))"},
+            timeout=60,
+        )
+        return response.json()
+
+    def read_sheet_values(
+        self,
+        spreadsheet_id: str,
+        range_name: str,
+    ) -> list[list[Any]]:
+        encoded_range = quote(range_name, safe="")
+        response = self._request(
+            "GET",
+            f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{encoded_range}",
+            headers=self._headers(content_type=None),
+            timeout=60,
+        )
+        return list(response.json().get("values") or [])
+
+    def read_sheet_values_by_gid(
+        self,
+        spreadsheet_id: str,
+        sheet_gid: str | int,
+        range_a1: str = "A1:AB1000",
+    ) -> list[list[Any]]:
+        metadata = self.get_spreadsheet_metadata(spreadsheet_id)
+        gid = str(sheet_gid)
+        for sheet in metadata.get("sheets") or []:
+            properties = sheet.get("properties") or {}
+            if str(properties.get("sheetId")) != gid:
+                continue
+            title = str(properties.get("title") or "").replace("'", "''")
+            return self.read_sheet_values(
+                spreadsheet_id,
+                f"'{title}'!{range_a1}",
+            )
+        raise GoogleWorkspaceError(
+            f"Google Sheet tab with gid {sheet_gid} was not found in spreadsheet {spreadsheet_id}."
+        )
 
     def batch_update_presentation(
         self, presentation_id: str, requests_body: list[dict[str, Any]]

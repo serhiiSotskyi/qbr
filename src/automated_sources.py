@@ -4,6 +4,7 @@ import json
 import os
 import re
 import base64
+import csv
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,9 @@ GA4_RUN_REPORT_URL = "https://analyticsdata.googleapis.com/v1beta/properties/{pr
 DATAFORSEO_TRENDS_URL = "https://api.dataforseo.com/v3/keywords_data/google_trends/explore/live"
 PAID_CHANNEL_GROUPS = ("Paid Search", "Cross-network")
 WIGHTLINK_TREND_TERMS = ("Wightlink Ferries", "Isle of Wight Ferry", "Isle of Wight Holidays")
+WIGHTLINK_PLAN_SPREADSHEET_ID = "18w3DWmDtJ5plGWuzHjGNnnQ-M-uvyCrhIBKeaSTOl9Q"
+WIGHTLINK_PLAN_SHEET_GID = "596378878"
+WIGHTLINK_PLAN_RANGE_A1 = "A1:AB1000"
 
 
 CLIENT_SOURCE_RULES: dict[str, dict[str, Any]] = {
@@ -104,6 +108,7 @@ class AutomatedSourcePaths:
     trends_dir: Path | None = None
     trends_ytd_current_dir: Path | None = None
     trends_ytd_previous_dir: Path | None = None
+    plan_workbook_path: Path | None = None
     other_campaigns_dir: Path | None = None
     source_data_dir: Path | None = None
     raw_api_dir: Path | None = None
@@ -206,8 +211,8 @@ def prepare_automated_source_inputs(
     client_config: dict[str, Any],
     report_mode: str,
     performance_csv_path: str | Path | None,
-    use_ga4_performance: bool,
-    use_dataforseo_trends: bool,
+    use_ga4_performance: bool = False,
+    use_dataforseo_trends: bool = False,
 ) -> AutomatedSourcePaths:
     project_root = Path(project_root)
     request_dir = Path(request_dir)
@@ -252,6 +257,7 @@ def prepare_automated_source_inputs(
         trends_dir=generated_trends.trends_dir,
         trends_ytd_current_dir=generated_trends.trends_ytd_current_dir,
         trends_ytd_previous_dir=generated_trends.trends_ytd_previous_dir,
+        plan_workbook_path=None,
         other_campaigns_dir=generated_other_campaigns,
         use_ga4_performance=use_ga4_performance,
         use_dataforseo_trends=use_dataforseo_trends,
@@ -262,11 +268,113 @@ def prepare_automated_source_inputs(
         trends_dir=generated_trends.trends_dir,
         trends_ytd_current_dir=generated_trends.trends_ytd_current_dir,
         trends_ytd_previous_dir=generated_trends.trends_ytd_previous_dir,
+        plan_workbook_path=None,
         other_campaigns_dir=generated_other_campaigns,
         source_data_dir=source_data_dir,
         raw_api_dir=raw_api_dir,
         source_manifest_path=source_manifest_path,
     )
+
+
+def generate_wightlink_plan_sheet_csv(
+    *,
+    request_dir: str | Path,
+    google_client: Any | None = None,
+    spreadsheet_id: str | None = None,
+    sheet_gid: str | int | None = None,
+    range_a1: str | None = None,
+    source_manifest_path: str | Path | None = None,
+) -> Path:
+    request_path = Path(request_dir)
+    source_data_dir = request_path / "source_data"
+    source_data_dir.mkdir(parents=True, exist_ok=True)
+    output_path = source_data_dir / "wightlink_plan_google_sheet.csv"
+    resolved_spreadsheet_id = (
+        spreadsheet_id
+        or os.getenv("WIGHTLINK_PLAN_SPREADSHEET_ID")
+        or WIGHTLINK_PLAN_SPREADSHEET_ID
+    )
+    resolved_gid = (
+        sheet_gid or os.getenv("WIGHTLINK_PLAN_SHEET_GID") or WIGHTLINK_PLAN_SHEET_GID
+    )
+    resolved_range = (
+        range_a1 or os.getenv("WIGHTLINK_PLAN_RANGE_A1") or WIGHTLINK_PLAN_RANGE_A1
+    )
+
+    try:
+        if google_client is None:
+            from .google_workspace import GoogleWorkspaceClient, GoogleWorkspaceConfig
+
+            google_client = GoogleWorkspaceClient(GoogleWorkspaceConfig.from_env())
+        rows = google_client.read_sheet_values_by_gid(
+            resolved_spreadsheet_id,
+            resolved_gid,
+            resolved_range,
+        )
+    except Exception as exc:  # noqa: BLE001 - returned to Streamlit as a clear fallback warning
+        raise AutomatedSourceError(
+            f"Wightlink plan Google Sheet could not be read; upload the plan CSV/XLSX fallback. {exc}"
+        ) from exc
+
+    if not rows:
+        raise AutomatedSourceError(
+            "Wightlink plan Google Sheet returned no rows; upload the plan CSV/XLSX fallback."
+        )
+
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows(rows)
+
+    manifest_path = Path(source_manifest_path) if source_manifest_path else request_path / "source_data" / "SOURCE_GENERATION_MANIFEST.json"
+    if manifest_path.exists():
+        update_source_generation_manifest_with_plan(
+            manifest_path=manifest_path,
+            request_dir=request_path,
+            plan_workbook_path=output_path,
+            source="google_sheets",
+            spreadsheet_id=resolved_spreadsheet_id,
+            sheet_gid=str(resolved_gid),
+            range_a1=resolved_range,
+        )
+    return output_path
+
+
+def update_source_generation_manifest_with_plan(
+    *,
+    manifest_path: str | Path,
+    request_dir: str | Path,
+    plan_workbook_path: str | Path,
+    source: str,
+    spreadsheet_id: str | None = None,
+    sheet_gid: str | None = None,
+    range_a1: str | None = None,
+) -> Path:
+    manifest_file = Path(manifest_path)
+    request_path = Path(request_dir)
+    try:
+        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        manifest = {"source_generation": {}}
+    generation = manifest.setdefault("source_generation", {})
+    generated_files = generation.setdefault("generated_files", {})
+    generated_files["plan_workbook"] = _relative_path(plan_workbook_path, request_path)
+    generation["wightlink_plan"] = {
+        "enabled": True,
+        "source": source,
+        "spreadsheet_id": spreadsheet_id,
+        "sheet_gid": sheet_gid,
+        "range_a1": range_a1,
+        "normalized_csv": generated_files["plan_workbook"],
+    }
+    notes = generation.setdefault("notes", [])
+    plan_note = (
+        "Wightlink plan source was pulled from Google Sheets."
+        if source == "google_sheets"
+        else "Wightlink plan source was supplied as a manual upload fallback."
+    )
+    if plan_note not in notes:
+        notes.append(plan_note)
+    _write_json(manifest_file, manifest)
+    return manifest_file
 
 
 def validate_generated_ga4_performance_source(
@@ -831,7 +939,8 @@ def write_source_generation_manifest(
     trends_dir: str | Path | None,
     trends_ytd_current_dir: str | Path | None,
     trends_ytd_previous_dir: str | Path | None,
-    other_campaigns_dir: str | Path | None,
+    plan_workbook_path: str | Path | None = None,
+    other_campaigns_dir: str | Path | None = None,
     use_ga4_performance: bool,
     use_dataforseo_trends: bool,
 ) -> Path:
@@ -842,6 +951,7 @@ def write_source_generation_manifest(
         "trends_dir": _relative_path(trends_dir, request_path),
         "trends_ytd_current_dir": _relative_path(trends_ytd_current_dir, request_path),
         "trends_ytd_previous_dir": _relative_path(trends_ytd_previous_dir, request_path),
+        "plan_workbook": _relative_path(plan_workbook_path, request_path),
         "other_campaigns_dir": _relative_path(other_campaigns_dir, request_path),
     }
     manifest = {
@@ -871,7 +981,8 @@ def write_source_generation_manifest(
             "generated_files": generated_files,
             "notes": [
                 "Performance and Google Trends source files were generated by APIs in the Streamlit test page.",
-                "Auction Insights, Wightlink plan workbooks, and optional Other campaign files remain manual uploads.",
+                "Auction Insights and optional Other campaign files remain manual uploads.",
+                "Wightlink plan workbooks are pulled from Google Sheets when configured, with manual upload fallback.",
                 "Secrets and tokens are intentionally excluded from this manifest.",
             ],
         }
@@ -1797,11 +1908,13 @@ __all__ = [
     "ga4_source_status",
     "generate_dataforseo_trend_csvs",
     "generate_ga4_performance_csv",
+    "generate_wightlink_plan_sheet_csv",
     "prepare_automated_source_inputs",
     "resolve_ga4_property_id",
     "resolve_trend_terms",
     "supports_ga4_source",
     "summarize_validation_deltas",
+    "update_source_generation_manifest_with_plan",
     "validate_generated_ga4_performance_source",
     "validate_generated_performance_against_fixture",
     "write_source_generation_manifest",

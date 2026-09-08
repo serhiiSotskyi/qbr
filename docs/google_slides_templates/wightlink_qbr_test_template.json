@@ -1,0 +1,184 @@
+{
+  "schema_version": "1.0",
+  "created_at": "2026-09-08",
+  "template_name": "Wightlink QBR Native Slides Template - TEST",
+  "source_presentation_id": "1Jvha79yeIn0pGqGasLf08jqER5-SSAEO7Te_BJDptMc",
+  "template_presentation_id": "1BFtXTYytY_jmQrTgw1FZLQdxTSDH1nFtPEmOWFfF5lE",
+  "template_url": "https://docs.google.com/presentation/d/1BFtXTYytY_jmQrTgw1FZLQdxTSDH1nFtPEmOWFfF5lE/edit",
+  "drive_folder_id": "1zKQMBP1fFgBH6fF6EwGZBIkXxXH1FROM",
+  "client_id": "wightlink",
+  "client_name": "Wightlink",
+  "report_mode": "quarterly",
+  "status": "prototype_template_created",
+  "generation_rules": {
+    "data_sources": {
+      "performance": "GA4 API generated performance.csv on API Source Test, or manual Performance CSV on the main page.",
+      "trends": "DataForSEO Google Trends API on API Source Test, current YTD versus prior-year YTD through the QBR quarter end.",
+      "auction_insights": "Manual Google Ads and Microsoft Ads Auction Insights CSV uploads for the same QBR period.",
+      "plan": "Google Sheets 2026/27 Middle Scenario Plan is pulled automatically where Workspace OAuth has Sheets scope; manual CSV/XLSX upload is the fallback."
+    },
+    "original_deck_rule": "The source presentation is never edited. The app copies this template deck and edits the copy.",
+    "chart_rule": "Trend and YTD breakdown chart slots use line-only charts. Monthly purchase/revenue and purchases YoY slots use bar-only charts.",
+    "style_rule": "Dark headers, title slides, and table header rows are explicitly restyled to white text. Cost/spend comparison text stays neutral grey."
+  },
+  "source_comments_applied": [
+    {
+      "source_slide_id": "p17",
+      "instruction": "Spend deltas are neutral. PMax commentary should focus on comparison to generics and the fact PMax will lose winners as performers are added to generics."
+    }
+  ],
+  "full_dark_slide_ids": ["p1", "p3", "p7", "p11", "p20", "p23", "p25", "p27"],
+  "table_header_ids": ["p8_i176", "p9_i192"],
+  "delete_object_ids": ["p9_i196"],
+  "force_white_text_ids": [
+    "p1_i16", "p1_i17", "p1_i20", "p1_i22", "p1_i25", "p1_i28", "p1_i31", "p1_i33",
+    "p2_i40", "p3_i82", "p4_i90", "p4_i98", "p5_i111", "p5_i117", "p5_i124",
+    "p6_i136", "p6_i141", "p6_i145", "p7_i163", "p8_i171", "p9_i185",
+    "p10_i205", "p11_i231", "p12_i239", "p13_i289", "p14_i333", "p15_i347",
+    "p16_i391", "p17_i405", "p18_i449", "p19_i463", "p20_i487", "p21_i495",
+    "p22_i584", "p23_i637", "p24_i645", "p25_i683", "p26_i693", "p27_i717"
+  ],
+  "muted_dark_text_ids": [
+    "p1_i19", "p2_i41", "p3_i83", "p4_i91", "p4_i94", "p4_i99", "p4_i102",
+    "p5_i112", "p5_i115", "p5_i118", "p5_i121", "p5_i125", "p6_i137",
+    "p6_i139", "p6_i142", "p6_i146", "p7_i164", "p8_i172", "p8_i175",
+    "p9_i186", "p9_i189", "p10_i209", "p11_i232", "p12_i240", "p12_i243",
+    "p13_i290", "p13_i293", "p14_i334", "p14_i337", "p15_i348", "p15_i351",
+    "p16_i392", "p16_i395", "p17_i406", "p17_i409", "p18_i450", "p18_i453",
+    "p19_i467", "p20_i488", "p21_i499", "p22_i582", "p23_i638", "p24_i648",
+    "p25_i684", "p26_i696", "p27_i718"
+  ],
+  "slides": {
+    "cover": {
+      "slide_id": "p1",
+      "title_id": "p1_i16",
+      "report_type_id": "p1_i17",
+      "period_id": "p1_i19",
+      "prepared_id": "p1_i20",
+      "purchases_id": "p1_i22",
+      "cost_id": "p1_i25",
+      "roas_id": "p1_i28",
+      "revenue_id": "p1_i31",
+      "footer_id": "p1_i33"
+    },
+    "agenda": {
+      "slide_id": "p2",
+      "title_id": "p2_i40",
+      "subtitle_id": "p2_i41",
+      "footer_id": "p2_i44"
+    },
+    "trend_wightlink_ferries": {
+      "slide_id": "p4",
+      "title_ids": ["p4_i90", "p4_i98"],
+      "subtitle_ids": ["p4_i91", "p4_i99"],
+      "source_id": "p4_i95",
+      "insights_id": "p4_i96",
+      "chart_id": "p4_i103",
+      "term": "Wightlink Ferries"
+    },
+    "trend_isle_of_wight_ferry": {
+      "slide_id": "p5",
+      "title_ids": ["p5_i111", "p5_i117", "p5_i124"],
+      "subtitle_ids": ["p5_i112", "p5_i118", "p5_i125"],
+      "source_id": "p5_i122",
+      "insights_id": "p5_i128",
+      "chart_id": "p5_i127",
+      "term": "Isle of Wight Ferry"
+    },
+    "trend_isle_of_wight_holidays": {
+      "slide_id": "p6",
+      "title_ids": ["p6_i136", "p6_i141", "p6_i145"],
+      "subtitle_ids": ["p6_i137", "p6_i142", "p6_i146"],
+      "source_id": "p6_i139",
+      "insights_id": "p6_i149",
+      "chart_id": "p6_i148",
+      "term": "Isle of Wight Holidays"
+    },
+    "auction_generic": {
+      "slide_id": "p8",
+      "title_id": "p8_i171",
+      "subtitle_id": "p8_i172",
+      "footer_id": "p8_i175",
+      "table_id": "p8_i176",
+      "insights_id": "p8_i177"
+    },
+    "auction_red_funnel": {
+      "slide_id": "p9",
+      "title_id": "p9_i185",
+      "subtitle_id": "p9_i186",
+      "footer_id": "p9_i189",
+      "table_id": "p9_i192",
+      "insights_id": "p9_i191"
+    },
+    "creative_review": {
+      "slide_id": "p10",
+      "title_id": "p10_i205",
+      "footer_id": "p10_i209",
+      "body_id": "p10_i211"
+    },
+    "all_performance": {
+      "slide_id": "p12",
+      "title_id": "p12_i239",
+      "subtitle_id": "p12_i240",
+      "footer_id": "p12_i243",
+      "value_ids": ["p12_i247", "p12_i253", "p12_i259", "p12_i265", "p12_i271", "p12_i277"],
+      "delta_ids": ["p12_i248", "p12_i254", "p12_i260", "p12_i266", "p12_i272", "p12_i278"],
+      "chart_id": "g3f31bd1d44f_0_3",
+      "insights_id": "p12_i281"
+    },
+    "brand_performance": {
+      "slide_id": "p13",
+      "title_id": "p13_i289",
+      "subtitle_id": "p13_i290",
+      "footer_id": "p13_i293",
+      "value_ids": ["p13_i297", "p13_i302", "p13_i307", "p13_i312", "p13_i317", "p13_i322"],
+      "delta_ids": ["p13_i298", "p13_i303", "p13_i308", "p13_i313", "p13_i318", "p13_i323"],
+      "chart_id": "p13_i324",
+      "insights_id": "p13_i325"
+    },
+    "brand_monthly_breakdown": {
+      "slide_id": "p14",
+      "title_id": "p14_i333",
+      "subtitle_id": "p14_i334",
+      "footer_id": "p14_i337",
+      "insights_id": "p14_i339",
+      "chart_ids": ["p14_i341", "p14_i342"]
+    },
+    "generic_performance": {
+      "slide_id": "p15",
+      "title_id": "p15_i347",
+      "subtitle_id": "p15_i348",
+      "footer_id": "p15_i351",
+      "value_ids": ["p15_i355", "p15_i360", "p15_i365", "p15_i370", "p15_i375", "p15_i380"],
+      "delta_ids": ["p15_i356", "p15_i361", "p15_i366", "p15_i371", "p15_i376", "p15_i381"],
+      "chart_id": "p15_i382",
+      "insights_id": "p15_i383"
+    },
+    "generic_monthly_breakdown": {
+      "slide_id": "p16",
+      "title_id": "p16_i391",
+      "subtitle_id": "p16_i392",
+      "footer_id": "p16_i395",
+      "insights_id": "p16_i397",
+      "chart_ids": ["p16_i399", "p16_i400"]
+    },
+    "pmax_performance": {
+      "slide_id": "p17",
+      "title_id": "p17_i405",
+      "subtitle_id": "p17_i406",
+      "footer_id": "p17_i409",
+      "value_ids": ["p17_i413", "p17_i418", "p17_i423", "p17_i428", "p17_i433", "p17_i438"],
+      "delta_ids": ["p17_i414", "p17_i419", "p17_i424", "p17_i429", "p17_i434", "p17_i439"],
+      "chart_id": "p17_i440",
+      "insights_id": "p17_i441"
+    },
+    "pmax_monthly_breakdown": {
+      "slide_id": "p18",
+      "title_id": "p18_i449",
+      "subtitle_id": "p18_i450",
+      "footer_id": "p18_i453",
+      "insights_id": "p18_i455",
+      "chart_ids": ["p18_i457", "p18_i458"]
+    }
+  }
+}

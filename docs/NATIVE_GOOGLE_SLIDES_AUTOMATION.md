@@ -65,3 +65,25 @@ API-generated PNG charts.
 WWT AUS monthly and Wightlink monthly are also enabled with their approved
 template manifests. Olympic monthly and annual native Google Slides generation
 remain disabled until matching approved template mappings are added.
+
+## Wightlink QBR Template
+
+Wightlink QBR native Slides generation is enabled on API Source Test using a
+copied template deck, not the original example deck:
+
+- Template: `https://docs.google.com/presentation/d/1BFtXTYytY_jmQrTgw1FZLQdxTSDH1nFtPEmOWFfF5lE/edit`
+- Manifest: `docs/google_slides_templates/wightlink_qbr_test_template.json`
+
+The Wightlink QBR flow uses API-generated GA4 performance data, DataForSEO
+trend CSVs, manually uploaded Google and Microsoft Auction Insights for the same
+quarter, and the Wightlink plan from Google Sheets. A manual plan CSV/XLSX
+upload remains available as a fallback if Sheets access is unavailable.
+
+Template-specific safeguards are applied during generation:
+
+- dark header/title text is forced to white
+- spend/cost comparison deltas are forced to grey
+- trend and YTD comparison charts are line-only
+- purchases/revenue charts are bar-only
+- current-quarter auction insights combine Google and Microsoft uploads while
+  keeping platform rows separate

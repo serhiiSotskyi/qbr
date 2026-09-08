@@ -22,6 +22,7 @@ from claude_handoff import (
 from main import run_report, run_text_report
 from notion_memory import NotionMemoryError, notion_save_key, save_report_to_notion
 from presentation_prompt_builder import build_presentation_prompt
+from src.automated_sources import AutomatedSourceError, generate_wightlink_plan_sheet_csv
 from src.auction_sources import write_cross_platform_auction_csv
 from src.env_utils import load_env_file, load_streamlit_secrets_into_env
 
@@ -343,7 +344,10 @@ def main() -> None:
     )
     use_cross_platform_auction = (
         report_mode == "quarterly"
-        and (client_id in WENDY_WU_CLIENT_IDS or client_id == "olympic_holidays")
+        and (
+            client_id in WENDY_WU_CLIENT_IDS
+            or client_id in {"wightlink", "olympic_holidays"}
+        )
     )
     auction_file = None
     google_auction_file = None
@@ -352,6 +356,8 @@ def main() -> None:
         if use_cross_platform_auction:
             if client_id == "olympic_holidays":
                 upload_label = "Olympic Holidays"
+            elif client_id == "wightlink":
+                upload_label = "Wightlink"
             else:
                 market_label = "UK" if client_id == "wendy_wu" else "Australia"
                 upload_label = f"Wendy Wu {market_label}"
@@ -385,7 +391,7 @@ def main() -> None:
         plan_workbook_file = st.file_uploader(
             "Wightlink Plan Sheet CSV or Workbook",
             type=["csv", "xlsx"],
-            help="Use the 2026/27 Middle Scenario Plan export. The app reads the first PPC Middle Plan Scenario table only.",
+            help="Optional fallback. If omitted, the app reads the 2026/27 Middle Scenario Plan from Google Sheets where credentials are configured.",
         )
         if report_mode == "quarterly":
             trends_current_ytd_files = st.file_uploader(
@@ -400,11 +406,16 @@ def main() -> None:
                 accept_multiple_files=True,
                 help="Upload matching prior-year YTD files for the same three Google Trends terms.",
             )
-            red_funnel_auction_file = st.file_uploader(
-                "Wightlink Red Funnel quarter Auction Insights CSV",
-                type=["csv"],
-                help="Quarter-only Auction Insights export for the report quarter. Used for the added Red Funnel Quarter slide.",
-            )
+            if use_cross_platform_auction:
+                st.caption(
+                    "The Red Funnel current-quarter slide uses the combined Google Ads + Microsoft Ads auction source above."
+                )
+            else:
+                red_funnel_auction_file = st.file_uploader(
+                    "Wightlink Red Funnel quarter Auction Insights CSV",
+                    type=["csv"],
+                    help="Quarter-only Auction Insights export for the report quarter. Used for the added Red Funnel Quarter slide.",
+                )
             red_funnel_prior_auction_file = st.file_uploader(
                 "Wightlink Red Funnel prior-year quarter Auction Insights CSV",
                 type=["csv"],
@@ -475,6 +486,16 @@ def main() -> None:
         )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
+        if client_id == "wightlink":
+            if not plan_workbook_path:
+                try:
+                    plan_workbook_path = str(
+                        generate_wightlink_plan_sheet_csv(request_dir=request_dir)
+                    )
+                except AutomatedSourceError as exc:
+                    st.warning(str(exc))
+            if report_mode == "quarterly" and auction_path and not red_funnel_auction_path:
+                red_funnel_auction_path = auction_path
 
         pptx_path = outputs_dir / f"{client_id}_report.pptx"
         report_txt_path = outputs_dir / "report.txt"
