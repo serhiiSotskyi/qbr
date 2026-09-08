@@ -8,6 +8,9 @@ import pandas as pd
 
 
 COLUMN_ALIASES: Dict[str, str] = {
+    "source": "source",
+    "platform": "source",
+    "network": "source",
     "display url domain": "domain",
     "display url": "domain",
     "display url domain (auction insights)": "domain",
@@ -58,8 +61,18 @@ def load_auction_csv(csv_path: str | Path) -> pd.DataFrame:
     if "domain" not in df.columns:
         raise ValueError("Auction insights CSV is missing a domain column.")
 
-    available_columns = ["domain"] + [col for col in PERCENT_COLUMNS if col in df.columns]
+    available_columns = []
+    if "source" in df.columns:
+        available_columns.append("source")
+    available_columns.extend(["domain"] + [col for col in PERCENT_COLUMNS if col in df.columns])
     cleaned = df[available_columns].copy()
+    if "source" in cleaned.columns:
+        cleaned["source"] = (
+            cleaned["source"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
     cleaned["domain"] = (
         cleaned["domain"]
         .fillna("")

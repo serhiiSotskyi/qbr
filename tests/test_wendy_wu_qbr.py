@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pptx import Presentation
 
+from src.auction_loader import load_auction_csv
+from src.auction_metrics import summarize_auction_insights
+from src.auction_sources import write_cross_platform_auction_csv
 from src.chart_builder import ChartBuilder
 from src.config_loader import ConfigLoader
 from src.data_loader import detect_latest_complete_month, detect_latest_complete_quarter, load_csv
@@ -31,6 +34,54 @@ SECTION_DIVIDER = "-" * 40
 
 
 class WendyWuQbrTests(unittest.TestCase):
+    def test_cross_platform_auction_export_preserves_google_and_microsoft_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            google_path = _write_auction_export(
+                root / "google.csv",
+                [
+                    ("You", "14.37%", "--", "--", "79.88%", "18.82%", "--"),
+                    ("audleytravel.com", "17.37%", "23.62%", "61.40%", "81.54%", "31.14%", "12.28%"),
+                ],
+            )
+            microsoft_path = _write_auction_export(
+                root / "microsoft.csv",
+                [
+                    ("You", "2.32%", "--", "--", "37.48%", "19.67%", "--"),
+                    ("audleytravel.com", "1.01%", "3.62%", "65.20%", "71.44%", "38.10%", "2.27%"),
+                ],
+            )
+            combined_path = write_cross_platform_auction_csv(
+                {"Google Ads": google_path, "Microsoft Ads": microsoft_path},
+                root / "combined.csv",
+            )
+            parsed = load_auction_csv(combined_path)
+            summary = summarize_auction_insights(parsed, client_domain="wendywu.co.uk")
+
+        self.assertEqual(
+            sorted(parsed["source"].unique().tolist()),
+            ["Google Ads", "Microsoft Ads"],
+        )
+        duplicate_sources = parsed[parsed["domain"] == "audleytravel.com"][
+            "source"
+        ].tolist()
+        self.assertEqual(duplicate_sources, ["Google Ads", "Microsoft Ads"])
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(
+            list(summary["table"].columns),
+            [
+                "Source",
+                "Domain",
+                "Impression Share",
+                "Overlap Rate",
+                "Position Above Rate",
+                "Top of Page Rate",
+                "Absolute Top Rate",
+                "Outranking Share",
+            ],
+        )
+
     def test_other_rollup_excludes_brand_and_matches_non_brand_remainder(self) -> None:
         for client_id, csv_path in FIXTURES.items():
             with self.subTest(client_id=client_id):
@@ -608,6 +659,23 @@ def _write_monthly_fixture() -> Path:
 def _write_trend_csv(path: Path, term: str, year: int, values: list[int]) -> None:
     rows = [{"Date": f"{year}-{month:02d}-01", term: value} for month, value in enumerate(values, start=1)]
     pd.DataFrame(rows).to_csv(path, index=False)
+
+
+def _write_auction_export(
+    path: Path, rows: list[tuple[str, str, str, str, str, str, str]]
+) -> Path:
+    path.write_text(
+        "\n".join(
+            [
+                "Auction insights report",
+                "1 April 2026 - 30 June 2026",
+                "Display URL domain,Impression share,Overlap rate,Position above rate,Top of page rate,Abs. Top of page rate,Outranking share",
+                *(",".join(row) for row in rows),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def _pptx_text(pptx_path: Path) -> str:

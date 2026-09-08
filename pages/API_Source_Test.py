@@ -66,13 +66,32 @@ def main() -> None:
     st.subheader("Manual Uploads")
     st.caption(
         "Performance and Trends uploads are intentionally hidden on this test page. "
-        "Auction Insights remains a manual Google Ads UI CSV export for QBRs."
+        "Auction Insights remains a manual same-period platform export for QBRs."
     )
-    auction_file = (
-        None
-        if _monthly_without_auction(client_id, report_mode)
-        else st.file_uploader("Auction CSV", type=["csv"])
+    use_wendy_wu_cross_platform_auction = (
+        client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly"
     )
+    auction_file = None
+    google_auction_file = None
+    microsoft_auction_file = None
+    if not _monthly_without_auction(client_id, report_mode):
+        if use_wendy_wu_cross_platform_auction:
+            market_label = "UK" if client_id == "wendy_wu" else "Australia"
+            st.info(
+                f"Wendy Wu {market_label} QBR Auction Insights needs both Google Ads and Microsoft Ads CSV exports for the same report period."
+            )
+            google_auction_file = st.file_uploader(
+                f"Wendy Wu {market_label} Google Ads Auction Insights CSV",
+                type=["csv"],
+                help="Export from Google Ads Auction Insights using the same QBR date range as the report.",
+            )
+            microsoft_auction_file = st.file_uploader(
+                f"Wendy Wu {market_label} Microsoft Ads Auction Insights CSV",
+                type=["csv"],
+                help="Export from Microsoft Ads Auction Insights using the same QBR date range as the Google Ads file.",
+            )
+        else:
+            auction_file = st.file_uploader("Auction CSV", type=["csv"])
     plan_workbook_file = None
     red_funnel_auction_file = None
     red_funnel_prior_auction_file = None
@@ -110,6 +129,13 @@ def main() -> None:
         if not supports_ga4_source(client_id):
             st.error(f"GA4 source generation is not configured for {client_id}.")
             return
+        if use_wendy_wu_cross_platform_auction and (
+            google_auction_file is None or microsoft_auction_file is None
+        ):
+            st.error(
+                "Please upload both Google Ads and Microsoft Ads Auction Insights CSVs for the same QBR period."
+            )
+            return
 
         use_dataforseo_trends = report_mode == "quarterly" and client_has_trends(
             client_config, report_mode
@@ -136,6 +162,8 @@ def main() -> None:
             [],
             red_funnel_auction_file,
             red_funnel_prior_auction_file,
+            google_auction_file,
+            microsoft_auction_file,
         )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)

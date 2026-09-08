@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from .auction_loader import load_auction_csv
 from .auction_metrics import summarize_auction_insights
+from .auction_sources import load_cross_platform_auction_csvs
 from .chart_builder import ChartBuilder
 from .config_loader import ConfigLoader
 from .data_loader import detect_latest_complete_quarter, load_csv
@@ -75,6 +76,7 @@ POSITIVE_RGB = {"red": 0.03, "green": 0.47, "blue": 0.22}
 NEGATIVE_RGB = {"red": 0.78, "green": 0.16, "blue": 0.13}
 CARD_METRIC_ORDER = ("Sales Leads", "Cost", "CPL", "CVR", "Clicks", "CTR")
 AUCTION_HEADERS = (
+    "Source",
     "Domain",
     "Impression Share",
     "Overlap Rate",
@@ -520,11 +522,13 @@ def build_wendy_wu_qbr_slides_payload(
         chart_builder=chart_builder,
         warnings=warnings,
     )
+    auction_sources = _resolve_manual_auction_sources(request_path)
     auction_path = _resolve_manual_auction_path(request_path)
     _populate_auction_section(
         shape_text=shape_text,
         tables=tables,
         auction_path=auction_path,
+        auction_sources=auction_sources,
         client_config=client_config,
         config_loader=config_loader,
         subtitle=subtitle,
@@ -557,7 +561,10 @@ def build_wendy_wu_qbr_slides_payload(
         "performance_csv": str(performance_csv),
         "manual_inputs": {
             "auction_insights_csv": str(auction_path) if auction_path else None,
+            "google_ads_auction_insights_csv": str(auction_sources.get("Google Ads") or ""),
+            "microsoft_ads_auction_insights_csv": str(auction_sources.get("Microsoft Ads") or ""),
             "auction_insights_required": True,
+            "auction_insights_same_period_required": True,
             "other_campaign_exports_dir": str(_resolve_other_campaigns_dir(request_path, source_manifest) or ""),
             "other_campaign_exports_optional": True,
         },
@@ -809,6 +816,7 @@ def _populate_auction_section(
     shape_text: dict[str, str],
     tables: dict[str, dict[str, Any]],
     auction_path: Path | None,
+    auction_sources: Mapping[str, Path],
     client_config: dict[str, Any],
     config_loader: ConfigLoader,
     subtitle: str,
@@ -817,15 +825,16 @@ def _populate_auction_section(
     shape_text["p29_i715"] = subtitle
     shape_text["p29_i718"] = config_loader.get_source_note(
         "auction_insights", client_config
-    ) or "Source: Google Ads Auction Insights"
-    if not auction_path:
+    ) or "Source: Google Ads and Microsoft Ads Auction Insights"
+    if not auction_sources and not auction_path:
         warnings.append(
-            "Manual Auction Insights CSV was not uploaded; auction slide marked review-required."
+            "Manual Google Ads and Microsoft Ads Auction Insights CSVs were not uploaded; auction slide marked review-required."
         )
         tables["p29_i720"] = {
             "values": [
                 list(AUCTION_HEADERS),
                 [
+                    "Manual upload required",
                     "Manual upload required",
                     "Review required",
                     "Review required",
@@ -837,12 +846,23 @@ def _populate_auction_section(
             ]
         }
         shape_text["p29_i719"] = (
-            "Review required: export Auction Insights from Google Ads for the QBR period "
-            "and regenerate or update this slide."
+            "Review required: export Auction Insights from Google Ads and Microsoft Ads "
+            "for the same QBR period and regenerate or update this slide."
         )
         return
 
-    auction_df = load_auction_csv(auction_path)
+    if auction_sources:
+        expected_sources = {"Google Ads", "Microsoft Ads"}
+        missing_sources = sorted(expected_sources - set(auction_sources))
+        if missing_sources:
+            warnings.append(
+                "Auction Insights is missing manual upload(s): "
+                + ", ".join(missing_sources)
+                + "."
+            )
+        auction_df = load_cross_platform_auction_csvs(auction_sources)
+    else:
+        auction_df = load_auction_csv(auction_path)
     summary = summarize_auction_insights(
         auction_df,
         client_domain=client_config.get("auction_insights", {}).get("client_domain"),
@@ -855,14 +875,20 @@ def _populate_auction_section(
             "Manual Auction Insights CSV was uploaded but no usable summary could be generated."
         )
         tables["p29_i720"] = {
-            "values": [list(AUCTION_HEADERS), ["No usable rows", "", "", "", "", "", ""]]
+            "values": [list(AUCTION_HEADERS), ["No usable rows", "", "", "", "", "", "", ""]]
         }
         shape_text["p29_i719"] = "Review required: Auction Insights CSV had no usable rows."
         return
 
     table_df = summary["table"].head(8)
     tables["p29_i720"] = {"values": _table_values(table_df)}
-    shape_text["p29_i719"] = "\n".join(generate_auction_bullets(summary))
+    bullets = list(generate_auction_bullets(summary))
+    if auction_sources:
+        bullets.insert(
+            0,
+            "Google Ads and Microsoft Ads rows are shown separately because Auction Insights percentages are platform-specific.",
+        )
+    shape_text["p29_i719"] = "\n".join(bullets)
 
 
 def _populate_review_required_sections(
@@ -1096,6 +1122,7 @@ def _target_column_widths(column_count: int, existing_widths: Sequence[int]) -> 
     weights = {
         6: (0.22, 0.19, 0.14, 0.15, 0.15, 0.15),
         7: (0.22, 0.13, 0.13, 0.15, 0.13, 0.12, 0.12),
+        8: (0.11, 0.19, 0.12, 0.12, 0.15, 0.11, 0.10, 0.10),
         9: (0.12, 0.13, 0.10, 0.09, 0.09, 0.13, 0.10, 0.10, 0.14),
     }.get(column_count)
     if not weights:
@@ -1248,9 +1275,32 @@ def _resolve_generated_file(
 def _resolve_manual_auction_path(request_path: Path) -> Path | None:
     auction_dir = request_path / "auction"
     if auction_dir.exists():
-        for path in sorted(auction_dir.glob("*.csv")):
+        for path in _csv_files(auction_dir):
             return path
     return None
+
+
+def _resolve_manual_auction_sources(request_path: Path) -> dict[str, Path]:
+    auction_dir = request_path / "auction"
+    sources: dict[str, Path] = {}
+    source_dirs = {
+        "Google Ads": auction_dir / "google_ads",
+        "Microsoft Ads": auction_dir / "microsoft_ads",
+    }
+    for label, source_dir in source_dirs.items():
+        if source_dir.exists():
+            for path in _csv_files(source_dir):
+                sources[label] = path
+                break
+    return sources
+
+
+def _csv_files(directory: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() == ".csv"
+    )
 
 
 def _resolve_other_campaigns_dir(

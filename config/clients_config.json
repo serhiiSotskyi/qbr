@@ -136,7 +136,7 @@
       },
       "source_notes": {
         "google_trends": "Source: Google Trends",
-        "auction_insights": "Source: Google Ads Auction Insights"
+        "auction_insights": "Source: Google Ads and Microsoft Ads Auction Insights"
       }
     },
     {
@@ -269,7 +269,7 @@
       },
       "source_notes": {
         "google_trends": "Source: Google Trends",
-        "auction_insights": "Source: Google Ads Auction Insights"
+        "auction_insights": "Source: Google Ads and Microsoft Ads Auction Insights"
       }
     },
     {

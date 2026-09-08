@@ -6,6 +6,7 @@ import pandas as pd
 
 
 DISPLAY_COLUMNS = {
+    "source": "Source",
     "domain": "Domain",
     "impression_share": "Impression Share",
     "overlap_rate": "Overlap Rate",
@@ -61,13 +62,15 @@ def format_auction_table(auction_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=DISPLAY_COLUMNS.values())
 
     columns = [column for column in DISPLAY_COLUMNS if column in auction_df.columns]
+    if "source" not in auction_df.columns:
+        columns = [column for column in columns if column != "source"]
     formatted = auction_df[columns].copy()
     if "impression_share" in formatted.columns:
         formatted = formatted.sort_values("impression_share", ascending=False, na_position="last").reset_index(drop=True)
     formatted = formatted.rename(columns={column: DISPLAY_COLUMNS[column] for column in columns})
 
     for column in formatted.columns:
-        if column == "Domain":
+        if column in {"Source", "Domain"}:
             continue
         formatted[column] = formatted[column].map(_fmt_pct)
 

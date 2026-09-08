@@ -657,6 +657,63 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
             "Manual upload required",
         )
 
+    def test_qbr_payload_combines_google_and_microsoft_auction_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_qbr_artifact(root)
+            _write_platform_auction_csv(
+                root / "auction" / "google_ads" / "google_auction.csv",
+                [
+                    ("you", "14.37%", "--", "--", "79.88%", "18.82%", "--"),
+                    ("audleytravel.com", "17.37%", "23.62%", "61.40%", "81.54%", "31.14%", "12.28%"),
+                ],
+            )
+            _write_platform_auction_csv(
+                root / "auction" / "microsoft_ads" / "microsoft_auction.csv",
+                [
+                    ("you", "2.32%", "--", "--", "37.48%", "19.67%", "--"),
+                    ("audleytravel.com", "1.01%", "3.62%", "65.20%", "71.44%", "38.10%", "2.27%"),
+                ],
+            )
+
+            payload = build_wendy_wu_qbr_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+            )
+
+        auction_values = payload["tables"]["p29_i720"]["values"]
+        self.assertEqual(
+            auction_values[0],
+            [
+                "Source",
+                "Domain",
+                "Impression Share",
+                "Overlap Rate",
+                "Position Above Rate",
+                "Top of Page Rate",
+                "Absolute Top Rate",
+                "Outranking Share",
+            ],
+        )
+        rows_text = "\n".join(" ".join(row) for row in auction_values)
+        self.assertIn("Google Ads", rows_text)
+        self.assertIn("Microsoft Ads", rows_text)
+        self.assertGreaterEqual(rows_text.count("audleytravel.com"), 2)
+        self.assertIn(
+            "Google Ads and Microsoft Ads rows are shown separately",
+            payload["shape_text"]["p29_i719"],
+        )
+        self.assertTrue(
+            payload["manual_inputs"]["google_ads_auction_insights_csv"].endswith(
+                "google_auction.csv"
+            )
+        )
+        self.assertTrue(
+            payload["manual_inputs"]["microsoft_ads_auction_insights_csv"].endswith(
+                "microsoft_auction.csv"
+            )
+        )
+
     def test_qbr_native_slides_generate_expected_table_chart_and_style_requests(
         self,
     ) -> None:
@@ -724,6 +781,60 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
             )
         )
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+    def test_qbr_native_slides_inserts_source_column_for_platform_auction(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_qbr_artifact(root)
+            _write_platform_auction_csv(
+                root / "auction" / "google_ads" / "google_auction.csv",
+                [("you", "14.37%", "--", "--", "79.88%", "18.82%", "--")],
+            )
+            _write_platform_auction_csv(
+                root / "auction" / "microsoft_ads" / "microsoft_auction.csv",
+                [("you", "2.32%", "--", "--", "37.48%", "19.67%", "--")],
+            )
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wendy_wu_qbr_presentation()
+            )
+
+            result = generate_native_google_slides(
+                client_id="wendy_wu",
+                client_name="Wendy Wu Tours",
+                report_mode="quarterly",
+                request_dir=root,
+                report_artifacts_path=artifact_path,
+                google_client=fake_client,
+                workspace_config=_configured_workspace(),
+                export_pdf=True,
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertTrue(
+            any(
+                request.get("insertTableColumns", {}).get("tableObjectId")
+                == "p29_i720"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("insertText", {}).get("objectId") == "p29_i720"
+                and request["insertText"].get("cellLocation")
+                == {"rowIndex": 0, "columnIndex": 0}
+                and request["insertText"]["text"] == "Source"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("insertText", {}).get("objectId") == "p29_i720"
+                and request["insertText"].get("cellLocation")
+                == {"rowIndex": 1, "columnIndex": 0}
+                and request["insertText"]["text"] == "Google Ads"
+                for request in fake_client.batch_requests
+            )
+        )
 
 
 class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
@@ -1283,6 +1394,19 @@ def _write_wendy_wu_qbr_artifact(root: Path) -> Path:
     artifact_path = root / "report_artifacts.json"
     artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
     return artifact_path
+
+
+def _write_platform_auction_csv(
+    path: Path, rows: list[tuple[str, str, str, str, str, str, str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = [
+        "Auction insights report",
+        "1 April 2026 - 30 June 2026",
+        "Display URL domain,Impression share,Overlap rate,Position above rate,Top of page rate,Abs. Top of page rate,Outranking share",
+    ]
+    content.extend(",".join(row) for row in rows)
+    path.write_text("\n".join(content), encoding="utf-8")
 
 
 def _write_wightlink_monthly_artifact(root: Path) -> Path:

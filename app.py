@@ -22,6 +22,7 @@ from claude_handoff import (
 from main import run_report, run_text_report
 from notion_memory import NotionMemoryError, notion_save_key, save_report_to_notion
 from presentation_prompt_builder import build_presentation_prompt
+from src.auction_sources import write_cross_platform_auction_csv
 from src.env_utils import load_env_file, load_streamlit_secrets_into_env
 
 
@@ -73,6 +74,8 @@ def build_request_inputs(
     trends_previous_ytd_files=None,
     red_funnel_auction_file=None,
     red_funnel_prior_auction_file=None,
+    google_auction_file=None,
+    microsoft_auction_file=None,
 ) -> tuple[Path, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
     request_id = uuid4().hex
     request_dir = TEMP_DIR / request_id
@@ -85,6 +88,24 @@ def build_request_inputs(
     auction_path = None
     if auction_file is not None:
         auction_path = save_uploaded_file(auction_file, request_dir / "auction" / auction_file.name)
+    cross_platform_auction_sources = {}
+    if google_auction_file is not None:
+        cross_platform_auction_sources["Google Ads"] = save_uploaded_file(
+            google_auction_file,
+            request_dir / "auction" / "google_ads" / google_auction_file.name,
+        )
+    if microsoft_auction_file is not None:
+        cross_platform_auction_sources["Microsoft Ads"] = save_uploaded_file(
+            microsoft_auction_file,
+            request_dir / "auction" / "microsoft_ads" / microsoft_auction_file.name,
+        )
+    if cross_platform_auction_sources:
+        combined_auction_path = write_cross_platform_auction_csv(
+            cross_platform_auction_sources,
+            request_dir / "auction" / "combined_google_microsoft_auction_insights.csv",
+        )
+        if combined_auction_path is not None:
+            auction_path = str(combined_auction_path)
 
     trends_dir = None
     if trends_files:
@@ -320,7 +341,30 @@ def main() -> None:
         client_id in WENDY_WU_CLIENT_IDS
         or client_id in {"wightlink", "olympic_holidays"}
     )
-    auction_file = None if is_monthly_performance_only else st.file_uploader("Auction CSV", type=["csv"])
+    use_wendy_wu_cross_platform_auction = (
+        client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly"
+    )
+    auction_file = None
+    google_auction_file = None
+    microsoft_auction_file = None
+    if not is_monthly_performance_only:
+        if use_wendy_wu_cross_platform_auction:
+            market_label = "UK" if client_id == "wendy_wu" else "Australia"
+            st.info(
+                f"Wendy Wu {market_label} QBR Auction Insights needs both Google Ads and Microsoft Ads exports for the same report period."
+            )
+            google_auction_file = st.file_uploader(
+                f"Wendy Wu {market_label} Google Ads Auction Insights CSV",
+                type=["csv"],
+                help="Export from Google Ads Auction Insights using the same QBR date range as the report.",
+            )
+            microsoft_auction_file = st.file_uploader(
+                f"Wendy Wu {market_label} Microsoft Ads Auction Insights CSV",
+                type=["csv"],
+                help="Export from Microsoft Ads Auction Insights using the same QBR date range as the Google Ads file.",
+            )
+        else:
+            auction_file = st.file_uploader("Auction CSV", type=["csv"])
     use_wendy_wu_ytd_trends = client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly"
     trends_files = (
         []
@@ -392,6 +436,13 @@ def main() -> None:
         if performance_file is None:
             st.error("Please upload a performance CSV")
             return
+        if use_wendy_wu_cross_platform_auction and (
+            google_auction_file is None or microsoft_auction_file is None
+        ):
+            st.error(
+                "Please upload both Google Ads and Microsoft Ads Auction Insights CSVs for the same QBR period."
+            )
+            return
 
         (
             request_dir,
@@ -414,6 +465,8 @@ def main() -> None:
             trends_previous_ytd_files,
             red_funnel_auction_file,
             red_funnel_prior_auction_file,
+            google_auction_file,
+            microsoft_auction_file,
         )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
