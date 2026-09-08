@@ -1,0 +1,177 @@
+{
+  "schema_version": "1.0",
+  "created_at": "2026-09-08",
+  "template_name": "Olympic Holidays QBR Native Slides Template - TEST",
+  "source_presentation_id": "1YXzBBi55wYeaneb7thAC3yppXws0-tdPBYFah7C2x84",
+  "template_presentation_id": "1UOIK998aUkBa0jr3qGysOcY_8m8Vo0J1NfR6uF07acM",
+  "template_url": "https://docs.google.com/presentation/d/1UOIK998aUkBa0jr3qGysOcY_8m8Vo0J1NfR6uF07acM/edit",
+  "drive_folder_id": "1zKQMBP1fFgBH6fF6EwGZBIkXxXH1FROM",
+  "client_id": "olympic_holidays",
+  "client_name": "Olympic Holidays",
+  "report_mode": "quarterly",
+  "status": "prototype_template_created",
+  "generation_rules": {
+    "data_sources": {
+      "performance": "GA4 API generated performance.csv on API Source Test.",
+      "trends": "DataForSEO Google Trends API, United Kingdom location, current YTD versus prior-year YTD through the QBR quarter end.",
+      "auction_insights": "Manual Google Ads and Microsoft Ads Auction Insights CSV uploads for the same QBR period."
+    },
+    "original_deck_rule": "The source presentation is never edited. The app copies this template deck and edits the copy.",
+    "period_rule": "The overall deck remains quarter-led. Trend slides show current YTD against prior-year YTD.",
+    "auction_rule": "Auction rows from Google Ads and Microsoft Ads are shown with a Source column because each platform reports auction percentages independently.",
+    "chart_rule": "Charts are rendered locally as high-resolution PNGs and inserted into existing native image slots.",
+    "style_rule": "Generated decks explicitly restyle title, subtitle, card delta, and table-header text so copied template styling remains readable."
+  },
+  "global_text_ids": {
+    "cover_brand": "p1_i19",
+    "cover_title": "p1_i20",
+    "cover_period": "p1_i22",
+    "cover_prepared": "p1_i23",
+    "cover_revenue": "p1_i26",
+    "cover_purchases": "p1_i28",
+    "cover_cpa": "p1_i30"
+  },
+  "slides": {
+    "brand_trend": {
+      "slide_id": "p2",
+      "title_id": "p2_i39",
+      "subtitle_id": "p2_i40",
+      "chart_id": "p2_i41",
+      "insights_id": "p2_i63",
+      "term": "Olympic Holidays",
+      "label": "Olympic Holidays"
+    },
+    "category_trend": {
+      "slide_id": "p3",
+      "title_id": "p3_i71",
+      "subtitle_id": "p3_i72",
+      "chart_id": "p3_i73",
+      "insights_id": "p3_i95",
+      "term": "Holidays to Greece",
+      "label": "Holidays to Greece"
+    },
+    "auction": {
+      "slide_id": "p5",
+      "title_id": "p5_i152",
+      "subtitle_id": "p5_i153",
+      "table_id": "p5_i154",
+      "insights_id": "p5_i157"
+    },
+    "executive_summary": {
+      "slide_id": "p4",
+      "title_id": "p4_i103",
+      "subtitle_id": "p4_i104",
+      "insights_id": "p4_i144",
+      "kpi_ids": {
+        "revenue": ["p4_i108", "p4_i109", "p4_i110"],
+        "purchases": ["p4_i114", "p4_i115", "p4_i116"],
+        "cpa": ["p4_i120", "p4_i121", "p4_i122"],
+        "cost": ["p4_i126", "p4_i127", "p4_i128"],
+        "aov": ["p4_i132", "p4_i133", "p4_i134"],
+        "cpatc": ["p4_i138", "p4_i139", "p4_i140"]
+      }
+    },
+    "overall": {
+      "slide_id": "p6",
+      "title_id": "p6_i165",
+      "subtitle_id": "p6_i166",
+      "table_id": "p6_i167",
+      "chart_ids": {
+        "revenue_cpa": "p6_i168",
+        "purchases_cpatc": "p6_i169"
+      },
+      "insights_id": "p6_i172"
+    },
+    "yoy": {
+      "slide_id": "p7",
+      "title_id": "p7_i180",
+      "subtitle_id": "p7_i181",
+      "coverage_id": "p7_i183",
+      "table_id": "p7_i184",
+      "chart_ids": {
+        "yoy_summary": "p7_i185"
+      },
+      "insights_id": "p7_i188"
+    },
+    "end_of_period": {
+      "slide_id": "p8",
+      "title_id": "p8_i196",
+      "subtitle_id": "p8_i197",
+      "previous_month_id": "p8_i200",
+      "previous_values": {
+        "revenue": "p8_i202",
+        "cost": "p8_i204",
+        "purchases": "p8_i206",
+        "cpa": "p8_i208",
+        "cpatc": "p8_i210"
+      },
+      "latest_month_id": "p8_i213",
+      "latest_values": {
+        "revenue": "p8_i215",
+        "cost": "p8_i217",
+        "purchases": "p8_i219",
+        "cpa": "p8_i221",
+        "cpatc": "p8_i223"
+      },
+      "change_label_id": "p8_i224",
+      "change_values": {
+        "revenue": "p8_i225",
+        "cost": "p8_i226",
+        "purchases": "p8_i227",
+        "cpa": "p8_i228",
+        "cpatc": "p8_i229"
+      },
+      "insights_id": "p8_i232"
+    },
+    "channel": {
+      "slide_id": "p9",
+      "title_id": "p9_i240",
+      "subtitle_id": "p9_i241",
+      "table_id": "p9_i242",
+      "chart_ids": {
+        "cost_share": "p9_i243",
+        "revenue_share": "p9_i244"
+      },
+      "insights_id": "p9_i247"
+    },
+    "generic": {
+      "slide_id": "p10",
+      "title_id": "p10_i255",
+      "subtitle_id": "p10_i256",
+      "table_id": "p10_i257",
+      "chart_ids": {
+        "revenue_cpa": "p10_i258",
+        "purchases_cpatc": "p10_i259"
+      },
+      "insights_id": "p10_i262"
+    },
+    "atc": {
+      "slide_id": "p11",
+      "title_id": "p11_i270",
+      "subtitle_id": "p11_i271",
+      "table_id": "p11_i272",
+      "total_atc_id": "p11_i276",
+      "total_atc_label_id": "p11_i277",
+      "cpatc_id": "p11_i281",
+      "cpatc_label_id": "p11_i282",
+      "chart_ids": {
+        "atc_cpatc": "p11_i283",
+        "purchases_cpatc": "p11_i284"
+      },
+      "insights_id": "p11_i287"
+    }
+  },
+  "sections": [
+    {"number": 1, "role": "cover", "slide_id": "p1"},
+    {"number": 2, "role": "trend_chart", "key": "brand_trend", "slide_id": "p2"},
+    {"number": 3, "role": "trend_chart", "key": "category_trend", "slide_id": "p3"},
+    {"number": 4, "role": "auction", "slide_id": "p5"},
+    {"number": 5, "role": "kpi_cards", "slide_id": "p4"},
+    {"number": 6, "role": "overall_performance", "slide_id": "p6"},
+    {"number": 7, "role": "yoy", "slide_id": "p7"},
+    {"number": 8, "role": "end_of_period", "slide_id": "p8"},
+    {"number": 9, "role": "campaign_mix", "slide_id": "p9"},
+    {"number": 10, "role": "generic_performance", "slide_id": "p10"},
+    {"number": 11, "role": "atc_analysis", "slide_id": "p11"}
+  ]
+}

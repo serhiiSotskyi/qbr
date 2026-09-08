@@ -31,6 +31,10 @@ from src.olympic_monthly_google_slides_builder import (
     OLYMPIC_MONTHLY_TEMPLATE_MANIFEST,
     build_olympic_monthly_slides_payload,
 )
+from src.olympic_qbr_google_slides_builder import (
+    OLYMPIC_QBR_TEMPLATE_MANIFEST,
+    build_olympic_qbr_slides_payload,
+)
 from src.wendy_wu_qbr_google_slides_builder import (
     build_wendy_wu_qbr_slides_payload,
 )
@@ -141,6 +145,7 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         wwt_uk_monthly = registry.status("wendy_wu", "monthly")
         wwt_aus_monthly = registry.status("wendy_wu_australia", "monthly")
         wightlink_monthly = registry.status("wightlink", "monthly")
+        olympic_qbr = registry.status("olympic_holidays", "quarterly")
         olympic_monthly = registry.status("olympic_holidays", "monthly")
 
         self.assertTrue(quarterly["supported"])
@@ -153,6 +158,8 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         self.assertTrue(wwt_aus_monthly["configured"])
         self.assertTrue(wightlink_monthly["supported"])
         self.assertTrue(wightlink_monthly["configured"])
+        self.assertTrue(olympic_qbr["supported"])
+        self.assertTrue(olympic_qbr["configured"])
         self.assertTrue(olympic_monthly["supported"])
         self.assertTrue(olympic_monthly["configured"])
 
@@ -1124,6 +1131,96 @@ class WightlinkMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(fake_client.permission_attempts, 2)
 
 
+class OlympicQBRNativeSlidesTests(unittest.TestCase):
+    def test_qbr_payload_uses_ytd_trends_and_cross_platform_auction(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_olympic_qbr_artifact(root)
+
+            payload = build_olympic_qbr_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+            )
+
+        self.assertEqual(payload["period"]["label"], "Q2 2026")
+        self.assertEqual(payload["shape_text"]["p1_i20"], "Q2 2026 Performance Review")
+        self.assertIn("YTD to Q2 2026", payload["shape_text"]["p2_i40"])
+        self.assertIn("same months last year", payload["shape_text"]["p2_i63"])
+        self.assertTrue(str(payload["charts"]["p2_i41"]).endswith("brand_trend.png"))
+
+        auction_table = payload["tables"]["p5_i154"]["values"]
+        self.assertEqual(
+            auction_table[0],
+            [
+                "Source",
+                "Domain",
+                "Imp. Share",
+                "Overlap",
+                "Pos. Above",
+                "Top Page",
+                "Abs. Top",
+                "Outrank",
+            ],
+        )
+        rows_text = "\n".join(" ".join(row) for row in auction_table)
+        self.assertIn("Google Ads", rows_text)
+        self.assertIn("Microsoft Ads", rows_text)
+        self.assertNotIn(" you ", f" {rows_text} ")
+        self.assertEqual(payload["manual_inputs"]["auction_insights_required"], True)
+        self.assertEqual(payload["warnings"], [])
+
+    def test_qbr_native_slides_uses_custom_builder_template_and_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_olympic_qbr_artifact(root)
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_olympic_qbr_presentation(existing_rows=4)
+            )
+
+            result = generate_native_google_slides(
+                client_id="olympic_holidays",
+                client_name="Olympic Holidays",
+                report_mode="quarterly",
+                request_dir=root,
+                report_artifacts_path=artifact_path,
+                google_client=fake_client,
+                workspace_config=_configured_workspace(),
+                export_pdf=True,
+            )
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(manifest["builder"], "olympic_holidays_qbr_template_manifest")
+        self.assertEqual(
+            manifest["template_id"], "1UOIK998aUkBa0jr3qGysOcY_8m8Vo0J1NfR6uF07acM"
+        )
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId") == "p2_i41"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("insertTableColumns", {}).get("tableObjectId") == "p5_i154"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId") == "p4_i128"
+                and request["updateTextStyle"]["style"]["foregroundColor"][
+                    "opaqueColor"
+                ]["rgbColor"]
+                == {"red": 0.42, "green": 0.42, "blue": 0.42}
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+
 class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
     def test_monthly_payload_uses_current_month_cards_ytd_tables_and_review_placeholders(
         self,
@@ -1583,6 +1680,111 @@ def _write_platform_auction_csv(
     ]
     content.extend(",".join(row) for row in rows)
     path.write_text("\n".join(content), encoding="utf-8")
+
+
+def _write_olympic_qbr_artifact(root: Path) -> Path:
+    source_data = root / "source_data"
+    source_data.mkdir(parents=True, exist_ok=True)
+    performance_csv = source_data / "performance.csv"
+    rows = []
+    base_rows = [
+        ("Brand", 120000, 12000, 75, 420),
+        ("Generic", 45000, 18000, 35, 260),
+        ("Performance Max", 30000, 9000, 22, 140),
+        ("Demand Gen", 10000, 4000, 8, 70),
+    ]
+    for year in (2025, 2026):
+        year_factor = 0.8 if year == 2025 else 1.0
+        for month in range(1, 7):
+            month_factor = 0.9 + month / 20
+            for campaign_type, revenue, cost, purchases, atc in base_rows:
+                adjusted_revenue = revenue * year_factor * month_factor
+                adjusted_cost = cost * year_factor * month_factor
+                adjusted_purchases = purchases * year_factor * month_factor
+                adjusted_atc = atc * year_factor * month_factor
+                rows.append(
+                    {
+                        "Date": f"{year}-{month:02d}-15",
+                        "Campaign Type": campaign_type,
+                        "Purchases": adjusted_purchases,
+                        "Revenue": adjusted_revenue,
+                        "Cost": adjusted_cost,
+                        "Add to cart": adjusted_atc,
+                        "CPA": adjusted_cost / adjusted_purchases,
+                        "Cost per ATC": adjusted_cost / adjusted_atc,
+                        "AOV": adjusted_revenue / adjusted_purchases,
+                    }
+                )
+    pd.DataFrame(rows).to_csv(performance_csv, index=False)
+
+    trends_dir = source_data / "trends"
+    trends_dir.mkdir()
+    for term, offset in (("Olympic Holidays", 0), ("Holidays to Greece", 15)):
+        trend_rows = []
+        for year in (2025, 2026):
+            year_factor = 0.8 if year == 2025 else 1.0
+            for month in range(1, 7):
+                trend_rows.append(
+                    {
+                        "Week": f"{year}-{month:02d}-01",
+                        term: round((40 + offset + month * 4) * year_factor, 1),
+                    }
+                )
+        pd.DataFrame(trend_rows).to_csv(
+            trends_dir / f"{term.lower().replace(' ', '_')}_trend.csv",
+            index=False,
+        )
+
+    _write_platform_auction_csv(
+        root / "auction" / "google_ads" / "google_auction.csv",
+        [
+            ("you", "", "", "", "69.3%", "18.2%", ""),
+            ("jet2holidays.com", "59.5%", "44.8%", "79.0%", "92.5%", "44.1%", "3.5%"),
+            ("tui.co.uk", "51.2%", "40.6%", "76.0%", "89.5%", "28.8%", "3.7%"),
+        ],
+    )
+    _write_platform_auction_csv(
+        root / "auction" / "microsoft_ads" / "microsoft_auction.csv",
+        [
+            ("loveholidays.com", "45.0%", "31.0%", "60.0%", "80.0%", "25.0%", "4.0%"),
+            ("onthebeach.co.uk", "30.0%", "20.0%", "55.0%", "75.0%", "20.0%", "5.0%"),
+        ],
+    )
+
+    source_manifest = source_data / "SOURCE_GENERATION_MANIFEST.json"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "source_generation": {
+                    "generated_files": {
+                        "performance_csv": "source_data/performance.csv",
+                        "trends_dir": "source_data/trends",
+                    },
+                    "period": {
+                        "kind": "quarterly",
+                        "year": 2026,
+                        "quarter": 2,
+                        "label": "Q2 2026",
+                        "start": "2026-04-01",
+                        "end": "2026-06-30",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifact = {
+        "client_id": "olympic_holidays",
+        "client_name": "Olympic Holidays",
+        "report_mode": "quarterly",
+        "period": {"label": "Q2 2026", "subtitle": "Q2 2026"},
+        "source_files": {"source_generation_manifest": str(source_manifest)},
+        "slides": [],
+        "charts": [],
+    }
+    artifact_path = root / "report_artifacts.json"
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    return artifact_path
 
 
 def _write_wightlink_monthly_artifact(root: Path) -> Path:
@@ -2098,6 +2300,75 @@ def _fake_olympic_monthly_presentation(existing_rows: int = 4) -> dict:
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
         "slides": [{"objectId": "olympic", "pageElements": page_elements}],
+    }
+
+
+def _fake_olympic_qbr_presentation(existing_rows: int = 4) -> dict:
+    manifest = json.loads(OLYMPIC_QBR_TEMPLATE_MANIFEST.read_text(encoding="utf-8"))
+    shape_ids = set(manifest["global_text_ids"].values())
+    table_ids = set()
+    image_ids = set()
+    for slide in manifest["slides"].values():
+        for key in (
+            "title_id",
+            "subtitle_id",
+            "coverage_id",
+            "insights_id",
+            "previous_month_id",
+            "latest_month_id",
+            "change_label_id",
+            "total_atc_id",
+            "total_atc_label_id",
+            "cpatc_id",
+            "cpatc_label_id",
+        ):
+            if slide.get(key):
+                shape_ids.add(slide[key])
+        for object_ids in (slide.get("kpi_ids") or {}).values():
+            shape_ids.update(object_ids)
+        for object_id in (slide.get("previous_values") or {}).values():
+            shape_ids.add(object_id)
+        for object_id in (slide.get("latest_values") or {}).values():
+            shape_ids.add(object_id)
+        for object_id in (slide.get("change_values") or {}).values():
+            shape_ids.add(object_id)
+        if slide.get("table_id"):
+            table_ids.add(slide["table_id"])
+        image_ids.update((slide.get("chart_ids") or {}).values())
+        if slide.get("chart_id"):
+            image_ids.add(slide["chart_id"])
+
+    page_elements = []
+    page_elements.extend(
+        {
+            "objectId": shape_id,
+            "shape": {
+                "text": {"textElements": [{"textRun": {"content": "Old text\n"}}]}
+            },
+            "transform": _transform(50, 50),
+        }
+        for shape_id in sorted(shape_ids)
+    )
+    page_elements.extend(
+        {
+            "objectId": table_id,
+            "table": {"rows": existing_rows, "columns": 7},
+            "transform": _transform(100, 130),
+        }
+        for table_id in sorted(table_ids)
+    )
+    page_elements.extend(
+        {
+            "objectId": image_id,
+            "image": {},
+            "size": _size(320, 200),
+            "transform": _transform(100, 220),
+        }
+        for image_id in sorted(image_ids)
+    )
+    return {
+        "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
+        "slides": [{"objectId": "olympic-qbr", "pageElements": page_elements}],
     }
 
 

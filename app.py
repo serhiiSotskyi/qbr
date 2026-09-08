@@ -341,25 +341,30 @@ def main() -> None:
         client_id in WENDY_WU_CLIENT_IDS
         or client_id in {"wightlink", "olympic_holidays"}
     )
-    use_wendy_wu_cross_platform_auction = (
-        client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly"
+    use_cross_platform_auction = (
+        report_mode == "quarterly"
+        and (client_id in WENDY_WU_CLIENT_IDS or client_id == "olympic_holidays")
     )
     auction_file = None
     google_auction_file = None
     microsoft_auction_file = None
     if not is_monthly_performance_only:
-        if use_wendy_wu_cross_platform_auction:
-            market_label = "UK" if client_id == "wendy_wu" else "Australia"
+        if use_cross_platform_auction:
+            if client_id == "olympic_holidays":
+                upload_label = "Olympic Holidays"
+            else:
+                market_label = "UK" if client_id == "wendy_wu" else "Australia"
+                upload_label = f"Wendy Wu {market_label}"
             st.info(
-                f"Wendy Wu {market_label} QBR Auction Insights needs both Google Ads and Microsoft Ads exports for the same report period."
+                f"{upload_label} QBR Auction Insights needs both Google Ads and Microsoft Ads exports for the same report period."
             )
             google_auction_file = st.file_uploader(
-                f"Wendy Wu {market_label} Google Ads Auction Insights CSV",
+                f"{upload_label} Google Ads Auction Insights CSV",
                 type=["csv"],
                 help="Export from Google Ads Auction Insights using the same QBR date range as the report.",
             )
             microsoft_auction_file = st.file_uploader(
-                f"Wendy Wu {market_label} Microsoft Ads Auction Insights CSV",
+                f"{upload_label} Microsoft Ads Auction Insights CSV",
                 type=["csv"],
                 help="Export from Microsoft Ads Auction Insights using the same QBR date range as the Google Ads file.",
             )
@@ -436,7 +441,7 @@ def main() -> None:
         if performance_file is None:
             st.error("Please upload a performance CSV")
             return
-        if use_wendy_wu_cross_platform_auction and (
+        if use_cross_platform_auction and (
             google_auction_file is None or microsoft_auction_file is None
         ):
             st.error(

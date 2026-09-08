@@ -664,7 +664,12 @@ def generate_dataforseo_trend_csvs(
         if trend_df.empty:
             continue
         if client_id == "olympic_holidays":
-            _write_google_trends_csv(olympic_trends_dir / f"{safe_term}_trend.csv", trend_df, term)
+            olympic_window = _trend_window(trend_df, period.previous_ytd_start, date_to)
+            _write_google_trends_csv(
+                olympic_trends_dir / f"{safe_term}_trend.csv",
+                olympic_window,
+                term,
+            )
         else:
             write_split_trend_csvs(
                 trend_df=trend_df,
