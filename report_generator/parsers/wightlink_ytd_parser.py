@@ -233,7 +233,7 @@ def _parse_trend_export(path: Path) -> dict[str, Any] | None:
     query_column = value_columns[0]
     rows = pd.DataFrame(
         {
-            "date": pd.to_datetime(df[date_column], dayfirst=True, format="mixed", errors="coerce"),
+            "date": _parse_date_series(df[date_column]),
             "value": df[query_column].map(_to_number),
         }
     ).dropna(subset=["date", "value"])
@@ -271,10 +271,25 @@ def _detect_date_column(df: pd.DataFrame) -> str | None:
         if _normalize_header(column) in DATE_COLUMN_HINTS:
             return str(column)
     for column in df.columns:
-        parsed = pd.to_datetime(df[column], dayfirst=True, format="mixed", errors="coerce")
+        parsed = _parse_date_series(df[column])
         if parsed.notna().sum() >= max(2, len(df) // 2):
             return str(column)
     return None
+
+
+def _parse_date_series(values: pd.Series) -> pd.Series:
+    text_values = values.astype(str).str.strip()
+    parsed = pd.to_datetime(text_values, format="%Y-%m-%d", errors="coerce")
+    missing = parsed.isna()
+    if missing.any():
+        fallback = pd.to_datetime(
+            text_values[missing],
+            dayfirst=True,
+            format="mixed",
+            errors="coerce",
+        )
+        parsed.loc[missing] = fallback
+    return parsed
 
 
 def _to_number(value: Any) -> float | None:

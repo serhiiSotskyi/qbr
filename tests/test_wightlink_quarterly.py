@@ -198,6 +198,49 @@ class WightlinkQuarterlyTests(unittest.TestCase):
         self.assertTrue(any(value is not None for value in section["series"][0]["data"]))
         self.assertTrue(any(value is not None for value in section["series"][1]["data"]))
 
+    def test_ytd_trend_parser_keeps_iso_dates_in_source_months(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            current = root / "current"
+            previous = root / "previous"
+            current.mkdir()
+            previous.mkdir()
+            (current / "wightlink_ferries_current.csv").write_text(
+                "\n".join(
+                    [
+                        "Week,Wightlink Ferries",
+                        "2026-04-19,58",
+                        "2026-05-10,58",
+                        "2026-06-21,75",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (previous / "wightlink_ferries_previous.csv").write_text(
+                "\n".join(
+                    [
+                        "Week,Wightlink Ferries",
+                        "2025-04-06,73",
+                        "2025-05-18,72",
+                        "2025-06-15,70",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            sections = parse_ytd_trend_inputs(
+                current,
+                previous,
+                parse_wightlink_performance_csv(
+                    PACK_V2 / "performance_daily_over_year_sample.csv"
+                )["quarter"],
+            )
+
+        section = sections[0]
+        self.assertEqual(section["labels"], ["Jan", "Feb", "Mar", "Apr", "May", "Jun"])
+        self.assertEqual(section["series"][0]["data"][3:], [58.0, 58.0, 75.0])
+        self.assertEqual(section["series"][1]["data"][3:], [73.0, 72.0, 70.0])
+
     def test_middle_plan_table_parser_uses_first_plan_table(self) -> None:
         performance = parse_wightlink_performance_csv(PACK_V2 / "performance_daily_over_year_sample.csv")
         plan = parse_wightlink_plan_workbook(
