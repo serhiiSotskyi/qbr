@@ -9,18 +9,13 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from report_generator.insights.olympic_insights import (
-    analyze_atc,
     analyze_channels,
-    analyze_end_of_period,
     analyze_generic_performance,
-    analyze_overall_performance,
     analyze_yoy,
     generate_executive_summary,
 )
 from report_generator.pipelines.olympic_pipeline import (
     _format_channel_table,
-    _format_monthly_table,
-    _format_atc_table,
     _format_yoy_table,
     _prepare_datasets,
     _yoy_section_subtitle,
@@ -68,12 +63,8 @@ from .olympic_monthly_google_slides_builder import (
     _count,
     _currency,
     _fmt_pct,
-    _image_object_ids,
-    _plot_purchases_cpatc,
-    _plot_revenue_cpa,
     _plot_share_donut,
     _shape_text_by_id,
-    _to_number,
     _upload_chart_assets,
 )
 from .trends_loader import TrendsLoader
@@ -293,42 +284,34 @@ def build_olympic_qbr_slides_payload(
         slides["auction"]["title_id"]: "Auction Insights",
         slides["auction"]["subtitle_id"]: "Competitor landscape",
         slides["auction"]["insights_id"]: "\n".join(data["auction"]["bullets"]),
-        slides["executive_summary"]["title_id"]: "Executive Summary",
+        slides["executive_summary"]["title_id"]: f"Overall Performance Q{period['quarter']}",
         slides["executive_summary"]["subtitle_id"]: f"Olympic Holidays | {period['label']}",
         slides["executive_summary"]["insights_id"]: "\n".join(
             data["insights"]["executive_summary"]
         ),
         slides["overall"]["title_id"]: "Overall Performance",
         slides["overall"]["subtitle_id"]: f"Olympic Holidays | {period['label']}",
-        slides["overall"]["insights_id"]: "\n".join(
-            data["insights"]["overall_performance"]
-        ),
         slides["yoy"]["title_id"]: _yoy_section_title(data.get("yoy_summary")),
         slides["yoy"]["subtitle_id"]: _yoy_section_subtitle(data.get("yoy_summary")),
         slides["yoy"]["coverage_id"]: _yoy_coverage_text(data.get("yoy_summary")),
         slides["yoy"]["insights_id"]: "\n".join(data["insights"]["yoy_comparison"]),
-        slides["end_of_period"]["title_id"]: "End of Period",
-        slides["end_of_period"]["subtitle_id"]: "Latest months",
-        slides["end_of_period"]["insights_id"]: "\n".join(
-            data["insights"]["end_of_period"]
-        ),
-        slides["channel"]["title_id"]: "Channel Performance",
+        slides["channel"]["title_id"]: "Campaign Type Performance",
         slides["channel"]["subtitle_id"]: "Cost and revenue share",
         slides["channel"]["insights_id"]: "\n".join(
             data["insights"]["channel_performance"]
+        ),
+        slides["generic_summary"]["title_id"]: "Generic Performance Summary",
+        slides["generic_summary"]["subtitle_id"]: (
+            f"Olympic Holidays | {period['label']}"
+        ),
+        slides["generic_summary"]["insights_id"]: "\n".join(
+            data["insights"]["generic_summary"]
         ),
         slides["generic"]["title_id"]: "Generic Performance",
         slides["generic"]["subtitle_id"]: f"Olympic Holidays | {period['label']}",
         slides["generic"]["insights_id"]: "\n".join(
             data["insights"]["generic_performance"]
         ),
-        slides["atc"]["title_id"]: "ATC Analysis",
-        slides["atc"]["subtitle_id"]: "Add to cart and cost per ATC",
-        slides["atc"]["total_atc_id"]: _count(data["summary"]["overall_atc"]),
-        slides["atc"]["total_atc_label_id"]: f"{period['label']} volume",
-        slides["atc"]["cpatc_id"]: _currency(data["summary"]["overall_cpatc"]),
-        slides["atc"]["cpatc_label_id"]: "Quarter average",
-        slides["atc"]["insights_id"]: "\n".join(data["insights"]["atc_analysis"]),
     }
     shape_text.update(
         _executive_kpi_text(
@@ -339,9 +322,11 @@ def build_olympic_qbr_slides_payload(
         )
     )
     shape_text.update(
-        _end_of_period_text(
-            slides["end_of_period"],
-            data["end_period"],
+        _qbr_section_kpi_text(
+            slides["generic_summary"]["kpi_ids"],
+            data["generic_card_summary"]["current"],
+            data["generic_card_summary"]["prior"],
+            period,
         )
     )
 
@@ -366,24 +351,18 @@ def build_olympic_qbr_slides_payload(
             "values": _quarter_monthly_table_values(data["generic_monthly"]),
             "font_size": QBR_MONTHLY_TABLE_FONT_SIZE_PT,
         },
-        slides["atc"]["table_id"]: {
-            "values": _dataframe_table_values(_format_atc_table(data["atc_trends"])),
-            "font_size": QBR_MONTHLY_TABLE_FONT_SIZE_PT,
-        },
     }
 
     charts = {
         slides["brand_trend"]["chart_id"]: data["trends"]["brand_trend"]["chart_path"],
         slides["category_trend"]["chart_id"]: data["trends"]["category_trend"]["chart_path"],
-        slides["overall"]["chart_ids"]["revenue_cpa"]: data["charts"]["overall_revenue_cpa"],
-        slides["overall"]["chart_ids"]["purchases_cpatc"]: data["charts"]["overall_purchases_cpatc"],
+        slides["overall"]["chart_ids"]["revenue_yoy"]: data["charts"]["overall_revenue_yoy"],
+        slides["overall"]["chart_ids"]["purchases_yoy"]: data["charts"]["overall_purchases_yoy"],
         slides["yoy"]["chart_ids"]["yoy_summary"]: data["charts"]["yoy_summary"],
         slides["channel"]["chart_ids"]["cost_share"]: data["charts"]["channel_cost_share"],
         slides["channel"]["chart_ids"]["revenue_share"]: data["charts"]["channel_revenue_share"],
-        slides["generic"]["chart_ids"]["revenue_cpa"]: data["charts"]["generic_revenue_cpa"],
-        slides["generic"]["chart_ids"]["purchases_cpatc"]: data["charts"]["generic_purchases_cpatc"],
-        slides["atc"]["chart_ids"]["atc_cpatc"]: data["charts"]["atc_cpatc"],
-        slides["atc"]["chart_ids"]["purchases_cpatc"]: data["charts"]["atc_purchases_cpatc"],
+        slides["generic"]["chart_ids"]["revenue_yoy"]: data["charts"]["generic_revenue_yoy"],
+        slides["generic"]["chart_ids"]["purchases_yoy"]: data["charts"]["generic_purchases_yoy"],
     }
 
     return {
@@ -421,12 +400,9 @@ def _prepare_olympic_qbr_data(
     data = _prepare_datasets(source_df, report_mode="quarterly")
     insights = {
         "executive_summary": generate_executive_summary(data)["bullets"],
-        "overall_performance": analyze_overall_performance(data)["bullets"],
         "yoy_comparison": analyze_yoy(data)["bullets"],
-        "end_of_period": analyze_end_of_period(data)["bullets"],
         "channel_performance": analyze_channels(data)["bullets"],
         "generic_performance": analyze_generic_performance(data)["bullets"],
-        "atc_analysis": analyze_atc(data)["bullets"],
     }
 
     summary = data["summary"]
@@ -453,16 +429,39 @@ def _prepare_olympic_qbr_data(
 
     charts_dir = request_dir / "outputs" / "native_google_slides_charts" / "olympic_qbr"
     charts_dir.mkdir(parents=True, exist_ok=True)
+    overall_monthly_yoy = _quarter_monthly_yoy_frame(
+        data["all_monthly"],
+        period=period,
+    )
+    generic_monthly_yoy = _quarter_monthly_yoy_frame(
+        data["raw_performance"],
+        period=period,
+        campaign_type="Generic",
+    )
+    generic_card_summary = _qbr_campaign_type_card_summary(
+        data["raw_performance"],
+        period=period,
+        campaign_type="Generic",
+    )
+    insights["generic_summary"] = _generic_summary_insights(
+        generic_card_summary["current"],
+        generic_card_summary["prior"],
+        period,
+    )
     charts = {
-        "overall_revenue_cpa": _plot_revenue_cpa(
-            charts_dir / "overall_revenue_cpa.png",
-            data["monthly_performance"],
-            "Overall",
+        "overall_revenue_yoy": _plot_quarter_monthly_yoy_bars(
+            charts_dir / "overall_revenue_yoy.png",
+            overall_monthly_yoy,
+            metric="revenue",
+            title="Monthly Revenue YoY",
+            period=period,
         ),
-        "overall_purchases_cpatc": _plot_purchases_cpatc(
-            charts_dir / "overall_purchases_cpatc.png",
-            data["monthly_performance"],
-            "Overall",
+        "overall_purchases_yoy": _plot_quarter_monthly_yoy_bars(
+            charts_dir / "overall_purchases_yoy.png",
+            overall_monthly_yoy,
+            metric="purchases",
+            title="Monthly Purchases YoY",
+            period=period,
         ),
         "yoy_summary": _plot_quarter_yoy_summary(
             charts_dir / "yoy_summary.png",
@@ -481,24 +480,19 @@ def _prepare_olympic_qbr_data(
             "revenue",
             "Revenue Share",
         ),
-        "generic_revenue_cpa": _plot_revenue_cpa(
-            charts_dir / "generic_revenue_cpa.png",
-            data["generic_monthly"],
-            "Generic",
+        "generic_revenue_yoy": _plot_quarter_monthly_yoy_bars(
+            charts_dir / "generic_revenue_yoy.png",
+            generic_monthly_yoy,
+            metric="revenue",
+            title="Generic Revenue YoY",
+            period=period,
         ),
-        "generic_purchases_cpatc": _plot_purchases_cpatc(
-            charts_dir / "generic_purchases_cpatc.png",
-            data["generic_monthly"],
-            "Generic",
-        ),
-        "atc_cpatc": _plot_atc_cpatc(
-            charts_dir / "atc_cpatc.png",
-            data["atc_trends"],
-        ),
-        "atc_purchases_cpatc": _plot_purchases_cpatc(
-            charts_dir / "atc_purchases_cpatc.png",
-            data["atc_trends"],
-            "ATC",
+        "generic_purchases_yoy": _plot_quarter_monthly_yoy_bars(
+            charts_dir / "generic_purchases_yoy.png",
+            generic_monthly_yoy,
+            metric="purchases",
+            title="Generic Purchases YoY",
+            period=period,
         ),
     }
     trends = _build_trend_payloads(
@@ -523,6 +517,7 @@ def _prepare_olympic_qbr_data(
         "trends": trends["sections"],
         "trends_window": trends_window,
         "auction": auction,
+        "generic_card_summary": generic_card_summary,
         "manual_inputs": {
             "google_ads_auction_insights_csv": str(
                 auction["sources"].get("Google Ads") or ""
@@ -702,29 +697,71 @@ def _executive_kpi_text(
     return output
 
 
-def _end_of_period_text(
-    slide_spec: Mapping[str, Any], end_period: pd.DataFrame
+def _qbr_section_kpi_text(
+    kpi_ids: Mapping[str, Sequence[str]],
+    current: Mapping[str, Any],
+    prior: Mapping[str, Any],
+    period: Mapping[str, Any],
 ) -> dict[str, str]:
-    if end_period.empty:
-        return {}
-    previous = end_period.iloc[-2] if len(end_period) > 1 else end_period.iloc[-1]
-    latest = end_period.iloc[-1]
-    previous_label = str(previous["month_label"])
-    latest_label = str(latest["month_label"])
-    output: dict[str, str] = {
-        str(slide_spec["previous_month_id"]): previous_label,
-        str(slide_spec["latest_month_id"]): f"{latest_label} - Latest",
-        str(slide_spec["change_label_id"]): (
-            f"Change\n{previous_label.split()[0]} to {latest_label.split()[0]}"
-        ),
+    labels = {
+        "revenue": period["label"],
+        "purchases": period["label"],
+        "cpa": "Cost per purchase",
+        "cost": "Total spend",
+        "aov": "Avg order value",
+        "cpatc": "Cost per add-to-cart",
     }
-    for metric, object_id in slide_spec["previous_values"].items():
-        output[str(object_id)] = _format_metric(metric, previous[metric])
-    for metric, object_id in slide_spec["latest_values"].items():
-        output[str(object_id)] = _format_metric(metric, latest[metric])
-    for metric, object_id in slide_spec["change_values"].items():
-        output[str(object_id)] = _fmt_pct(_pct_change(previous[metric], latest[metric]))
+    output: dict[str, str] = {}
+    for metric, ids in kpi_ids.items():
+        ids = list(ids or [])
+        if len(ids) != 3:
+            continue
+        value_id, label_id, delta_id = ids
+        value = _summary_value(current, metric)
+        output[value_id] = (
+            _currency(value)
+            if metric in {"revenue", "cpa", "cost", "aov", "cpatc"}
+            else _count(value)
+        )
+        output[label_id] = labels.get(metric, period["label"])
+        output[delta_id] = (
+            f"{_fmt_pct(_pct_change(_summary_value(prior, metric), value))} YoY"
+            if current.get("has_rows")
+            else "Review required"
+        )
     return output
+
+
+def _generic_summary_insights(
+    current: Mapping[str, Any],
+    prior: Mapping[str, Any],
+    period: Mapping[str, Any],
+) -> list[str]:
+    if not current.get("has_rows"):
+        return [
+            "Review required: no Generic campaign rows were available for this quarter.",
+            "Check the campaign classification before using this slide for client delivery.",
+        ]
+    revenue_change = _fmt_pct(
+        _pct_change(_summary_value(prior, "revenue"), _summary_value(current, "revenue"))
+    )
+    purchases_change = _fmt_pct(
+        _pct_change(
+            _summary_value(prior, "purchases"), _summary_value(current, "purchases")
+        )
+    )
+    cost_change = _fmt_pct(
+        _pct_change(_summary_value(prior, "cost"), _summary_value(current, "cost"))
+    )
+    cpa_change = _fmt_pct(
+        _pct_change(_summary_value(prior, "cpa"), _summary_value(current, "cpa"))
+    )
+    return [
+        f"Generic delivered {_currency(current['revenue'])} revenue from {_count(current['purchases'])} purchases in {period['label']}.",
+        f"Revenue moved {revenue_change} YoY and purchases moved {purchases_change} YoY.",
+        f"Spend moved {cost_change} YoY, with CPA at {_currency(current['cpa'])} ({cpa_change} YoY).",
+        "Review commentary before client delivery.",
+    ]
 
 
 def _quarter_monthly_table_values(frame: pd.DataFrame, *, overall: bool = False) -> list[list[str]]:
@@ -767,6 +804,108 @@ def _campaign_mix_for_chart(frame: pd.DataFrame) -> pd.DataFrame:
     if "campaign_type" not in chart_df.columns:
         chart_df["campaign_type"] = "Unknown"
     return chart_df
+
+
+def _qbr_campaign_type_card_summary(
+    frame: pd.DataFrame,
+    *,
+    period: Mapping[str, Any],
+    campaign_type: str,
+) -> dict[str, dict[str, Any]]:
+    return {
+        "current": _qbr_campaign_type_totals(
+            frame,
+            campaign_type=campaign_type,
+            year=int(period["year"]),
+            quarter=int(period["quarter"]),
+        ),
+        "prior": _qbr_campaign_type_totals(
+            frame,
+            campaign_type=campaign_type,
+            year=int(period["year"]) - 1,
+            quarter=int(period["quarter"]),
+        ),
+    }
+
+
+def _qbr_campaign_type_totals(
+    frame: pd.DataFrame,
+    *,
+    campaign_type: str,
+    year: int,
+    quarter: int,
+) -> dict[str, Any]:
+    if frame.empty:
+        return _empty_summary(False)
+    working = frame.copy()
+    if "date" in working.columns:
+        working["date"] = pd.to_datetime(working["date"], errors="coerce")
+    elif "Date" in working.columns:
+        working["date"] = pd.to_datetime(working["Date"], errors="coerce")
+    if "date" in working.columns:
+        working["year"] = working["date"].dt.year
+        working["quarter"] = working["date"].dt.quarter
+    channel_column = "channel" if "channel" in working.columns else "Campaign Type"
+    filtered = working[
+        (working.get("year") == year)
+        & (working.get("quarter") == quarter)
+        & (
+            working[channel_column]
+            .fillna("")
+            .astype(str)
+            .str.casefold()
+            == campaign_type.casefold()
+        )
+    ].copy()
+    if filtered.empty:
+        return _empty_summary(False)
+    revenue = float(pd.to_numeric(filtered.get("revenue"), errors="coerce").sum())
+    cost = float(pd.to_numeric(filtered.get("cost"), errors="coerce").sum())
+    purchases = float(pd.to_numeric(filtered.get("purchases"), errors="coerce").sum())
+    add_to_cart = float(
+        pd.to_numeric(filtered.get("add_to_cart"), errors="coerce").sum()
+    )
+    return {
+        "has_rows": True,
+        "revenue": revenue,
+        "cost": cost,
+        "purchases": purchases,
+        "add_to_cart": add_to_cart,
+        "atc": add_to_cart,
+        "cpa": _safe_summary_divide(cost, purchases),
+        "cpatc": _safe_summary_divide(cost, add_to_cart),
+        "aov": _safe_summary_divide(revenue, purchases),
+    }
+
+
+def _empty_summary(has_rows: bool = False) -> dict[str, Any]:
+    return {
+        "has_rows": has_rows,
+        "revenue": 0.0,
+        "cost": 0.0,
+        "purchases": 0.0,
+        "add_to_cart": 0.0,
+        "atc": 0.0,
+        "cpa": 0.0,
+        "cpatc": 0.0,
+        "aov": 0.0,
+    }
+
+
+def _safe_summary_divide(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def _summary_value(summary: Mapping[str, Any], metric: str) -> float:
+    key = "add_to_cart" if metric == "atc" else metric
+    value = summary.get(key)
+    if value is None and key == "add_to_cart":
+        value = summary.get("atc")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return numeric if math.isfinite(numeric) else 0.0
 
 
 def _trend_comparison_frame(
@@ -931,38 +1070,164 @@ def _plot_quarter_yoy_summary(
     return output_path
 
 
-def _plot_atc_cpatc(output_path: Path, frame: pd.DataFrame) -> Path:
-    plot_df = frame.rename(columns={"atc": "add_to_cart"}).copy()
-    fig, ax1 = plt.subplots(figsize=(6.0, 2.9))
-    if plot_df.empty or plot_df["add_to_cart"].fillna(0).sum() == 0:
-        ax1.text(0.5, 0.5, "No source data", ha="center", va="center", color="#666666")
-        ax1.set_xticks([])
-        ax1.set_yticks([])
-        for spine in ax1.spines.values():
+def _quarter_monthly_yoy_frame(
+    frame: pd.DataFrame,
+    *,
+    period: Mapping[str, Any],
+    campaign_type: str | None = None,
+) -> pd.DataFrame:
+    columns = [
+        "month_num",
+        "month",
+        "revenue_current",
+        "revenue_prior",
+        "purchases_current",
+        "purchases_prior",
+    ]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    working = frame.copy()
+    if "date" in working.columns:
+        working["date"] = pd.to_datetime(working["date"], errors="coerce")
+        working["month_start"] = working["date"].dt.to_period("M").dt.to_timestamp()
+    elif "month_start" in working.columns:
+        working["month_start"] = pd.to_datetime(
+            working["month_start"], errors="coerce"
+        )
+    else:
+        return pd.DataFrame(columns=columns)
+    working = working.dropna(subset=["month_start"]).copy()
+    if working.empty:
+        return pd.DataFrame(columns=columns)
+    if campaign_type:
+        channel_column = "channel" if "channel" in working.columns else "Campaign Type"
+        if channel_column not in working.columns:
+            return pd.DataFrame(columns=columns)
+        working = working[
+            working[channel_column].fillna("").astype(str).str.casefold()
+            == campaign_type.casefold()
+        ].copy()
+    working["year"] = working["month_start"].dt.year
+    working["quarter"] = working["month_start"].dt.quarter
+    working["month_num"] = working["month_start"].dt.month
+    for metric in ("revenue", "purchases"):
+        working[metric] = pd.to_numeric(working.get(metric), errors="coerce").fillna(0)
+    monthly = (
+        working.groupby(["year", "quarter", "month_num"], as_index=False)[
+            ["revenue", "purchases"]
+        ]
+        .sum()
+        .reset_index(drop=True)
+    )
+    year = int(period["year"])
+    quarter = int(period["quarter"])
+    start_month = (quarter - 1) * 3 + 1
+    months = pd.DataFrame(
+        {
+            "month_num": [start_month, start_month + 1, start_month + 2],
+            "month": [
+                pd.Timestamp(year, month, 1).strftime("%b")
+                for month in range(start_month, start_month + 3)
+            ],
+        }
+    )
+    current = (
+        monthly[(monthly["year"] == year) & (monthly["quarter"] == quarter)]
+        .rename(
+            columns={
+                "revenue": "revenue_current",
+                "purchases": "purchases_current",
+            }
+        )[["month_num", "revenue_current", "purchases_current"]]
+    )
+    prior = (
+        monthly[(monthly["year"] == year - 1) & (monthly["quarter"] == quarter)]
+        .rename(
+            columns={
+                "revenue": "revenue_prior",
+                "purchases": "purchases_prior",
+            }
+        )[["month_num", "revenue_prior", "purchases_prior"]]
+    )
+    comparison = months.merge(current, on="month_num", how="left").merge(
+        prior, on="month_num", how="left"
+    )
+    numeric_columns = [
+        "revenue_current",
+        "revenue_prior",
+        "purchases_current",
+        "purchases_prior",
+    ]
+    comparison[numeric_columns] = comparison[numeric_columns].fillna(0.0)
+    return comparison[columns]
+
+
+def _plot_quarter_monthly_yoy_bars(
+    output_path: Path,
+    comparison: pd.DataFrame,
+    *,
+    metric: str,
+    title: str,
+    period: Mapping[str, Any],
+) -> Path:
+    current_column = f"{metric}_current"
+    prior_column = f"{metric}_prior"
+    fig, ax = plt.subplots(figsize=(5.9, 3.0))
+    has_data = (
+        not comparison.empty
+        and comparison[[current_column, prior_column]].fillna(0).to_numpy().sum() > 0
+    )
+    if not has_data:
+        ax.text(0.5, 0.5, "No matched YoY source data", ha="center", va="center", color="#666666")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
             spine.set_visible(False)
     else:
-        ax2 = ax1.twinx()
-        ax1.bar(plot_df["month_label"], plot_df["add_to_cart"], color=OLYMPIC_RED, alpha=0.88)
-        ax2.plot(
-            plot_df["month_label"],
-            plot_df["cpatc"],
-            color=OLYMPIC_BLUE,
-            marker="o",
-            linewidth=2.0,
+        x = list(range(len(comparison)))
+        width = 0.34
+        prior_values = comparison[prior_column].fillna(0).astype(float)
+        current_values = comparison[current_column].fillna(0).astype(float)
+        prior_label = f"Q{period['quarter']} {int(period['year']) - 1}"
+        current_label = str(period["label"])
+        ax.bar(
+            [item - width / 2 for item in x],
+            prior_values,
+            width,
+            color=OLYMPIC_GREY,
+            label=prior_label,
         )
-        ax1.set_title("Add to Cart and Cost/ATC", fontsize=10, color=OLYMPIC_BLUE, fontweight="bold")
-        ax1.set_ylabel("Add to Cart", fontsize=8, color=OLYMPIC_BLUE)
-        ax2.set_ylabel("Cost/ATC", fontsize=8, color=OLYMPIC_BLUE)
-        ax1.tick_params(axis="x", labelsize=8)
-        ax1.tick_params(axis="y", labelsize=7)
-        ax2.tick_params(axis="y", labelsize=7)
-        ax1.grid(axis="y", alpha=0.18)
-        ax1.spines[["top", "right"]].set_visible(False)
-        ax2.spines[["top", "left"]].set_visible(False)
+        ax.bar(
+            [item + width / 2 for item in x],
+            current_values,
+            width,
+            color=OLYMPIC_RED,
+            label=current_label,
+        )
+        ax.set_xticks(x)
+        ax.set_xticklabels(comparison["month"], fontsize=8)
+        ax.set_title(title, fontsize=10, color=OLYMPIC_BLUE, fontweight="bold")
+        ax.set_ylabel("Revenue (£)" if metric == "revenue" else "Purchases", fontsize=8)
+        ax.tick_params(axis="y", labelsize=7)
+        ax.grid(axis="y", alpha=0.18)
+        ax.legend(fontsize=7, loc="upper left")
+        ax.spines[["top", "right"]].set_visible(False)
+        for bars in ax.containers:
+            labels = [
+                _compact_currency(value) if metric == "revenue" else f"{value:,.0f}"
+                for value in bars.datavalues
+            ]
+            ax.bar_label(bars, labels=labels, fontsize=6, padding=2)
     plt.tight_layout()
     fig.savefig(output_path, dpi=220, transparent=False, facecolor="white")
     plt.close(fig)
     return output_path
+
+
+def _compact_currency(value: float) -> str:
+    if abs(value) >= 1000:
+        return f"£{value / 1000:,.0f}k"
+    return f"£{value:,.0f}"
 
 
 def _auction_table_values(frame: pd.DataFrame) -> list[list[str]]:
@@ -1036,12 +1301,6 @@ def _top_metric_text(rows: list[dict[str, Any]] | None, label: str) -> str | Non
     if top.get("value") is None:
         return None
     return f"{top['domain']} had the {label} at {top['value'] * 100:.1f}%."
-
-
-def _format_metric(metric: str, value: Any) -> str:
-    if metric in {"revenue", "cost", "cpa", "cpatc", "aov"}:
-        return _currency(value)
-    return _count(value)
 
 
 def _pct_change(base: Any, current: Any) -> float | None:
@@ -1178,22 +1437,15 @@ def _subtitle_text_ids(manifest: Mapping[str, Any]) -> list[str]:
 def _delta_object_ids(payload: Mapping[str, Any]) -> dict[str, str]:
     manifest = _read_json(OLYMPIC_QBR_TEMPLATE_MANIFEST)
     ids: dict[str, str] = {}
-    for metric, object_ids in (
-        manifest.get("slides", {})
-        .get("executive_summary", {})
-        .get("kpi_ids", {})
-        .items()
-    ):
-        object_ids = list(object_ids or [])
-        if len(object_ids) == 3:
-            ids[str(object_ids[2])] = str(metric)
-    for metric, object_id in (
-        manifest.get("slides", {})
-        .get("end_of_period", {})
-        .get("change_values", {})
-        .items()
-    ):
-        ids[str(object_id)] = str(metric)
+    for slide in (manifest.get("slides") or {}).values():
+        if not isinstance(slide, Mapping):
+            continue
+        for metric, object_ids in (slide.get("kpi_ids") or {}).items():
+            object_ids = list(object_ids or [])
+            if len(object_ids) == 3:
+                ids[str(object_ids[2])] = str(metric)
+        for metric, object_id in (slide.get("change_values") or {}).items():
+            ids[str(object_id)] = str(metric)
     return ids
 
 

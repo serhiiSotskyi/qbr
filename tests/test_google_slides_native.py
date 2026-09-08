@@ -1144,9 +1144,31 @@ class OlympicQBRNativeSlidesTests(unittest.TestCase):
 
         self.assertEqual(payload["period"]["label"], "Q2 2026")
         self.assertEqual(payload["shape_text"]["p1_i20"], "Q2 2026 Performance Review")
+        self.assertEqual(payload["shape_text"]["p4_i103"], "Overall Performance Q2")
+        self.assertEqual(payload["shape_text"]["p9_i240"], "Campaign Type Performance")
+        self.assertEqual(
+            payload["shape_text"]["ohqbr_gen_103"],
+            "Generic Performance Summary",
+        )
+        self.assertIn("Generic delivered", payload["shape_text"]["ohqbr_gen_144"])
+        self.assertNotIn("p6_i172", payload["shape_text"])
         self.assertIn("YTD to Q2 2026", payload["shape_text"]["p2_i40"])
         self.assertIn("same months last year", payload["shape_text"]["p2_i63"])
         self.assertTrue(str(payload["charts"]["p2_i41"]).endswith("brand_trend.png"))
+        self.assertTrue(
+            str(payload["charts"]["p6_i168"]).endswith("overall_revenue_yoy.png")
+        )
+        self.assertTrue(
+            str(payload["charts"]["p6_i169"]).endswith("overall_purchases_yoy.png")
+        )
+        self.assertTrue(
+            str(payload["charts"]["p10_i258"]).endswith("generic_revenue_yoy.png")
+        )
+        self.assertTrue(
+            str(payload["charts"]["p10_i259"]).endswith("generic_purchases_yoy.png")
+        )
+        self.assertFalse(any("p8_" in key for key in payload["shape_text"]))
+        self.assertFalse(any("p11_" in key for key in payload["shape_text"]))
 
         auction_table = payload["tables"]["p5_i154"]["values"]
         self.assertEqual(
@@ -1202,6 +1224,17 @@ class OlympicQBRNativeSlidesTests(unittest.TestCase):
                 for request in fake_client.batch_requests
             )
         )
+        replaced_images = {
+            request.get("replaceImage", {}).get("imageObjectId")
+            for request in fake_client.batch_requests
+            if request.get("replaceImage")
+        }
+        self.assertIn("p6_i168", replaced_images)
+        self.assertIn("p6_i169", replaced_images)
+        self.assertIn("p10_i258", replaced_images)
+        self.assertIn("p10_i259", replaced_images)
+        self.assertNotIn("p11_i283", replaced_images)
+        self.assertNotIn("p11_i284", replaced_images)
         self.assertTrue(
             any(
                 request.get("insertTableColumns", {}).get("tableObjectId") == "p5_i154"
@@ -1218,7 +1251,35 @@ class OlympicQBRNativeSlidesTests(unittest.TestCase):
                 for request in fake_client.batch_requests
             )
         )
+        self.assertTrue(
+            any(
+                request.get("updateTextStyle", {}).get("objectId") == "ohqbr_gen_128"
+                and request["updateTextStyle"]["style"]["foregroundColor"][
+                    "opaqueColor"
+                ]["rgbColor"]
+                == {"red": 0.42, "green": 0.42, "blue": 0.42}
+                for request in fake_client.batch_requests
+            )
+        )
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+    def test_qbr_template_manifest_applies_source_slide_comments(self) -> None:
+        manifest = json.loads(OLYMPIC_QBR_TEMPLATE_MANIFEST.read_text(encoding="utf-8"))
+        section_slide_ids = [section["slide_id"] for section in manifest["sections"]]
+
+        self.assertEqual(len(section_slide_ids), 10)
+        self.assertNotIn("p8", section_slide_ids)
+        self.assertNotIn("p11", section_slide_ids)
+        self.assertEqual(
+            section_slide_ids[section_slide_ids.index("p10") - 1],
+            "ohqbr_gen_slide",
+        )
+        self.assertNotIn("end_of_period", manifest["slides"])
+        self.assertNotIn("atc", manifest["slides"])
+        self.assertEqual(
+            manifest["slides"]["overall"]["chart_ids"],
+            {"revenue_yoy": "p6_i168", "purchases_yoy": "p6_i169"},
+        )
 
 
 class OlympicMonthlyNativeSlidesTests(unittest.TestCase):

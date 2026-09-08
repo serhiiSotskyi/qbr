@@ -9,7 +9,7 @@
   "client_id": "olympic_holidays",
   "client_name": "Olympic Holidays",
   "report_mode": "quarterly",
-  "status": "prototype_template_created",
+  "status": "prototype_template_updated_from_source_comments",
   "generation_rules": {
     "data_sources": {
       "performance": "GA4 API generated performance.csv on API Source Test.",
@@ -19,9 +19,39 @@
     "original_deck_rule": "The source presentation is never edited. The app copies this template deck and edits the copy.",
     "period_rule": "The overall deck remains quarter-led. Trend slides show current YTD against prior-year YTD.",
     "auction_rule": "Auction rows from Google Ads and Microsoft Ads are shown with a Source column because each platform reports auction percentages independently.",
-    "chart_rule": "Charts are rendered locally as high-resolution PNGs and inserted into existing native image slots.",
+    "chart_rule": "Charts are rendered locally as high-resolution PNGs and inserted into existing native image slots. Overall and Generic QBR performance chart slots use separate monthly YoY bar charts, not combined bar/line charts.",
     "style_rule": "Generated decks explicitly restyle title, subtitle, card delta, and table-header text so copied template styling remains readable."
   },
+  "source_comments_applied": [
+    {
+      "source_slide_id": "p6",
+      "instruction": "Change charts to show purchases YoY and revenue YoY per month. Remove the commentary section."
+    },
+    {
+      "source_slide_id": "p11",
+      "instruction": "Remove this slide."
+    },
+    {
+      "source_slide_id": "p10",
+      "instruction": "Replace charts with purchases YoY and revenue YoY by month as two separate charts."
+    },
+    {
+      "source_slide_id": "p10",
+      "instruction": "Add a slide before Generic Performance with Generic-only metric cards and commentary space."
+    },
+    {
+      "source_slide_id": "p9",
+      "instruction": "Title should be Campaign Type Performance."
+    },
+    {
+      "source_slide_id": "p8",
+      "instruction": "Remove this slide."
+    },
+    {
+      "source_slide_id": "p4",
+      "instruction": "Change title to Overall Performance Q2."
+    }
+  ],
   "global_text_ids": {
     "cover_brand": "p1_i19",
     "cover_title": "p1_i20",
@@ -77,10 +107,9 @@
       "subtitle_id": "p6_i166",
       "table_id": "p6_i167",
       "chart_ids": {
-        "revenue_cpa": "p6_i168",
-        "purchases_cpatc": "p6_i169"
-      },
-      "insights_id": "p6_i172"
+        "revenue_yoy": "p6_i168",
+        "purchases_yoy": "p6_i169"
+      }
     },
     "yoy": {
       "slide_id": "p7",
@@ -93,36 +122,6 @@
       },
       "insights_id": "p7_i188"
     },
-    "end_of_period": {
-      "slide_id": "p8",
-      "title_id": "p8_i196",
-      "subtitle_id": "p8_i197",
-      "previous_month_id": "p8_i200",
-      "previous_values": {
-        "revenue": "p8_i202",
-        "cost": "p8_i204",
-        "purchases": "p8_i206",
-        "cpa": "p8_i208",
-        "cpatc": "p8_i210"
-      },
-      "latest_month_id": "p8_i213",
-      "latest_values": {
-        "revenue": "p8_i215",
-        "cost": "p8_i217",
-        "purchases": "p8_i219",
-        "cpa": "p8_i221",
-        "cpatc": "p8_i223"
-      },
-      "change_label_id": "p8_i224",
-      "change_values": {
-        "revenue": "p8_i225",
-        "cost": "p8_i226",
-        "purchases": "p8_i227",
-        "cpa": "p8_i228",
-        "cpatc": "p8_i229"
-      },
-      "insights_id": "p8_i232"
-    },
     "channel": {
       "slide_id": "p9",
       "title_id": "p9_i240",
@@ -134,31 +133,30 @@
       },
       "insights_id": "p9_i247"
     },
+    "generic_summary": {
+      "slide_id": "ohqbr_gen_slide",
+      "title_id": "ohqbr_gen_103",
+      "subtitle_id": "ohqbr_gen_104",
+      "insights_id": "ohqbr_gen_144",
+      "kpi_ids": {
+        "revenue": ["ohqbr_gen_108", "ohqbr_gen_109", "ohqbr_gen_110"],
+        "purchases": ["ohqbr_gen_114", "ohqbr_gen_115", "ohqbr_gen_116"],
+        "cpa": ["ohqbr_gen_120", "ohqbr_gen_121", "ohqbr_gen_122"],
+        "cost": ["ohqbr_gen_126", "ohqbr_gen_127", "ohqbr_gen_128"],
+        "aov": ["ohqbr_gen_132", "ohqbr_gen_133", "ohqbr_gen_134"],
+        "cpatc": ["ohqbr_gen_138", "ohqbr_gen_139", "ohqbr_gen_140"]
+      }
+    },
     "generic": {
       "slide_id": "p10",
       "title_id": "p10_i255",
       "subtitle_id": "p10_i256",
       "table_id": "p10_i257",
       "chart_ids": {
-        "revenue_cpa": "p10_i258",
-        "purchases_cpatc": "p10_i259"
+        "revenue_yoy": "p10_i258",
+        "purchases_yoy": "p10_i259"
       },
       "insights_id": "p10_i262"
-    },
-    "atc": {
-      "slide_id": "p11",
-      "title_id": "p11_i270",
-      "subtitle_id": "p11_i271",
-      "table_id": "p11_i272",
-      "total_atc_id": "p11_i276",
-      "total_atc_label_id": "p11_i277",
-      "cpatc_id": "p11_i281",
-      "cpatc_label_id": "p11_i282",
-      "chart_ids": {
-        "atc_cpatc": "p11_i283",
-        "purchases_cpatc": "p11_i284"
-      },
-      "insights_id": "p11_i287"
     }
   },
   "sections": [
@@ -169,9 +167,8 @@
     {"number": 5, "role": "kpi_cards", "slide_id": "p4"},
     {"number": 6, "role": "overall_performance", "slide_id": "p6"},
     {"number": 7, "role": "yoy", "slide_id": "p7"},
-    {"number": 8, "role": "end_of_period", "slide_id": "p8"},
-    {"number": 9, "role": "campaign_mix", "slide_id": "p9"},
-    {"number": 10, "role": "generic_performance", "slide_id": "p10"},
-    {"number": 11, "role": "atc_analysis", "slide_id": "p11"}
+    {"number": 8, "role": "campaign_mix", "slide_id": "p9"},
+    {"number": 9, "role": "generic_summary", "slide_id": "ohqbr_gen_slide"},
+    {"number": 10, "role": "generic_performance", "slide_id": "p10"}
   ]
 }
