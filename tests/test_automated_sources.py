@@ -32,7 +32,7 @@ from src.source_normalizers import (
     normalize_wightlink_performance_export,
 )
 from src.trends_metrics import build_trend_summary
-from src.trends_loader import TrendsLoader
+from src.trends_loader import TrendsLoader, normalize_term
 
 
 class FakeGA4Client:
@@ -204,6 +204,20 @@ class DateToRejectingDataForSEOClient(FakeDataForSEOClient):
         self.calls.append(date_to)
         if date_to is not None:
             raise AutomatedSourceError("DataForSEO Trends task failed: Invalid Field: 'date_to'.")
+        return super().fetch_interest_over_time(
+            keyword=keyword,
+            location_name=location_name,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+
+class LocationRecordingDataForSEOClient(FakeDataForSEOClient):
+    def __init__(self) -> None:
+        self.locations: list[str] = []
+
+    def fetch_interest_over_time(self, *, keyword, location_name, date_from, date_to):
+        self.locations.append(location_name)
         return super().fetch_interest_over_time(
             keyword=keyword,
             location_name=location_name,
@@ -526,6 +540,69 @@ class AutomatedSourcesTests(unittest.TestCase):
             previous = pd.read_csv(previous_files[0])
             self.assertEqual(current["wendy wu tours"].tolist(), [40.0, 80.0])
             self.assertEqual(previous["wendy wu tours"].tolist(), [30.0, 45.0])
+
+    def test_dataforseo_source_uses_australia_location_for_wwt_aus(self) -> None:
+        client_config = {
+            "id": "wendy_wu_australia",
+            "country": "Australia",
+            "brand_trends": {"enabled": True, "terms": ["wendy wu tours australia"]},
+            "destination_trends": {"enabled": False, "destinations": []},
+            "trend_aliases": {"wendy wu tours australia": ["wendy wu tours"]},
+        }
+        period = SourcePeriod(
+            kind="quarterly",
+            year=2026,
+            quarter=2,
+            start=pd.Timestamp("2026-04-01"),
+            end=pd.Timestamp("2026-06-30"),
+        )
+        trends_client = LocationRecordingDataForSEOClient()
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {"DATAFORSEO_LOGIN": "login", "DATAFORSEO_PASSWORD": "password"},
+            clear=False,
+        ):
+            generate_dataforseo_trend_csvs(
+                client_config=client_config,
+                report_mode="quarterly",
+                period=period,
+                output_dir=tmpdir,
+                trends_client=trends_client,
+            )
+
+        self.assertTrue(trends_client.locations)
+        self.assertEqual(set(trends_client.locations), {"Australia"})
+        self.assertEqual(
+            resolve_trend_terms(client_config),
+            ["wendy wu tours australia", "wendy wu tours"],
+        )
+
+    def test_ytd_trend_summary_allows_empty_prior_year_series(self) -> None:
+        current = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2026-01-05", "2026-04-05"]),
+                "month_start": pd.to_datetime(["2026-01-01", "2026-04-01"]),
+                "term": ["wendy wu tours australia", "wendy wu tours australia"],
+                "normalized_term": [normalize_term("wendy wu tours australia")] * 2,
+                "value": [40.0, 80.0],
+                "source_file": ["current.csv", "current.csv"],
+            }
+        )
+        previous = pd.DataFrame(
+            columns=["date", "month_start", "term", "normalized_term", "value", "source_file"]
+        )
+
+        summary = build_trend_summary(
+            current,
+            "Brand",
+            ["wendy wu tours australia"],
+            QuarterInfo(2026, 2),
+            comparison_period="ytd",
+            previous_trends_df=previous,
+        )
+
+        self.assertIsNotNone(summary)
+        self.assertTrue(summary["comparison"]["prior_value"].isna().all())
 
     def test_dataforseo_source_omits_date_to_and_filters_locally(self) -> None:
         client_config = {

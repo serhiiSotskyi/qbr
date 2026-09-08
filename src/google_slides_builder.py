@@ -307,7 +307,7 @@ def generate_native_google_slides(
             google_client=google_client,
             export_pdf=export_pdf,
         )
-    if client_id == "wendy_wu" and report_mode == "quarterly":
+    if client_id in {"wendy_wu", "wendy_wu_australia"} and report_mode == "quarterly":
         from .wendy_wu_qbr_google_slides_builder import (
             generate_wendy_wu_qbr_google_slides,
         )

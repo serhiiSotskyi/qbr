@@ -40,7 +40,13 @@ def build_trend_summary(
         return None
 
     current_lookup = current_df.set_index("month_start")["value"].to_dict()
-    prior_lookup = prior_df.assign(month_num=prior_df["month_start"].dt.month).set_index("month_num")["value"].to_dict()
+    prior_lookup = (
+        prior_df.assign(month_num=prior_df["month_start"].dt.month)
+        .set_index("month_num")["value"]
+        .to_dict()
+        if not prior_df.empty
+        else {}
+    )
     comparison_rows: List[Dict] = []
     for month_start in pd.date_range(current_start, current_end, freq="MS"):
         month_num = int(month_start.month)

@@ -137,6 +137,7 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
         registry = GoogleSlidesTemplateRegistry()
 
         quarterly = registry.status("wendy_wu", "quarterly")
+        wwt_aus_quarterly = registry.status("wendy_wu_australia", "quarterly")
         wwt_uk_monthly = registry.status("wendy_wu", "monthly")
         wwt_aus_monthly = registry.status("wendy_wu_australia", "monthly")
         wightlink_monthly = registry.status("wightlink", "monthly")
@@ -144,6 +145,8 @@ class GoogleWorkspaceConfigTests(unittest.TestCase):
 
         self.assertTrue(quarterly["supported"])
         self.assertTrue(quarterly["configured"])
+        self.assertTrue(wwt_aus_quarterly["supported"])
+        self.assertTrue(wwt_aus_quarterly["configured"])
         self.assertTrue(wwt_uk_monthly["supported"])
         self.assertTrue(wwt_uk_monthly["configured"])
         self.assertTrue(wwt_aus_monthly["supported"])
@@ -692,6 +695,48 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
             "Manual upload required",
         )
 
+    def test_qbr_payload_supports_australia_template_currency_and_destinations(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_qbr_artifact(
+                root,
+                client_id="wendy_wu_australia",
+                client_name="Wendy Wu Tours Australia",
+            )
+
+            payload = build_wendy_wu_qbr_slides_payload(
+                request_dir=root,
+                artifact=json.loads(artifact_path.read_text(encoding="utf-8")),
+                client_id="wendy_wu_australia",
+            )
+
+        self.assertEqual(payload["currency"], {"code": "AUD", "symbol": "$"})
+        self.assertEqual(payload["shape_text"]["p1_i20"], "Wendy Wu Tours Australia")
+        self.assertNotIn("SLIDES_API1312704722_38", payload["tables"])
+        all_text = json.dumps(
+            {"shape_text": payload["shape_text"], "tables": payload["tables"]},
+            ensure_ascii=False,
+        )
+        self.assertIn("$", all_text)
+        self.assertNotIn("£", all_text)
+        self.assertTrue(
+            str(payload["charts"][("p7_i106", "cost_leads")]).endswith(
+                "_cost_leads_bars.png"
+            )
+        )
+        self.assertEqual(
+            payload["manual_inputs"]["auction_insights_required"],
+            True,
+        )
+        self.assertEqual(
+            Path(payload["template_manifest"]).name
+            if isinstance(payload["template_manifest"], str)
+            else payload["template_manifest"]["client_id"],
+            "wendy_wu_australia",
+        )
+
     def test_qbr_payload_combines_google_and_microsoft_auction_sources(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -832,6 +877,55 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
                     "p2_i45",
                     {"red": 1.0, "green": 1.0, "blue": 1.0},
                 )
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
+
+    def test_australia_qbr_native_slides_use_custom_wendy_wu_builder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            artifact_path = _write_wendy_wu_qbr_artifact(
+                root,
+                client_id="wendy_wu_australia",
+                client_name="Wendy Wu Tours Australia",
+            )
+            fake_client = FakeGoogleWorkspaceClient(
+                presentation=_fake_wendy_wu_qbr_presentation(include_central_asia=False)
+            )
+
+            result = generate_native_google_slides(
+                client_id="wendy_wu_australia",
+                client_name="Wendy Wu Tours Australia",
+                report_mode="quarterly",
+                request_dir=root,
+                report_artifacts_path=artifact_path,
+                google_client=fake_client,
+                workspace_config=_configured_workspace(),
+                export_pdf=True,
+            )
+            manifest = json.loads(
+                Path(result.manifest_path).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(
+            manifest["builder"], "wendy_wu_australia_qbr_template_manifest"
+        )
+        self.assertEqual(manifest["currency"], {"code": "AUD", "symbol": "$"})
+        self.assertEqual(
+            manifest["template_id"], "1OZY5uv2bKLbxYGgrbrT7P57JAnjSw88UGDagr_AA6cE"
+        )
+        self.assertTrue(
+            any(
+                request.get("replaceImage", {}).get("imageObjectId") == "p3_i57"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertFalse(
+            any(
+                request.get("insertText", {}).get("objectId")
+                == "SLIDES_API1312704722_38"
                 for request in fake_client.batch_requests
             )
         )
@@ -1384,7 +1478,12 @@ def _write_wendy_wu_monthly_artifact(
     return artifact_path
 
 
-def _write_wendy_wu_qbr_artifact(root: Path) -> Path:
+def _write_wendy_wu_qbr_artifact(
+    root: Path,
+    *,
+    client_id: str = "wendy_wu",
+    client_name: str = "Wendy Wu Tours",
+) -> Path:
     source_data = root / "source_data"
     source_data.mkdir(parents=True, exist_ok=True)
     performance_csv = source_data / "performance.csv"
@@ -1400,6 +1499,12 @@ def _write_wendy_wu_qbr_artifact(root: Path) -> Path:
         ("Generic", "Mongolia", 4, 140, 700),
         ("Generic", "Peru", 2, 120, 600),
     ]
+    if client_id == "wendy_wu_australia":
+        section_rows = [
+            row
+            for row in section_rows
+            if row[1] not in {"Central Asia", "Mongolia"}
+        ]
     for year, multiplier in ((2025, 0.5), (2026, 1.0)):
         for month in range(1, 7):
             for campaign_type, destination, leads, cost, revenue in section_rows:
@@ -1454,8 +1559,8 @@ def _write_wendy_wu_qbr_artifact(root: Path) -> Path:
         encoding="utf-8",
     )
     artifact = {
-        "client_id": "wendy_wu",
-        "client_name": "Wendy Wu Tours",
+        "client_id": client_id,
+        "client_name": client_name,
         "report_mode": "quarterly",
         "period": {"label": "Q2 2026", "subtitle": "Q2 2026 (Apr - Jun 2026)"},
         "source_files": {"source_generation_manifest": str(source_manifest)},
@@ -1740,7 +1845,7 @@ def _fake_wendy_wu_monthly_presentation() -> dict:
     }
 
 
-def _fake_wendy_wu_qbr_presentation() -> dict:
+def _fake_wendy_wu_qbr_presentation(*, include_central_asia: bool = True) -> dict:
     shape_ids = {
         "p1_i20",
         "p1_i21",
@@ -1771,26 +1876,31 @@ def _fake_wendy_wu_qbr_presentation() -> dict:
         "p7_i136",
         "p7_i141",
         "p7_i142",
-        "SLIDES_API1312704722_3",
-        "SLIDES_API1312704722_4",
-        "SLIDES_API1312704722_6",
-        "SLIDES_API1312704722_9",
-        "SLIDES_API1312704722_14",
-        "SLIDES_API1312704722_19",
-        "SLIDES_API1312704722_24",
-        "SLIDES_API1312704722_29",
-        "SLIDES_API1312704722_34",
-        "SLIDES_API1312704722_11",
-        "SLIDES_API1312704722_16",
-        "SLIDES_API1312704722_21",
-        "SLIDES_API1312704722_26",
-        "SLIDES_API1312704722_31",
-        "SLIDES_API1312704722_36",
-        "SLIDES_API1312704722_37",
         "p29_i715",
         "p29_i718",
         "p29_i719",
     }
+    if include_central_asia:
+        shape_ids.update(
+            {
+                "SLIDES_API1312704722_3",
+                "SLIDES_API1312704722_4",
+                "SLIDES_API1312704722_6",
+                "SLIDES_API1312704722_9",
+                "SLIDES_API1312704722_14",
+                "SLIDES_API1312704722_19",
+                "SLIDES_API1312704722_24",
+                "SLIDES_API1312704722_29",
+                "SLIDES_API1312704722_34",
+                "SLIDES_API1312704722_11",
+                "SLIDES_API1312704722_16",
+                "SLIDES_API1312704722_21",
+                "SLIDES_API1312704722_26",
+                "SLIDES_API1312704722_31",
+                "SLIDES_API1312704722_36",
+                "SLIDES_API1312704722_37",
+            }
+        )
     table_ids = {
         "p9_i202": (5, 9),
         "p11_i260": (5, 9),
@@ -1800,10 +1910,11 @@ def _fake_wendy_wu_qbr_presentation() -> dict:
         "p20_i504": (4, 6),
         "p22_i564": (4, 6),
         "p24_i622": (4, 6),
-        "SLIDES_API1312704722_38": (4, 6),
         "p26_i682": (4, 9),
         "p29_i720": (9, 7),
     }
+    if include_central_asia:
+        table_ids["SLIDES_API1312704722_38"] = (4, 6)
     page_elements = []
     page_elements.extend(
         {

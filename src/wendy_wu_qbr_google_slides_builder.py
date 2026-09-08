@@ -67,8 +67,28 @@ WWT_UK_QBR_TEMPLATE_MANIFEST = (
     / "google_slides_templates"
     / "wendy_wu_uk_qbr_test_template.json"
 )
-OBSOLETE_WWT_UK_QBR_TEMPLATE_IDS = {
-    "1P5L_zODZ1D81QZK5Z8nuZ41ygON3D8GqTjYEeeDqMec",
+WWT_AUS_QBR_TEMPLATE_MANIFEST = (
+    PROJECT_ROOT
+    / "docs"
+    / "google_slides_templates"
+    / "wendy_wu_australia_qbr_test_template.json"
+)
+WENDY_WU_QBR_TEMPLATE_MANIFESTS = {
+    "wendy_wu": WWT_UK_QBR_TEMPLATE_MANIFEST,
+    "wendy_wu_australia": WWT_AUS_QBR_TEMPLATE_MANIFEST,
+}
+WENDY_WU_QBR_BUILDER_NAMES = {
+    "wendy_wu": "wendy_wu_uk_qbr_template_manifest",
+    "wendy_wu_australia": "wendy_wu_australia_qbr_template_manifest",
+}
+OBSOLETE_WENDY_WU_QBR_TEMPLATE_IDS = {
+    "wendy_wu": {
+        "1P5L_zODZ1D81QZK5Z8nuZ41ygON3D8GqTjYEeeDqMec",
+    },
+    "wendy_wu_australia": {
+        "1HukrzM7APAQbPJP9Z_9eyD-RNWa2WNSj6mOQ4dFyMQ8",
+        "1aI_bgn-lB2GCJVfjGmsDMX-iLlhRi7HpFs0HfS4un4M",
+    },
 }
 
 NEUTRAL_DELTA_RGB = {"red": 0.42, "green": 0.42, "blue": 0.42}
@@ -293,9 +313,12 @@ def generate_wendy_wu_qbr_google_slides(
     outputs_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = Path(report_artifacts_path)
     manifest_path = outputs_dir / "google_slides_generation_manifest.json"
-    template_manifest = _read_json(WWT_UK_QBR_TEMPLATE_MANIFEST)
+    template_manifest_path = _template_manifest_path(client_id)
+    template_manifest = _read_json(template_manifest_path)
     warnings: list[str] = []
-    effective_template_id = _effective_template_id(template, template_manifest, warnings)
+    effective_template_id = _effective_template_id(
+        client_id, template, template_manifest, warnings
+    )
 
     base_manifest: dict[str, Any] = {
         "schema_version": "1.0",
@@ -303,12 +326,12 @@ def generate_wendy_wu_qbr_google_slides(
         "client_id": client_id,
         "client_name": client_name,
         "report_mode": "quarterly",
-        "builder": "wendy_wu_uk_qbr_template_manifest",
+        "builder": _builder_name(client_id),
         "report_artifacts": str(artifact_path),
         "template_id": effective_template_id,
         "configured_template_id": template.template_id,
         "template_key": template.key,
-        "template_manifest": str(WWT_UK_QBR_TEMPLATE_MANIFEST),
+        "template_manifest": str(template_manifest_path),
         "chart_assets": [],
         "permission_cleanup": [],
         "output_sharing": [],
@@ -323,7 +346,7 @@ def generate_wendy_wu_qbr_google_slides(
     qa_pdf_path: Path | None = None
     output_sharing: list[dict[str, Any]] = []
     status = "success"
-    message = "Native WWT UK QBR Google Slides deck generated."
+    message = f"Native {client_name} QBR Google Slides deck generated."
     batch_update_request_count = 0
     payload: dict[str, Any] | None = None
 
@@ -331,6 +354,7 @@ def generate_wendy_wu_qbr_google_slides(
         payload = build_wendy_wu_qbr_slides_payload(
             request_dir=request_path,
             artifact=artifact,
+            client_id=client_id,
             template_manifest=template_manifest,
         )
         warnings.extend(payload.get("warnings") or [])
@@ -374,7 +398,7 @@ def generate_wendy_wu_qbr_google_slides(
                 presentation, payload["template_manifest"]
             )
         )
-        requests_body.extend(_build_cost_delta_style_requests())
+        requests_body.extend(_build_cost_delta_style_requests(presentation))
 
         batch_update_request_count = len(requests_body)
         _send_batch_updates(client, copied_id, requests_body)
@@ -388,7 +412,7 @@ def generate_wendy_wu_qbr_google_slides(
                 warnings.append(f"QA PDF export failed: {exc}")
     except Exception as exc:  # noqa: BLE001
         status = "failed"
-        message = f"Native WWT UK QBR Google Slides generation failed: {exc}"
+        message = f"Native {client_name} QBR Google Slides generation failed: {exc}"
     finally:
         cleanup_records = (
             asset_store.cleanup_public_permissions() if asset_store else []
@@ -402,6 +426,7 @@ def generate_wendy_wu_qbr_google_slides(
             "batch_update_request_count": batch_update_request_count,
             "manual_inputs": payload.get("manual_inputs") if payload else None,
             "automated_sources": payload.get("automated_sources") if payload else None,
+            "currency": payload.get("currency") if payload else None,
             "chart_assets": (
                 [asset.to_manifest() for asset in asset_store.assets]
                 if asset_store
@@ -432,6 +457,7 @@ def build_wendy_wu_qbr_slides_payload(
     *,
     request_dir: str | Path,
     artifact: dict[str, Any],
+    client_id: str = "wendy_wu",
     template_manifest: dict[str, Any] | None = None,
     project_root: str | Path = PROJECT_ROOT,
 ) -> dict[str, Any]:
@@ -442,14 +468,14 @@ def build_wendy_wu_qbr_slides_payload(
         chart_styles_path=root / "config" / "chart_styles.yaml",
         clients_config_path=root / "config" / "clients_config.json",
     )
-    client_config = config_loader.get_client_config("wendy_wu")
+    client_config = config_loader.get_client_config(client_id)
     source_manifest = _load_source_generation_manifest(request_path, artifact)
     performance_csv = _resolve_generated_file(
         source_manifest, request_path, "performance_csv"
     ) or request_path / "source_data" / "performance.csv"
     if not performance_csv.exists():
         raise FileNotFoundError(
-            "Could not find API-generated WWT UK QBR performance.csv."
+            f"Could not find API-generated {client_config.get('name', client_id)} QBR performance.csv."
         )
 
     df = load_csv(performance_csv)
@@ -471,7 +497,8 @@ def build_wendy_wu_qbr_slides_payload(
     )
     subtitle = _format_quarter_subtitle(quarter)
     footer = f"{quarter.label} | Summon Digital | Confidential"
-    client_label = "Wendy Wu Tours UK"
+    client_label = _client_label(client_id, client_config)
+    currency = _currency_for_client(client_id, client_config)
 
     shape_text: dict[str, str] = {
         "p1_i20": client_label,
@@ -501,11 +528,13 @@ def build_wendy_wu_qbr_slides_payload(
         subtitle=subtitle,
         footer=footer,
         chart_builder=chart_builder,
+        currency_symbol=currency["symbol"],
     )
     _populate_monthly_chart_sections(
         charts=charts,
         report=report,
         chart_builder=chart_builder,
+        currency_symbol=currency["symbol"],
     )
     _populate_trend_sections(
         shape_text=shape_text,
@@ -543,7 +572,9 @@ def build_wendy_wu_qbr_slides_payload(
     )
     _populate_review_required_sections(shape_text, subtitle, footer, quarter.label)
 
-    manifest = template_manifest or _read_json(WWT_UK_QBR_TEMPLATE_MANIFEST)
+    _localize_payload_currency(shape_text, tables, currency["symbol"])
+
+    manifest = template_manifest or _read_json(_template_manifest_path(client_id))
     return {
         "artifact": {
             **artifact,
@@ -566,6 +597,7 @@ def build_wendy_wu_qbr_slides_payload(
         "tables": tables,
         "charts": charts,
         "performance_csv": str(performance_csv),
+        "currency": currency,
         "manual_inputs": {
             "auction_insights_csv": str(auction_path) if auction_path else None,
             "google_ads_auction_insights_csv": str(auction_sources.get("Google Ads") or ""),
@@ -592,18 +624,45 @@ def build_wendy_wu_qbr_slides_payload(
 
 
 def _effective_template_id(
-    template: TemplateConfig, template_manifest: Mapping[str, Any], warnings: list[str]
+    client_id: str,
+    template: TemplateConfig,
+    template_manifest: Mapping[str, Any],
+    warnings: list[str],
 ) -> str:
     configured = str(template.template_id or "").strip()
     manifest_template = str(template_manifest.get("template_presentation_id") or "").strip()
     source = str(template_manifest.get("source_presentation_id") or "").strip()
-    obsolete_ids = {source, *OBSOLETE_WWT_UK_QBR_TEMPLATE_IDS}
+    obsolete_ids = {source, *OBSOLETE_WENDY_WU_QBR_TEMPLATE_IDS.get(client_id, set())}
     if configured and configured in obsolete_ids and manifest_template:
         warnings.append(
-            "Configured WWT UK QBR template points at an old/source deck; using the copied template deck instead."
+            "Configured WWT QBR template points at an old/source deck; using the copied template deck instead."
         )
         return manifest_template
     return configured or manifest_template
+
+
+def _template_manifest_path(client_id: str) -> Path:
+    path = WENDY_WU_QBR_TEMPLATE_MANIFESTS.get(client_id)
+    if not path:
+        raise ValueError(f"No WWT QBR native template manifest configured for {client_id}.")
+    return path
+
+
+def _builder_name(client_id: str) -> str:
+    return WENDY_WU_QBR_BUILDER_NAMES.get(client_id, "wendy_wu_qbr_template_manifest")
+
+
+def _client_label(client_id: str, client_config: Mapping[str, Any]) -> str:
+    if client_id == "wendy_wu":
+        return "Wendy Wu Tours UK"
+    return str(client_config.get("name") or "Wendy Wu Tours Australia")
+
+
+def _currency_for_client(client_id: str, client_config: Mapping[str, Any]) -> dict[str, str]:
+    country = str(client_config.get("country") or "").strip().lower()
+    if client_id == "wendy_wu_australia" or country == "australia":
+        return {"code": "AUD", "symbol": "$"}
+    return {"code": "GBP", "symbol": "£"}
 
 
 def _populate_cover(shape_text: dict[str, str], report: dict[str, Any]) -> None:
@@ -627,6 +686,7 @@ def _populate_summary_sections(
     subtitle: str,
     footer: str,
     chart_builder: ChartBuilder,
+    currency_symbol: str,
 ) -> None:
     for key, section in SUMMARY_SLIDES.items():
         scope = _scope_for_section(report, section)
@@ -660,20 +720,24 @@ def _populate_summary_sections(
             if scope_type == "destination":
                 destination = str(section["scope"][1])
                 table_df = _format_mix_table(report["dest_mix"].get(destination, pd.DataFrame()))
-                tables[str(table_id)] = {"values": _table_values(table_df)}
+                tables[str(table_id)] = {
+                    "values": _table_values(table_df, currency_symbol)
+                }
             else:
                 tables[str(table_id)] = {
-                    "values": _table_values(_format_monthly_table(scope["monthly"]))
+                    "values": _table_values(
+                        _format_monthly_table(scope["monthly"], currency_symbol)
+                    )
                 }
 
         chart_ids = section.get("chart_ids") or {}
         if "cpl_cvr" in chart_ids and "cost_leads" in chart_ids:
             scope_key = _chart_scope_key(key)
-            charts[(str(chart_ids["cpl_cvr"]), "cpl_cvr")] = chart_builder._plot_cpl_cvr(
-                scope_key, scope["monthly"]
+            charts[(str(chart_ids["cpl_cvr"]), "cpl_cvr")] = _build_cpl_cvr_chart(
+                chart_builder, scope_key, scope["monthly"], currency_symbol
             )
             charts[(str(chart_ids["cost_leads"]), "cost_leads")] = _build_cost_leads_bar_chart(
-                chart_builder, scope_key, scope["monthly"]
+                chart_builder, scope_key, scope["monthly"], currency_symbol
             )
         if "campaign_mix" in chart_ids:
             destination = str(section["scope"][1])
@@ -696,6 +760,7 @@ def _populate_monthly_chart_sections(
     charts: dict[tuple[str, str], Path],
     report: dict[str, Any],
     chart_builder: ChartBuilder,
+    currency_symbol: str,
 ) -> None:
     for key, section in MONTHLY_TREND_SLIDES.items():
         scope = _scope_for_section(report, section)
@@ -703,10 +768,10 @@ def _populate_monthly_chart_sections(
             continue
         scope_key = _chart_scope_key(key)
         charts[(str(section["chart_ids"]["cpl_cvr"]), f"{key}_cpl_cvr")] = (
-            chart_builder._plot_cpl_cvr(scope_key, scope["monthly"])
+            _build_cpl_cvr_chart(chart_builder, scope_key, scope["monthly"], currency_symbol)
         )
         charts[(str(section["chart_ids"]["cost_leads"]), f"{key}_cost_leads")] = _build_cost_leads_bar_chart(
-            chart_builder, scope_key, scope["monthly"]
+            chart_builder, scope_key, scope["monthly"], currency_symbol
         )
 
 
@@ -735,7 +800,7 @@ def _populate_trend_sections(
     current_df = TrendsLoader(current_dir).load_from_directory()
     previous_df = TrendsLoader(previous_dir).load_from_directory()
     if current_df.empty:
-        warnings.append("DataForSEO YTD trend CSVs were not available for WWT UK QBR.")
+        warnings.append("DataForSEO YTD trend CSVs were not available for WWT QBR.")
         for section in TREND_SLIDES.values():
             shape_text[str(section["bullets_id"])] = (
                 "Review required: DataForSEO trend source was not available."
@@ -797,7 +862,10 @@ def _populate_other_campaigns_section(
     source_dir = _resolve_other_campaigns_dir(request_path, source_manifest)
     config = client_config.get("other_top_campaigns", {})
     if not config.get("enabled"):
-        config = get_wendy_wu_other_top_campaigns_config("wendy_wu") or config
+        config = (
+            get_wendy_wu_other_top_campaigns_config(str(client_config.get("id") or ""))
+            or config
+        )
     summary = load_other_campaign_summary(
         source_dir,
         exclude_terms=config.get("exclude_terms", []),
@@ -973,7 +1041,7 @@ def _summary_title_for_section(key: str, section: Mapping[str, Any]) -> str:
     return label
 
 
-def _format_monthly_table(monthly_df: pd.DataFrame) -> pd.DataFrame:
+def _format_monthly_table(monthly_df: pd.DataFrame, currency_symbol: str = "£") -> pd.DataFrame:
     if not isinstance(monthly_df, pd.DataFrame) or monthly_df.empty:
         return pd.DataFrame(
             columns=[
@@ -1005,19 +1073,23 @@ def _format_monthly_table(monthly_df: pd.DataFrame) -> pd.DataFrame:
             working[col] = working[col].map(lambda value: f"{int(round(float(value))):,}")
     for col in ["Cost", "CPC", "CPL"]:
         if col in working.columns:
-            working[col] = working[col].map(_fmt_currency)
+            working[col] = working[col].map(
+                lambda value: _fmt_currency(value, currency_symbol)
+            )
     for col in ["CTR", "CVR"]:
         if col in working.columns:
             working[col] = working[col].map(_fmt_percent)
     return working[columns]
 
 
-def _table_values(table_df: pd.DataFrame) -> list[list[str]]:
+def _table_values(table_df: pd.DataFrame, currency_symbol: str = "£") -> list[list[str]]:
     if table_df.empty:
         return [["Status"], ["No data available"]]
     values = [list(map(str, table_df.columns))]
     for row in table_df.fillna("").astype(str).itertuples(index=False):
-        values.append([str(value) for value in row])
+        values.append(
+            [_localize_currency_text(str(value), currency_symbol) for value in row]
+        )
     return values
 
 
@@ -1262,13 +1334,16 @@ def _page_height_magnitude(presentation: Mapping[str, Any]) -> float:
     return 5_143_500.0
 
 
-def _build_cost_delta_style_requests() -> list[dict[str, Any]]:
+def _build_cost_delta_style_requests(presentation: Mapping[str, Any]) -> list[dict[str, Any]]:
+    existing_ids = _text_object_ids(dict(presentation))
     requests_body = []
     for section in SUMMARY_SLIDES.values():
         delta_ids = list(section.get("delta_ids") or [])
         if len(delta_ids) < 2:
             continue
-        requests_body.append(_text_color_request(str(delta_ids[1]), NEUTRAL_DELTA_RGB))
+        delta_id = str(delta_ids[1])
+        if delta_id in existing_ids:
+            requests_body.append(_text_color_request(delta_id, NEUTRAL_DELTA_RGB))
     return requests_body
 
 
@@ -1285,8 +1360,108 @@ def _text_color_request(object_id: str, rgb: Mapping[str, float]) -> dict[str, A
     }
 
 
+def _build_cpl_cvr_chart(
+    chart_builder: ChartBuilder,
+    scope_key: str,
+    monthly_table: pd.DataFrame,
+    currency_symbol: str,
+) -> Path:
+    out_path = chart_builder.charts_dir / f"{scope_key}_cpl_cvr.png"
+    if (
+        not isinstance(monthly_table, pd.DataFrame)
+        or monthly_table.empty
+        or "Month" not in monthly_table.columns
+        or "CPL" not in monthly_table.columns
+        or "CVR" not in monthly_table.columns
+    ):
+        return chart_builder._plot_empty_state(out_path, "No CPL or CVR data")
+
+    df = monthly_table[monthly_table["Month"] != "Total"].copy()
+    if df.empty:
+        return chart_builder._plot_empty_state(out_path, "No CPL or CVR data")
+
+    months = df["Month"].astype(str).tolist()
+    cpl = pd.to_numeric(df["CPL"], errors="coerce").tolist()
+    cvr = [
+        value * 100 if value is not None and not pd.isna(value) else None
+        for value in pd.to_numeric(df["CVR"], errors="coerce").tolist()
+    ]
+
+    fig, ax_cpl = plt.subplots(figsize=chart_builder.figure_size)
+    ax_cvr = ax_cpl.twinx()
+
+    cpl_line = ax_cpl.plot(
+        months,
+        cpl,
+        marker="o",
+        markersize=7,
+        color=chart_builder.colors.get("cpl", "#C32026"),
+        linewidth=2.5,
+        label=f"CPL ({currency_symbol})",
+        zorder=3,
+    )[0]
+    cvr_line = ax_cvr.plot(
+        months,
+        cvr,
+        marker="o",
+        markersize=7,
+        color=chart_builder.colors.get("cvr", "#111111"),
+        linewidth=3,
+        label="CVR (%)",
+        zorder=4,
+    )[0]
+
+    ax_cpl.set_title("CPL vs CVR", fontsize=chart_builder.title_size)
+    ax_cpl.set_xlabel("Month", fontsize=chart_builder.body_size)
+    ax_cpl.set_ylabel(f"CPL ({currency_symbol})", fontsize=chart_builder.body_size)
+    ax_cvr.set_ylabel("CVR (%)", fontsize=chart_builder.body_size)
+    ax_cpl.tick_params(axis="both", labelsize=chart_builder.body_size)
+    ax_cvr.tick_params(axis="both", labelsize=chart_builder.body_size)
+    ax_cpl.grid(axis="y", alpha=0.2)
+
+    for index, value in enumerate(cpl):
+        if value is None or pd.isna(value):
+            continue
+        ax_cpl.annotate(
+            _format_currency_label(float(value), currency_symbol),
+            xy=(index, value),
+            xytext=(0, 10),
+            textcoords="offset points",
+            ha="center",
+            fontsize=chart_builder.body_size - 1,
+            color=chart_builder.colors.get("cpl", "#C32026"),
+        )
+
+    for index, value in enumerate(cvr):
+        if value is None or pd.isna(value):
+            continue
+        ax_cvr.annotate(
+            f"{value:.1f}%",
+            xy=(index, value),
+            xytext=(0, -16),
+            textcoords="offset points",
+            ha="center",
+            fontsize=chart_builder.body_size - 1,
+            color=chart_builder.colors.get("cvr", "#111111"),
+        )
+
+    ax_cpl.legend(
+        [cpl_line, cvr_line],
+        [f"CPL ({currency_symbol})", "CVR (%)"],
+        loc="upper left",
+        fontsize=chart_builder.body_size,
+    )
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=180)
+    plt.close(fig)
+    return out_path
+
+
 def _build_cost_leads_bar_chart(
-    chart_builder: ChartBuilder, scope_key: str, monthly_table: pd.DataFrame
+    chart_builder: ChartBuilder,
+    scope_key: str,
+    monthly_table: pd.DataFrame,
+    currency_symbol: str,
 ) -> Path:
     out_path = chart_builder.charts_dir / f"{scope_key}_cost_leads_bars.png"
     if (
@@ -1326,21 +1501,21 @@ def _build_cost_leads_bar_chart(
         width=width,
         color=chart_builder.colors.get("cost", "#D83A40"),
         alpha=0.9,
-        label="Cost (£)",
+        label=f"Cost ({currency_symbol})",
         zorder=2,
     )
 
     ax_leads.set_title("Cost vs Sales Leads", fontsize=chart_builder.title_size)
     ax_leads.set_xlabel("Month", fontsize=chart_builder.body_size)
     ax_leads.set_ylabel("Sales Leads", fontsize=chart_builder.body_size)
-    ax_cost.set_ylabel("Cost (£)", fontsize=chart_builder.body_size)
+    ax_cost.set_ylabel(f"Cost ({currency_symbol})", fontsize=chart_builder.body_size)
     ax_leads.set_xticks(x_positions, months)
     ax_leads.tick_params(axis="both", labelsize=chart_builder.body_size)
     ax_cost.tick_params(axis="y", labelsize=chart_builder.body_size)
     ax_leads.grid(axis="y", alpha=0.2)
     ax_leads.set_axisbelow(True)
     ax_cost.yaxis.set_major_formatter(
-        FuncFormatter(lambda value, _: chart_builder._format_currency_axis(value))
+        FuncFormatter(lambda value, _: _format_currency_axis(value, currency_symbol))
     )
     ax_leads.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
 
@@ -1367,7 +1542,7 @@ def _build_cost_leads_bar_chart(
         if not value:
             continue
         ax_cost.annotate(
-            chart_builder._format_currency_label(float(value), abbreviated=True),
+            _format_currency_label(float(value), currency_symbol, abbreviated=True),
             xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
             xytext=(0, 5),
             textcoords="offset points",
@@ -1379,7 +1554,7 @@ def _build_cost_leads_bar_chart(
 
     ax_leads.legend(
         [lead_bars[0], cost_bars[0]],
-        ["Sales Leads", "Cost (£)"],
+        ["Sales Leads", f"Cost ({currency_symbol})"],
         loc="upper left",
         fontsize=chart_builder.body_size,
         frameon=False,
@@ -1520,6 +1695,29 @@ def _kpi_yoy(kpis: Mapping[str, Mapping[str, Any]], metric: str) -> str:
     return str(item.get("yoy_label") if item else "n/a")
 
 
+def _localize_payload_currency(
+    shape_text: dict[str, str],
+    tables: dict[str, dict[str, Any]],
+    currency_symbol: str,
+) -> None:
+    if currency_symbol == "£":
+        return
+    for object_id, value in list(shape_text.items()):
+        shape_text[object_id] = _localize_currency_text(value, currency_symbol)
+    for table_payload in tables.values():
+        rows = table_payload.get("values")
+        if not isinstance(rows, list):
+            continue
+        table_payload["values"] = [
+            [_localize_currency_text(str(value), currency_symbol) for value in row]
+            for row in rows
+        ]
+
+
+def _localize_currency_text(value: str, currency_symbol: str) -> str:
+    return str(value).replace("£", currency_symbol) if currency_symbol != "£" else str(value)
+
+
 def _maybe_set(
     shape_text: dict[str, str], ids: Sequence[str], index: int, value: str
 ) -> None:
@@ -1549,10 +1747,32 @@ def _chart_scope_key(key: str) -> str:
     return f"native_qbr_{re.sub(r'[^a-z0-9]+', '_', key.lower()).strip('_')}"
 
 
-def _fmt_currency(value: Any) -> str:
+def _fmt_currency(value: Any, currency_symbol: str = "£") -> str:
     if value is None or pd.isna(value):
         return "n/a"
-    return f"£{float(value):,.2f}"
+    return f"{currency_symbol}{float(value):,.2f}"
+
+
+def _format_currency_label(
+    value: float, currency_symbol: str = "£", abbreviated: bool = False
+) -> str:
+    if abbreviated:
+        absolute = abs(value)
+        if absolute >= 1_000_000:
+            return f"{currency_symbol}{value / 1_000_000:.1f}m"
+        if absolute >= 1_000:
+            return f"{currency_symbol}{value / 1_000:.1f}k"
+        return f"{currency_symbol}{value:,.0f}"
+    return f"{currency_symbol}{value:,.2f}"
+
+
+def _format_currency_axis(value: float, currency_symbol: str = "£") -> str:
+    absolute = abs(float(value))
+    if absolute >= 1_000_000:
+        return f"{currency_symbol}{float(value) / 1_000_000:.1f}m"
+    if absolute >= 1_000:
+        return f"{currency_symbol}{float(value) / 1_000:.0f}k"
+    return f"{currency_symbol}{float(value):,.0f}"
 
 
 def _fmt_percent(value: Any) -> str:

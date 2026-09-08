@@ -756,6 +756,13 @@ def resolve_trend_terms(client_config: dict[str, Any]) -> list[str]:
     if destination_config.get("enabled"):
         for destination in destination_config.get("destinations", []):
             terms.extend(str(term).strip() for term in destination.get("terms", []) if str(term).strip())
+    trend_aliases = client_config.get("trend_aliases", {})
+    if isinstance(trend_aliases, Mapping):
+        configured_terms = set(terms)
+        for configured_term, aliases in trend_aliases.items():
+            if str(configured_term).strip() not in configured_terms:
+                continue
+            terms.extend(str(alias).strip() for alias in aliases if str(alias).strip())
     return _dedupe(terms)
 
 

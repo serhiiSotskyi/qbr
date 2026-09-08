@@ -436,7 +436,7 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
             "src.google_slides_builder",
             "main",
         ]
-    if client_id == "wendy_wu" and report_mode == "quarterly":
+    if client_id in WENDY_WU_CLIENT_IDS and report_mode == "quarterly":
         module_names = [
             "src.data_loader",
             "src.metrics",
