@@ -853,7 +853,9 @@ def _card_value(metric_key: str, kpi: Mapping[str, Any] | None) -> str:
     value = kpi.get("value_raw")
     if _is_missing(value):
         return str(kpi.get("value") or "--")
-    if metric_key in {"cost", "purchase_revenue", "cpa", "aov"}:
+    if metric_key in {"cost", "purchase_revenue"}:
+        return f"£{float(value):,.0f}"
+    if metric_key in {"cpa", "aov"}:
         return _format_plan_currency(value)
     if metric_key == "roas":
         return _format_ratio(value)
@@ -938,6 +940,9 @@ def _build_template_style_requests(
     for object_id, rgb in delta_styles.items():
         if object_id in existing_text_ids:
             requests_body.append(_text_color_request(str(object_id), rgb))
+    requests_body.extend(
+        _kpi_value_font_size_requests(presentation, template_manifest)
+    )
     for table_id in tables:
         if table_id not in existing_table_ids:
             continue
@@ -945,6 +950,46 @@ def _build_template_style_requests(
         column_count = max(len(row) for row in values) if values else 0
         requests_body.extend(_table_header_text_requests(table_id, column_count))
     return requests_body
+
+
+def _kpi_value_font_size_requests(
+    presentation: Mapping[str, Any],
+    template_manifest: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    existing_text_ids = _text_object_ids(presentation)
+    requests_body: list[dict[str, Any]] = []
+    summary_keys = [
+        "all_performance",
+        "brand_performance",
+        "generic_performance",
+        "pmax_performance",
+        "ferry_performance",
+        "routes_performance",
+    ]
+    for summary_key in summary_keys:
+        value_ids = (
+            template_manifest.get("slides", {})
+            .get(summary_key, {})
+            .get("value_ids")
+            or []
+        )
+        if len(value_ids) <= 2:
+            continue
+        revenue_value_id = str(value_ids[2])
+        if revenue_value_id in existing_text_ids:
+            requests_body.append(_text_font_size_request(revenue_value_id, 18))
+    return requests_body
+
+
+def _text_font_size_request(object_id: str, size_pt: float) -> dict[str, Any]:
+    return {
+        "updateTextStyle": {
+            "objectId": object_id,
+            "textRange": {"type": "ALL"},
+            "style": {"fontSize": {"magnitude": size_pt, "unit": "PT"}},
+            "fields": "fontSize",
+        }
+    }
 
 
 def _build_delete_object_requests(
