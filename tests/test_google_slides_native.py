@@ -1222,6 +1222,11 @@ class WightlinkQBRNativeSlidesTests(unittest.TestCase):
         self.assertIn("Google Ads", auction_sources)
         self.assertIn("Microsoft Ads", auction_sources)
         self.assertEqual(payload["tables"]["p9_i192"]["values"][0][3], "Change")
+        red_funnel_metric_labels = [
+            row[0] for row in payload["tables"]["p9_i192"]["values"][1:]
+        ]
+        self.assertIn("Google Ads - Impression Share", red_funnel_metric_labels)
+        self.assertIn("Microsoft Ads - Impression Share", red_funnel_metric_labels)
         self.assertIn("DataForSEO", payload["shape_text"]["p4_i95"])
         chart_ids = {image_id for image_id, _chart_key in payload["charts"]}
         self.assertIn("p4_i103", chart_ids)
@@ -1245,7 +1250,7 @@ class WightlinkQBRNativeSlidesTests(unittest.TestCase):
             )
 
         red_funnel_rows = payload["tables"]["p9_i192"]["values"]
-        self.assertEqual(red_funnel_rows[1][0], "Impression Share")
+        self.assertEqual(red_funnel_rows[1][0], "Google Ads - Impression Share")
         self.assertNotIn(
             "Review required",
             "\n".join(" ".join(row) for row in red_funnel_rows),

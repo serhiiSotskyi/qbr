@@ -304,6 +304,38 @@ class WightlinkQuarterlyTests(unittest.TestCase):
         self.assertIn("Q2 2026", first_row)
         self.assertIn("Change", first_row)
 
+    def test_red_funnel_detail_uses_standard_combined_auction_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            auction_path = root / "combined_google_microsoft_auction_insights.csv"
+            auction_path.write_text(
+                "\n".join(
+                    [
+                        "Auction insights report",
+                        "1 April 2026 - 30 June 2026",
+                        "Source,Display URL domain,Impression share,Overlap rate,Position above rate,Top of page rate,Abs. Top of page rate,Outranking share",
+                        "Google Ads,you,52.00%,--,--,90.00%,41.00%,--",
+                        "Google Ads,redfunnel.co.uk,24.00%,45.00%,66.00%,95.00%,43.00%,26.00%",
+                        "Microsoft Ads,you,48.00%,--,--,88.00%,39.00%,--",
+                        "Microsoft Ads,redfunnel.co.uk,18.00%,35.00%,55.00%,84.00%,32.00%,30.00%",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = generate_wightlink_report(
+                PACK_V2 / "performance_daily_over_year_sample.csv",
+                root / "wightlink.pptx",
+                auction_csv=auction_path,
+            )
+
+        red_funnel = next(slide for slide in result["slides"] if slide.get("section_title") == "Auction Insights - Red Funnel Quarter")
+        metric_labels = [row["Metric"] for row in red_funnel["table"]["rows"]]
+        self.assertIn("Google Ads - Impression Share", metric_labels)
+        self.assertIn("Microsoft Ads - Impression Share", metric_labels)
+        self.assertIn("Google Ads, Microsoft Ads", " ".join(red_funnel["bullets"]))
+        self.assertIn("not averaged", " ".join(red_funnel["bullets"]))
+
     def test_monthly_pipeline_builds_performance_only_monthly_deck(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

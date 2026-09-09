@@ -115,7 +115,7 @@ def main() -> None:
         if report_mode == "quarterly":
             if use_cross_platform_auction:
                 st.caption(
-                    "The Red Funnel current-quarter slide uses the combined Google Ads + Microsoft Ads auction source above."
+                    "The Red Funnel detail slide is filtered from the same Google Ads + Microsoft Ads Auction Insights uploads above. No separate current-quarter Red Funnel file is needed."
                 )
             else:
                 red_funnel_auction_file = st.file_uploader(
@@ -123,8 +123,9 @@ def main() -> None:
                     type=["csv"],
                 )
             red_funnel_prior_auction_file = st.file_uploader(
-                "Wightlink Red Funnel prior-year quarter Auction Insights CSV",
+                "Wightlink prior-year quarter Auction Insights CSV for Red Funnel YoY",
                 type=["csv"],
+                help="Optional same-quarter-prior-year Auction Insights export. The app filters Red Funnel from this file for the YoY column.",
             )
 
     other_campaign_files = []

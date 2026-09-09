@@ -150,6 +150,11 @@ def build_wightlink_claude_handoff_package(
     if not is_monthly:
         warnings.extend(_build_v2_source_warnings(trend_sources, raw_inputs, plan_book_csv))
 
+    red_funnel_quarter_source = (
+        red_funnel_auction_csv
+        if red_funnel_auction_csv is not None
+        else auction_csv
+    )
     variables = {
         "client_display_name": "Wightlink",
         "report_family": "Wightlink PPC Monthly" if is_monthly else "Wightlink PPC QBR",
@@ -167,7 +172,7 @@ def build_wightlink_claude_handoff_package(
         "performance_original_filename": _source_name(performance_csv),
         "auction_original_filename": _source_name(auction_csv) if auction_csv is not None else "not supplied",
         "plan_original_filename": _source_name(plan_book_csv) if plan_book_csv is not None else "not supplied",
-        "red_funnel_quarter_auction_original_filename": _source_name(red_funnel_auction_csv) if red_funnel_auction_csv is not None else "not supplied",
+        "red_funnel_quarter_auction_original_filename": _source_name(red_funnel_quarter_source) if red_funnel_quarter_source is not None else "not supplied",
         "red_funnel_prior_auction_original_filename": _source_name(red_funnel_prior_auction_csv) if red_funnel_prior_auction_csv is not None else "not supplied",
         "headline_cost": headline_kpis["cost"],
         "headline_purchases": headline_kpis["purchases"],
@@ -262,6 +267,16 @@ def build_wightlink_claude_handoff_package(
         "reference_pptx_filename": _reference_pptx_filename(is_monthly) if reference_pptx_bytes is not None else None,
         "has_plan_source": plan_book_csv is not None,
         "plan_source_url": PLAN_SOURCE_URL,
+        "red_funnel_quarter_auction_original_filename": (
+            _source_name(red_funnel_quarter_source)
+            if red_funnel_quarter_source is not None
+            else None
+        ),
+        "red_funnel_prior_auction_original_filename": (
+            _source_name(red_funnel_prior_auction_csv)
+            if red_funnel_prior_auction_csv is not None
+            else None
+        ),
         "headline_kpis": headline_kpis,
         "trend_queries": trend_queries,
         "trend_sources": trend_sources,
@@ -354,14 +369,22 @@ def build_raw_inputs(
             )
         )
 
-    if red_funnel_auction_csv is not None:
+    effective_red_funnel_auction_csv = (
+        red_funnel_auction_csv if red_funnel_auction_csv is not None else auction_csv
+    )
+    if effective_red_funnel_auction_csv is not None:
+        red_funnel_role = (
+            "Quarter-only Red Funnel Auction Insights source"
+            if red_funnel_auction_csv is not None
+            else "Red Funnel source filtered from the standard quarter Auction Insights source"
+        )
         inputs.append(
             WightlinkRawInput(
-                source_name=_source_name(red_funnel_auction_csv),
+                source_name=_source_name(effective_red_funnel_auction_csv),
                 archive_name="source_data/auction_insights_red_funnel_quarter.csv",
-                role="Quarter-only Red Funnel Auction Insights source",
+                role=red_funnel_role,
                 required=True,
-                payload=_read_payload(red_funnel_auction_csv),
+                payload=_read_payload(effective_red_funnel_auction_csv),
             )
         )
 

@@ -408,7 +408,7 @@ def main() -> None:
             )
             if use_cross_platform_auction:
                 st.caption(
-                    "The Red Funnel current-quarter slide uses the combined Google Ads + Microsoft Ads auction source above."
+                    "The Red Funnel detail slide is filtered from the same Google Ads + Microsoft Ads Auction Insights uploads above. No separate current-quarter Red Funnel file is needed."
                 )
             else:
                 red_funnel_auction_file = st.file_uploader(
@@ -417,9 +417,9 @@ def main() -> None:
                     help="Quarter-only Auction Insights export for the report quarter. Used for the added Red Funnel Quarter slide.",
                 )
             red_funnel_prior_auction_file = st.file_uploader(
-                "Wightlink Red Funnel prior-year quarter Auction Insights CSV",
+                "Wightlink prior-year quarter Auction Insights CSV for Red Funnel YoY",
                 type=["csv"],
-                help="Same-quarter-prior-year Auction Insights export, e.g. Q2 2025 for a Q2 2026 report. Used for Red Funnel YoY comparison.",
+                help="Optional same-quarter-prior-year Auction Insights export, e.g. Q2 2025 for a Q2 2026 report. The app filters Red Funnel from this file for the YoY column.",
             )
     elif use_wendy_wu_ytd_trends:
         market_label = "UK" if client_id == "wendy_wu" else "Australia"

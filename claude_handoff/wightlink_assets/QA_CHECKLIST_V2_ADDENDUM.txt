@@ -19,6 +19,7 @@ Auction Insights checks
 - Red Funnel slide exists and is Red Funnel only.
 - Red Funnel slide uses report-quarter data and same-quarter-prior-year data when supplied.
 - The YoY change column is populated only from a supplied prior-year auction insights file.
+- Google Ads and Microsoft Ads Red Funnel rows stay separate; Auction Insights percentages are not averaged across platforms.
 - Table metrics match the source exactly.
 
 YTD performance checks

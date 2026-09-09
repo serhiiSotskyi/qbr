@@ -57,11 +57,11 @@ Raw source data files
 
 - source_data/auction_insights_red_funnel_quarter.csv
   Original upload: {{red_funnel_quarter_auction_original_filename}}
-  Role: Quarter-only Red Funnel Auction Insights source for the report quarter.
+  Role: Alias/fallback copy of the standard quarter Auction Insights source. Use it only to filter Red Funnel current-quarter rows.
 
 - source_data/auction_insights_red_funnel_prior_year_quarter.csv
   Original upload: {{red_funnel_prior_auction_original_filename}}
-  Role: Same-quarter-prior-year Red Funnel Auction Insights source for YoY comparison.
+  Role: Optional same-quarter-prior-year Auction Insights source. Use it only to filter Red Funnel rows for YoY comparison.
 
 Plan source note
 For V2, the plan source should come from the first table in the Google Sheet tab "2026/27 Middle Scenario Plan", headed "PPC Middle Plan Scenario". Do not use the Actuals table as the plan source.

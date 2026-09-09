@@ -143,7 +143,7 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
                 auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
                 trend_ytd_current_csv_files=[current / current_file.name],
                 trend_ytd_previous_csv_files=[previous / previous_file.name],
-                red_funnel_auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
+                red_funnel_auction_csv=None,
                 red_funnel_prior_auction_csv=SAMPLE_V2_INPUTS / "auction_insights.csv",
                 plan_book_csv=SAMPLE_V2_INPUTS / "wightlink_plan_2026_27_middle_scenario.csv",
                 reference_pptx=DEFAULT_WIGHTLINK_REFERENCE_PPTX_PATH,
@@ -162,6 +162,13 @@ class WightlinkClaudeHandoffPackageTests(unittest.TestCase):
         self.assertTrue(manifest["has_plan_source"])
         self.assertIn("ROAS", manifest["plan_comparison"]["metrics_available"])
         self.assertTrue(any(source["current_ytd_filename"] for source in manifest["trend_sources"]))
+        self.assertEqual(
+            manifest["red_funnel_quarter_auction_original_filename"],
+            "auction_insights.csv",
+        )
+        self.assertFalse(
+            any("Missing quarter-only Red Funnel" in warning for warning in manifest["warnings"])
+        )
         source_index = package.read("SOURCE_SECTION_INDEX.txt").decode("utf-8")
         self.assertIn("Brand Monthly Breakdown YTD", source_index)
         self.assertIn("Auction Insights - Red Funnel Quarter", source_index)

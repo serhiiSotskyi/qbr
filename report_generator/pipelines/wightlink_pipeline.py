@@ -368,7 +368,7 @@ def _build_red_funnel_quarter_slide(
         "subtitle": subtitle,
         "table": {"rows": table_rows},
         "bullets": bullets,
-        "source_note": "Source: Quarter Auction Insights CSVs",
+        "source_note": "Source: Wightlink Google Ads + Microsoft Ads Auction Insights CSVs",
     }
 
 
@@ -379,13 +379,13 @@ def _red_funnel_quarter_rows_and_bullets(
     prior_label: str,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     rows = auction_section.get("rows", []) if auction_section else []
-    red_funnel = next((row for row in rows if _is_red_funnel(row.get("display_url_domain"))), None)
+    red_funnel_rows = [row for row in rows if _is_red_funnel(row.get("display_url_domain"))]
     prior_rows = prior_auction_section.get("rows", []) if prior_auction_section else []
-    prior_red_funnel = next((row for row in prior_rows if _is_red_funnel(row.get("display_url_domain"))), None)
-    if not red_funnel:
+    prior_red_funnel_rows = [row for row in prior_rows if _is_red_funnel(row.get("display_url_domain"))]
+    if not red_funnel_rows:
         return (
-            [{"Status": "Review required", "Detail": "No Red Funnel row was found in the uploaded quarter auction insights source."}],
-            ["Review required - upload a quarter-only Auction Insights export containing Red Funnel to populate this slide."],
+            [{"Status": "Review required", "Detail": "No Red Funnel row was found in the standard quarter auction insights source."}],
+            ["Review required - upload the Wightlink Google Ads and Microsoft Ads Auction Insights exports containing Red Funnel to populate this slide."],
         )
 
     metrics = [
@@ -397,31 +397,51 @@ def _red_funnel_quarter_rows_and_bullets(
         ("Outranking Share", "outranking_share"),
     ]
     table_rows = []
-    for label, key in metrics:
-        current_value = red_funnel.get(key)
-        prior_value = prior_red_funnel.get(key) if prior_red_funnel else None
-        delta = _delta(current_value, prior_value)
-        table_rows.append({
-            "Metric": label,
-            prior_label: _format_pct(prior_value),
-            current_label: _format_pct(current_value),
-            "Change": _format_pp_delta(delta),
-            "What it means": _red_funnel_metric_note(key, delta),
-        })
+    include_source = len(red_funnel_rows) > 1 or any(row.get("source") for row in red_funnel_rows)
+    for red_funnel in red_funnel_rows:
+        source_label = _auction_source_label(red_funnel)
+        prior_red_funnel = _matching_red_funnel_prior_row(
+            red_funnel,
+            prior_red_funnel_rows,
+        )
+        for label, key in metrics:
+            current_value = red_funnel.get(key)
+            prior_value = prior_red_funnel.get(key) if prior_red_funnel else None
+            delta = _delta(current_value, prior_value)
+            metric_label = f"{source_label} - {label}" if include_source else label
+            table_rows.append({
+                "Metric": metric_label,
+                prior_label: _format_pct(prior_value),
+                current_label: _format_pct(current_value),
+                "Change": _format_pp_delta(delta),
+                "What it means": _red_funnel_metric_note(key, delta),
+            })
 
     bullets = []
-    overlap = red_funnel.get("overlap_rate")
-    if overlap is not None:
-        bullets.append(f"Red Funnel overlapped in {_format_pct(overlap)} of eligible quarter auctions.")
-    if prior_red_funnel:
-        impression_delta = _delta(red_funnel.get("impression_share"), prior_red_funnel.get("impression_share"))
-        outranking_delta = _delta(red_funnel.get("outranking_share"), prior_red_funnel.get("outranking_share"))
-        if impression_delta is not None:
-            bullets.append(f"Red Funnel impression share moved {_format_pp_delta(impression_delta)} versus {prior_label}.")
-        if outranking_delta is not None:
-            bullets.append(f"Wightlink outranking share versus Red Funnel moved {_format_pp_delta(outranking_delta)}.")
-    else:
-        bullets.append("Upload the same-quarter prior-year Red Funnel Auction Insights CSV to populate the YoY change column.")
+    if include_source:
+        sources = ", ".join(dict.fromkeys(_auction_source_label(row) for row in red_funnel_rows))
+        bullets.append(
+            f"Red Funnel rows were found in {sources}; Auction Insights percentages are platform-specific and are not averaged."
+        )
+    for red_funnel in red_funnel_rows:
+        source_label = _auction_source_label(red_funnel)
+        source_suffix = f" in {source_label}" if include_source else ""
+        overlap = red_funnel.get("overlap_rate")
+        if overlap is not None:
+            bullets.append(f"Red Funnel overlapped in {_format_pct(overlap)} of eligible quarter auctions{source_suffix}.")
+        prior_red_funnel = _matching_red_funnel_prior_row(
+            red_funnel,
+            prior_red_funnel_rows,
+        )
+        if prior_red_funnel:
+            impression_delta = _delta(red_funnel.get("impression_share"), prior_red_funnel.get("impression_share"))
+            outranking_delta = _delta(red_funnel.get("outranking_share"), prior_red_funnel.get("outranking_share"))
+            if impression_delta is not None:
+                bullets.append(f"Red Funnel impression share moved {_format_pp_delta(impression_delta)} versus {prior_label}{source_suffix}.")
+            if outranking_delta is not None:
+                bullets.append(f"Wightlink outranking share versus Red Funnel moved {_format_pp_delta(outranking_delta)}{source_suffix}.")
+    if not prior_red_funnel_rows:
+        bullets.append("Upload the same-quarter prior-year Auction Insights CSV to populate the YoY change column.")
     return table_rows, bullets or ["Quarter-only Red Funnel metrics are shown from the uploaded Auction Insights source."]
 
 
@@ -837,6 +857,29 @@ def _is_missing(value: Any) -> bool:
 def _is_red_funnel(value: Any) -> bool:
     normalized = "".join(char.lower() for char in str(value) if char.isalnum())
     return "redfunnel" in normalized
+
+
+def _auction_source_label(row: dict[str, Any]) -> str:
+    source = str(row.get("source") or "").strip()
+    return source or "Auction Insights"
+
+
+def _matching_red_funnel_prior_row(
+    current_row: dict[str, Any],
+    prior_rows: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if not prior_rows:
+        return None
+    current_source = _normalize_auction_source(current_row.get("source"))
+    if current_source:
+        for row in prior_rows:
+            if _normalize_auction_source(row.get("source")) == current_source:
+                return row
+    return prior_rows[0]
+
+
+def _normalize_auction_source(value: Any) -> str:
+    return "".join(char.lower() for char in str(value or "") if char.isalnum())
 
 
 def _sortable(value: Any, none_default: float = 0.0) -> float:

@@ -46,7 +46,7 @@ Hard requirements
 - Every report.txt source section must be represented.
 - Convert missing reference sections into clearly marked human-review placeholders.
 - If V2 files are present, use the lean V2 structure in SLIDE_MAPPING.csv. Do not recreate removed Plan vs Actual detail slides or the old Purchases+CPA / Revenue+ROAS chart-pair slides.
-- Red Funnel slide must show Red Funnel only. If source_data/auction_insights_red_funnel_prior_year_quarter.csv is supplied, include the YoY pp change columns.
+- Red Funnel slide must show Red Funnel only, filtered from the standard Wightlink Auction Insights source. Keep Google Ads and Microsoft Ads Red Funnel rows separate; do not average platform percentages. If source_data/auction_insights_red_funnel_prior_year_quarter.csv is supplied, include the YoY pp change columns.
 - Campaign-type chart slides must use one monthly purchases and purchase revenue chart only.
 - Apply CHART_QA_ADDENDUM_FOR_CLAUDE.txt to every chart slide. Charts must not be squashed, clipped, or overlapping; inspect full-slide screenshots/thumbnails after chart replacement.
 - Run QA_CHECKLIST.txt before returning.

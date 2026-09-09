@@ -7,8 +7,10 @@ Slide behavior
 Use one Red Funnel slide. Do not create both a Red Funnel quarter slide and a separate Red Funnel YoY slide.
 
 Required source
-Use a quarter-only Auction Insights export for the report quarter.
+Use the standard quarter-only Wightlink Auction Insights export for the report quarter.
 For Q2 2026 this means Apr 1, 2026 through Jun 30, 2026.
+
+Current-quarter Red Funnel data comes from source_data/auction_insights.csv. If source_data/auction_insights_red_funnel_quarter.csv is also present, it is an alias/fallback copy of the same standard auction source, not a separate manual requirement.
 
 Use source_data/auction_insights_red_funnel_prior_year_quarter.csv for the same quarter prior year when it is supplied.
 For Q2 2026 this means Apr 1, 2025 through Jun 30, 2025.
@@ -31,6 +33,7 @@ Metrics to include where available
 
 Comparison behavior
 - Show Red Funnel only.
+- If both Google Ads and Microsoft Ads include Red Funnel rows, keep the platform values separate. Do not average Auction Insights percentages across platforms.
 - If previous-period metrics are supplied, show prior quarter, current quarter, pp change, and a concise "what it means" note for each metric.
 - If only current-quarter metrics are supplied, show current-quarter values and explain what they mean. Clearly mark the YoY comparison as unavailable.
 
