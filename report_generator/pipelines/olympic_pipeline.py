@@ -140,6 +140,10 @@ def _prepare_datasets(df: pd.DataFrame, report_mode: str = "quarterly") -> dict[
     if missing:
         raise ValueError(f"Olympic Holidays CSV missing required columns: {sorted(missing)}")
 
+    if "Campaign" in working_df.columns:
+        island_hopping = working_df["Campaign"].map(_is_olympic_island_hopping_campaign)
+        working_df.loc[island_hopping, "channel"] = "Island Hopping"
+
     working_df = working_df[list(required)].copy()
     working_df["date"] = _parse_olympic_dates(working_df["date"])
     working_df = working_df.dropna(subset=["date"]).copy()
@@ -1055,6 +1059,12 @@ def _format_yoy_table(yoy_summary: dict[str, Any] | None) -> pd.DataFrame:
     if not yoy_summary:
         return pd.DataFrame([{"Status": "No matched prior-year quarter"}])
     return yoy_summary["table"].copy()
+
+
+def _is_olympic_island_hopping_campaign(value: Any) -> bool:
+    normalized = str(value or "").lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    return "island hop" in normalized or "ilsand hop" in normalized
 
 
 def _parse_olympic_dates(values: pd.Series) -> pd.Series:

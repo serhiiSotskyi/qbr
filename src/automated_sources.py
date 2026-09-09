@@ -1390,9 +1390,16 @@ def classify_campaign_type(campaign_name: Any) -> str:
 
 def classify_olympic_datastudio_campaign_type(campaign_name: Any) -> str:
     normalized = _normalize_text(campaign_name)
+    if _is_olympic_island_hopping_campaign(campaign_name):
+        return "Island Hopping"
     if normalized == "pmax domes luxury":
         return "Other"
     return classify_campaign_type(campaign_name)
+
+
+def _is_olympic_island_hopping_campaign(campaign_name: Any) -> bool:
+    normalized = _normalize_text(campaign_name)
+    return "island hop" in normalized or "ilsand hop" in normalized
 
 
 def _campaign_type_classifier_for_rules(rules: Mapping[str, Any]) -> Any:

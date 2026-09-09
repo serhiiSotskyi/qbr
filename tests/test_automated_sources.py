@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from main import run_text_report
-from report_generator.pipelines.olympic_pipeline import _parse_olympic_dates
+from report_generator.pipelines.olympic_pipeline import _parse_olympic_dates, _prepare_datasets
 from src.automated_sources import (
     AutomatedSourceError,
     SourcePeriod,
@@ -28,6 +28,7 @@ from src.automated_sources import (
 )
 from src.data_loader import QuarterInfo, load_csv
 from src.source_normalizers import (
+    normalize_olympic_performance_export,
     normalize_wendy_wu_performance_export,
     normalize_wightlink_performance_export,
 )
@@ -144,11 +145,14 @@ class OlympicFakeGA4Client:
                 _ga4_cost_row("20260801", "Performance Max - Greece", 100, 10, 1000, channel_group="Cross-network"),
                 _ga4_cost_row("20260801", "PMax - Domes Luxury", 20, 2, 200, channel_group="Cross-network"),
                 _ga4_cost_row("20260801", "Display - Remarketing - Greece", 5, 1, 50, channel_group="Display"),
+                _ga4_cost_row("20260801", "Search - Generic - Greece Holidays - Island Hopping", 30, 4, 400),
             ]
         return [
             _ga4_event_row("20260801", "Performance Max - Greece", "purchase", 2, 500, channel_group="Cross-network"),
             _ga4_event_row("20260801", "PMax - Domes Luxury", "add_to_cart", 3, 0, channel_group="Cross-network"),
             _ga4_event_row("20260801", "Display - Remarketing - Greece", "add_to_cart", 2, 0, channel_group="Display"),
+            _ga4_event_row("20260801", "Search - Generic - Greece Holidays - Island Hopping", "purchase", 1, 100),
+            _ga4_event_row("20260801", "Search - Generic - Greece Holidays - Island Hopping", "add_to_cart", 4, 0),
             _ga4_event_row("20250110", "Q125", "add_to_cart", 1, 0, channel_group="Display"),
         ]
 
@@ -340,11 +344,107 @@ class AutomatedSourcesTests(unittest.TestCase):
 
         self.assertIn("Display", str(fake_client.filters))
         self.assertEqual(classify_olympic_datastudio_campaign_type("PMax - Domes Luxury"), "Other")
+        self.assertEqual(
+            classify_olympic_datastudio_campaign_type(
+                "Search - Generic - Greece Holidays - Island Hopping"
+            ),
+            "Island Hopping",
+        )
         performance_max = output[output["Campaign Type"] == "Performance Max"]
+        island_hopping = output[output["Campaign Type"] == "Island Hopping"]
         other = output[output["Campaign Type"] == "Other"]
         self.assertEqual(float(performance_max["Cost"].sum()), 100.0)
+        self.assertEqual(float(island_hopping["Cost"].sum()), 30.0)
+        self.assertEqual(float(island_hopping["Purchases"].sum()), 1.0)
+        self.assertEqual(float(island_hopping["Revenue"].sum()), 100.0)
+        self.assertEqual(float(island_hopping["Add to cart"].sum()), 4.0)
         self.assertEqual(float(other["Cost"].sum()), 25.0)
         self.assertEqual(float(other["Add to cart"].sum()), 5.0)
+
+    def test_olympic_uploaded_datastudio_csv_promotes_island_hopping_campaigns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "olympic.csv"
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Generic",
+                        "Destination": "Greece",
+                        "Campaign": "Search - Generic - Greece Holidays - Island Hopping",
+                        "Purchases": 1,
+                        "Revenue": 1170.67,
+                        "Cost": 2789.87,
+                        "CPA": 2789.87,
+                        "Add to cart": 7.48,
+                        "Cost per ATC": 372.98,
+                        "AOV": 1170.67,
+                        "CVR": 0.01,
+                    },
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Generic",
+                        "Destination": "Greece",
+                        "Campaign": "Search - Generic - Greece Holidays - Other Islands",
+                        "Purchases": 2,
+                        "Revenue": 2000,
+                        "Cost": 1000,
+                        "CPA": 500,
+                        "Add to cart": 5,
+                        "Cost per ATC": 200,
+                        "AOV": 1000,
+                        "CVR": 0.02,
+                    },
+                ]
+            ).to_csv(csv_path, index=False)
+
+            normalized = normalize_olympic_performance_export(csv_path)
+
+        self.assertEqual(
+            normalized.loc[normalized["Cost"] == 2789.87, "Campaign Type"].iloc[0],
+            "Island Hopping",
+        )
+        self.assertEqual(
+            normalized.loc[normalized["Cost"] == 1000, "Campaign Type"].iloc[0],
+            "Generic",
+        )
+
+    def test_olympic_pipeline_promotes_island_hopping_before_channel_aggregation(self) -> None:
+        data = _prepare_datasets(
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Generic",
+                        "Campaign": "Search - Generic - Greece Holidays - Island Hopping",
+                        "Purchases": 1,
+                        "Revenue": 1170.67,
+                        "Cost": 2970.27,
+                        "CPA": 2970.27,
+                        "Add to cart": 9.48,
+                        "Cost per ATC": 313.32,
+                        "AOV": 1170.67,
+                    },
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Generic",
+                        "Campaign": "Search - Generic - Greece Holidays - Other Islands",
+                        "Purchases": 2,
+                        "Revenue": 2000,
+                        "Cost": 1000,
+                        "CPA": 500,
+                        "Add to cart": 5,
+                        "Cost per ATC": 200,
+                        "AOV": 1000,
+                    },
+                ]
+            ),
+            report_mode="monthly",
+        )
+
+        breakdown = data["channel_breakdown"].set_index("channel")
+        self.assertIn("Island Hopping", breakdown.index)
+        self.assertEqual(float(breakdown.loc["Island Hopping", "cost"]), 2970.27)
+        self.assertEqual(float(breakdown.loc["Generic", "cost"]), 1000.0)
 
     def test_olympic_iso_dates_are_not_parsed_as_dayfirst_dates(self) -> None:
         parsed = _parse_olympic_dates(pd.Series([f"2026-08-{day:02d}" for day in range(1, 13)]))

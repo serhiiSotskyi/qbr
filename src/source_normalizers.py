@@ -103,6 +103,9 @@ def normalize_olympic_performance_export(csv_path: str | Path) -> pd.DataFrame:
         raise ValueError(f"Olympic Holidays performance CSV missing required columns: {missing}")
     if "Campaign Type" in df.columns:
         df["Campaign Type"] = df["Campaign Type"].map(_canonical_campaign_type)
+    if "Campaign" in df.columns:
+        island_hopping = df["Campaign"].map(_is_olympic_island_hopping_campaign)
+        df.loc[island_hopping, "Campaign Type"] = "Island Hopping"
     return _coerce_order(df, OLYMPIC_COLUMNS)
 
 
@@ -178,11 +181,20 @@ def _canonical_campaign_type(value: Any) -> str:
         "generics": "Generic",
         "demandgen": "Demand Gen",
         "discovery": "Demand Gen",
+        "islandhopping": "Island Hopping",
+        "islandhoping": "Island Hopping",
+        "ilsandhopping": "Island Hopping",
+        "ilsandhoping": "Island Hopping",
         "pmax": "Performance Max",
         "performancemax": "Performance Max",
         "other": "Other",
     }
     return lookup.get(normalized, str(value).strip())
+
+
+def _is_olympic_island_hopping_campaign(value: Any) -> bool:
+    normalized = _normalize_text(value)
+    return "island hop" in normalized or "ilsand hop" in normalized
 
 
 __all__ = [
