@@ -185,7 +185,7 @@ def main() -> None:
         outputs_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            automated_paths = prepare_automated_source_inputs(
+            automated_paths = _prepare_automated_source_inputs_fresh(
                 project_root=BASE_DIR,
                 request_dir=request_dir,
                 client_config=client_config,
@@ -573,6 +573,16 @@ def _build_request_inputs_fresh(
         google_auction_file=google_auction_file,
         microsoft_auction_file=microsoft_auction_file,
     )
+
+
+def _prepare_automated_source_inputs_fresh(**kwargs):
+    """Resolve source generation at click time so deployed pages do not reuse stale modules."""
+    automated_module = importlib.import_module("src.automated_sources")
+    automated_module = importlib.reload(automated_module)
+    try:
+        return automated_module.prepare_automated_source_inputs(**kwargs)
+    except automated_module.AutomatedSourceError as exc:
+        raise AutomatedSourceError(str(exc)) from exc
 
 
 def _validate_report_artifacts_against_source(
