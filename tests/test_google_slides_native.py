@@ -196,7 +196,9 @@ class WightlinkPlanSourceTests(unittest.TestCase):
             source_data = root / "source_data"
             source_data.mkdir()
             performance_csv = source_data / "performance.csv"
-            performance_csv.write_text("Date,Campaign Type,Data Type,Cost\n", encoding="utf-8")
+            performance_csv.write_text(
+                "Date,Campaign Type,Data Type,Cost\n", encoding="utf-8"
+            )
             manifest_path = write_source_generation_manifest(
                 request_dir=root,
                 client_config={"id": "wightlink", "name": "Wightlink"},
@@ -649,8 +651,7 @@ class WendyWuMonthlyNativeSlidesTests(unittest.TestCase):
                 == "p3_i202"
                 and request["updateTableCellProperties"]["tableRange"]["location"]
                 == {"rowIndex": 0, "columnIndex": 0}
-                and request["updateTableCellProperties"]["tableRange"]["rowSpan"]
-                == 1
+                and request["updateTableCellProperties"]["tableRange"]["rowSpan"] == 1
                 for request in fake_client.batch_requests
             )
         )
@@ -746,7 +747,9 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
             ca_table[0],
             ["Campaign Type", "Cost", "Sales Leads", "Cost Share", "Lead Share", "CPL"],
         )
-        self.assertIn("Central Asia & Mongolia", payload["shape_text"]["SLIDES_API1312704722_3"])
+        self.assertIn(
+            "Central Asia & Mongolia", payload["shape_text"]["SLIDES_API1312704722_3"]
+        )
         self.assertTrue(any("(+" in row[1] for row in ca_table[1:]))
         self.assertTrue(any("(+" in row[2] for row in ca_table[1:]))
         self.assertTrue(any("(+" in row[3] or "(-" in row[3] for row in ca_table[1:]))
@@ -809,9 +812,11 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
             True,
         )
         self.assertEqual(
-            Path(payload["template_manifest"]).name
-            if isinstance(payload["template_manifest"], str)
-            else payload["template_manifest"]["client_id"],
+            (
+                Path(payload["template_manifest"]).name
+                if isinstance(payload["template_manifest"], str)
+                else payload["template_manifest"]["client_id"]
+            ),
             "wendy_wu_australia",
         )
 
@@ -823,14 +828,30 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
                 root / "auction" / "google_ads" / "google_auction.csv",
                 [
                     ("you", "14.37%", "--", "--", "79.88%", "18.82%", "--"),
-                    ("audleytravel.com", "17.37%", "23.62%", "61.40%", "81.54%", "31.14%", "12.28%"),
+                    (
+                        "audleytravel.com",
+                        "17.37%",
+                        "23.62%",
+                        "61.40%",
+                        "81.54%",
+                        "31.14%",
+                        "12.28%",
+                    ),
                 ],
             )
             _write_platform_auction_csv(
                 root / "auction" / "microsoft_ads" / "microsoft_auction.csv",
                 [
                     ("you", "2.32%", "--", "--", "37.48%", "19.67%", "--"),
-                    ("audleytravel.com", "1.01%", "3.62%", "65.20%", "71.44%", "38.10%", "2.27%"),
+                    (
+                        "audleytravel.com",
+                        "1.01%",
+                        "3.62%",
+                        "65.20%",
+                        "71.44%",
+                        "38.10%",
+                        "2.27%",
+                    ),
                 ],
             )
 
@@ -914,8 +935,7 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
-                request.get("deleteTableColumn", {}).get("tableObjectId")
-                == "p26_i682"
+                request.get("deleteTableColumn", {}).get("tableObjectId") == "p26_i682"
                 for request in fake_client.batch_requests
             )
         )
@@ -1039,8 +1059,7 @@ class WendyWuQbrNativeSlidesTests(unittest.TestCase):
         self.assertEqual(result.status, "success")
         self.assertTrue(
             any(
-                request.get("insertTableColumns", {}).get("tableObjectId")
-                == "p29_i720"
+                request.get("insertTableColumns", {}).get("tableObjectId") == "p29_i720"
                 for request in fake_client.batch_requests
             )
         )
@@ -1216,9 +1235,7 @@ class WightlinkQBRNativeSlidesTests(unittest.TestCase):
         self.assertEqual(payload["period"]["label"], "Q2 2026")
         self.assertIn("Plan:", payload["shape_text"]["p12_i248"])
         self.assertEqual(payload["tables"]["p8_i176"]["values"][0][0], "Source")
-        auction_sources = [
-            row[0] for row in payload["tables"]["p8_i176"]["values"][1:]
-        ]
+        auction_sources = [row[0] for row in payload["tables"]["p8_i176"]["values"][1:]]
         self.assertIn("Google Ads", auction_sources)
         self.assertIn("Microsoft Ads", auction_sources)
         self.assertEqual(payload["tables"]["p9_i192"]["values"][0][3], "Change")
@@ -1492,19 +1509,36 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
                 )
 
         self.assertEqual(payload["period"]["label"], "Aug 2026")
-        self.assertEqual(
-            payload["shape_text"]["g3faba7ffb95_2_17"], "£20,000"
-        )
-        self.assertEqual(
-            payload["shape_text"]["g3faba7ffb95_2_85"], "£10,000"
-        )
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_17"], "£20,000")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_85"], "£10,000")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_97"], "2.00")
+        self.assertEqual(payload["shape_text"]["OHBrandRevenueValue"], "£8,000")
         self.assertIn("MoM:", payload["shape_text"]["g3faba7ffb95_2_87"])
-        overall_table = payload["tables"]["g3faba7ffb95_2_112"]["values"]
+        self.assertEqual(len(payload["runtime_slide_templates"]), 2)
+        overall_table = payload["tables"]["OHOverallSummaryTable"]["values"]
         self.assertEqual(len(overall_table), 10)
         self.assertEqual(
             overall_table[0],
-            ["Month", "Revenue", "Spend", "Purchases", "CPA", "Cost/ATC"],
+            [
+                "Month",
+                "Revenue",
+                "Spend",
+                "Purchases",
+                "Add to Cart",
+                "ROAS",
+                "CPA",
+                "Cost/ATC",
+                "AOV",
+            ],
         )
+        self.assertIn("OHBrandSummaryTable", payload["tables"])
+        self.assertEqual(
+            payload["tables"]["g3faba7ffb95_2_125"]["values"][0],
+            ["Metric", "Aug 2025", "Aug 2026", "Change"],
+        )
+        self.assertIn("ROAS", payload["tables"]["g3faba7ffb95_2_125"]["values"][5])
+        self.assertIn("g3faba7ffb95_2_126", payload["delete_object_ids"])
+        self.assertIn("g3faba7ffb95_2_103", payload["delete_object_ids"])
         self.assertEqual(
             payload["tables"]["g3faba7ffb95_2_332"]["values"][1][0],
             "No API source",
@@ -1542,13 +1576,21 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
             )
 
         self.assertEqual(result.status, "success")
-        self.assertEqual(manifest["builder"], "olympic_holidays_monthly_template_manifest")
+        self.assertEqual(
+            manifest["builder"], "olympic_holidays_monthly_template_manifest"
+        )
         self.assertEqual(manifest["output_sharing"][0]["status"], "shared")
         self.assertTrue(
             any(
-                request.get("insertTableRows", {}).get("tableObjectId")
-                == "g3faba7ffb95_2_112"
-                and request["insertTableRows"]["number"] == 6
+                request.get("duplicateObject", {}).get("objectId")
+                == "g3faba7ffb95_2_144"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("createTable", {}).get("objectId")
+                == "OHOverallSummaryTable"
                 for request in fake_client.batch_requests
             )
         )
@@ -1556,6 +1598,19 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
             any(
                 request.get("replaceImage", {}).get("imageObjectId")
                 == "g3faba7ffb95_2_113"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("deleteObject", {}).get("objectId") == "g3faba7ffb95_2_126"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
+                request.get("deleteObject", {}).get("objectId")
+                == "olympic_key_highlights_heading"
                 for request in fake_client.batch_requests
             )
         )
@@ -1913,9 +1968,7 @@ def _write_wendy_wu_qbr_artifact(
     ]
     if client_id == "wendy_wu_australia":
         section_rows = [
-            row
-            for row in section_rows
-            if row[1] not in {"Central Asia", "Mongolia"}
+            row for row in section_rows if row[1] not in {"Central Asia", "Mongolia"}
         ]
     for year, multiplier in ((2025, 0.5), (2026, 1.0)):
         for month in range(1, 7):
@@ -2153,7 +2206,9 @@ def _write_wightlink_monthly_artifact(root: Path) -> Path:
 
 
 def _write_wightlink_qbr_artifact(root: Path) -> Path:
-    fixture = Path(__file__).resolve().parent / "fixtures" / "wightlink_v2_sample_inputs"
+    fixture = (
+        Path(__file__).resolve().parent / "fixtures" / "wightlink_v2_sample_inputs"
+    )
     source_data = root / "source_data"
     trends_current = source_data / "trends_ytd_current"
     trends_previous = source_data / "trends_ytd_previous"
@@ -2725,7 +2780,10 @@ def _fake_olympic_monthly_presentation(existing_rows: int = 4) -> dict:
     shape_ids = set(manifest["global_text_ids"].values())
     table_ids = set()
     image_ids = set()
+    slide_ids = []
     for slide in manifest["slides"].values():
+        if slide.get("slide_id"):
+            slide_ids.append(slide["slide_id"])
         for key in ("title_id", "subtitle_id", "coverage_id", "insights_id"):
             if slide.get(key):
                 shape_ids.add(slide[key])
@@ -2746,6 +2804,15 @@ def _fake_olympic_monthly_presentation(existing_rows: int = 4) -> dict:
         }
         for shape_id in sorted(shape_ids)
     )
+    page_elements.append(
+        {
+            "objectId": "olympic_key_highlights_heading",
+            "shape": {
+                "text": {"textElements": [{"textRun": {"content": "Key Highlights\n"}}]}
+            },
+            "transform": _transform(70, 260),
+        }
+    )
     page_elements.extend(
         {
             "objectId": table_id,
@@ -2763,9 +2830,18 @@ def _fake_olympic_monthly_presentation(existing_rows: int = 4) -> dict:
         }
         for image_id in sorted(image_ids)
     )
+    slides = [
+        {
+            "objectId": slide_ids[0] if slide_ids else "olympic",
+            "pageElements": page_elements,
+        }
+    ]
+    slides.extend(
+        {"objectId": slide_id, "pageElements": []} for slide_id in slide_ids[1:]
+    )
     return {
         "pageSize": {"width": {"magnitude": 1000}, "height": {"magnitude": 600}},
-        "slides": [{"objectId": "olympic", "pageElements": page_elements}],
+        "slides": slides,
     }
 
 

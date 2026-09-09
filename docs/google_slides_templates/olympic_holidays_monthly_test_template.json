@@ -11,11 +11,13 @@
   "status": "prototype_template_created",
   "generation_rules": {
     "data_source": "monthly reports use API-generated performance data only",
-    "monthly_kpi_cards": "KPI cards show the selected month only, with MoM and YoY comparisons.",
-    "tables": "Tables and charts show current-year YTD through the selected month.",
-    "charts": "Charts are rendered locally as high-resolution PNGs and inserted into existing native image slots.",
+    "monthly_kpi_cards": "KPI cards show the selected month only, with MoM and YoY comparisons. The sixth KPI slot is ROAS, matching the WWT monthly card pattern.",
+    "tables": "Each summary card slide receives a generated YTD monthly table. Campaign type performance is selected-month only.",
+    "charts": "Charts are rendered locally as high-resolution PNGs. Performance charts use YoY grouped bars only; CPA and Cost per ATC are not plotted as chart lines.",
     "spend_delta_style": "Cost/spend MoM and YoY comparison text must stay neutral grey, regardless of positive or negative change.",
-    "island_source_rule": "Island Hopping campaign slides are populated only when an Island Hopping campaign type exists in the performance CSV. Island destination/search-term slides remain review-required unless a separate island-detail source is added."
+    "island_source_rule": "Island Hopping campaign slides are populated only when an Island Hopping campaign type exists in the performance CSV. Island destination/search-term slides remain review-required unless a separate island-detail source is added.",
+    "key_highlights": "Key highlights/insight boxes are removed from generated Olympic monthly decks to avoid stale template commentary.",
+    "brand_section": "The generator adds a Brand section by duplicating the Generic template slides when the native template does not already include Brand slides."
   },
   "global_text_ids": {
     "cover_report_title": "g3faba7ffb95_2_11",
@@ -33,12 +35,36 @@
       "prefix": "ALL",
       "scope": "overall",
       "kpi_ids": {
-        "revenue": ["g3faba7ffb95_2_67", "g3faba7ffb95_2_68", "g3faba7ffb95_2_69"],
-        "purchases": ["g3faba7ffb95_2_73", "g3faba7ffb95_2_74", "g3faba7ffb95_2_75"],
-        "cpa": ["g3faba7ffb95_2_79", "g3faba7ffb95_2_80", "g3faba7ffb95_2_81"],
-        "cost": ["g3faba7ffb95_2_85", "g3faba7ffb95_2_86", "g3faba7ffb95_2_87"],
-        "aov": ["g3faba7ffb95_2_91", "g3faba7ffb95_2_92", "g3faba7ffb95_2_93"],
-        "cpatc": ["g3faba7ffb95_2_97", "g3faba7ffb95_2_98", "g3faba7ffb95_2_99"]
+        "revenue": [
+          "g3faba7ffb95_2_67",
+          "g3faba7ffb95_2_68",
+          "g3faba7ffb95_2_69"
+        ],
+        "purchases": [
+          "g3faba7ffb95_2_73",
+          "g3faba7ffb95_2_74",
+          "g3faba7ffb95_2_75"
+        ],
+        "cpa": [
+          "g3faba7ffb95_2_79",
+          "g3faba7ffb95_2_80",
+          "g3faba7ffb95_2_81"
+        ],
+        "cost": [
+          "g3faba7ffb95_2_85",
+          "g3faba7ffb95_2_86",
+          "g3faba7ffb95_2_87"
+        ],
+        "aov": [
+          "g3faba7ffb95_2_91",
+          "g3faba7ffb95_2_92",
+          "g3faba7ffb95_2_93"
+        ],
+        "roas": [
+          "g3faba7ffb95_2_97",
+          "g3faba7ffb95_2_98",
+          "g3faba7ffb95_2_99"
+        ]
       }
     },
     "overall_ytd": {
@@ -47,8 +73,8 @@
       "subtitle_id": "g3faba7ffb95_2_111",
       "table_id": "g3faba7ffb95_2_112",
       "chart_ids": {
-        "revenue_cpa": "g3faba7ffb95_2_113",
-        "purchases_cpatc": "g3faba7ffb95_2_114"
+        "revenue_yoy": "g3faba7ffb95_2_113",
+        "purchases_yoy": "g3faba7ffb95_2_114"
       }
     },
     "yoy": {
@@ -81,12 +107,36 @@
       "prefix": "GEN",
       "scope": "Generic",
       "kpi_ids": {
-        "revenue": ["g3faba7ffb95_2_154", "g3faba7ffb95_2_155", "g3faba7ffb95_2_156"],
-        "purchases": ["g3faba7ffb95_2_160", "g3faba7ffb95_2_161", "g3faba7ffb95_2_162"],
-        "cpa": ["g3faba7ffb95_2_166", "g3faba7ffb95_2_167", "g3faba7ffb95_2_168"],
-        "cost": ["g3faba7ffb95_2_172", "g3faba7ffb95_2_173", "g3faba7ffb95_2_174"],
-        "aov": ["g3faba7ffb95_2_178", "g3faba7ffb95_2_179", "g3faba7ffb95_2_180"],
-        "cpatc": ["g3faba7ffb95_2_184", "g3faba7ffb95_2_185", "g3faba7ffb95_2_186"]
+        "revenue": [
+          "g3faba7ffb95_2_154",
+          "g3faba7ffb95_2_155",
+          "g3faba7ffb95_2_156"
+        ],
+        "purchases": [
+          "g3faba7ffb95_2_160",
+          "g3faba7ffb95_2_161",
+          "g3faba7ffb95_2_162"
+        ],
+        "cpa": [
+          "g3faba7ffb95_2_166",
+          "g3faba7ffb95_2_167",
+          "g3faba7ffb95_2_168"
+        ],
+        "cost": [
+          "g3faba7ffb95_2_172",
+          "g3faba7ffb95_2_173",
+          "g3faba7ffb95_2_174"
+        ],
+        "aov": [
+          "g3faba7ffb95_2_178",
+          "g3faba7ffb95_2_179",
+          "g3faba7ffb95_2_180"
+        ],
+        "roas": [
+          "g3faba7ffb95_2_184",
+          "g3faba7ffb95_2_185",
+          "g3faba7ffb95_2_186"
+        ]
       }
     },
     "generic_ytd": {
@@ -95,8 +145,8 @@
       "subtitle_id": "g3faba7ffb95_2_198",
       "table_id": "g3faba7ffb95_2_199",
       "chart_ids": {
-        "revenue_cpa": "g3faba7ffb95_2_200",
-        "purchases_cpatc": "g3faba7ffb95_2_201"
+        "revenue_yoy": "g3faba7ffb95_2_200",
+        "purchases_yoy": "g3faba7ffb95_2_201"
       },
       "insights_id": "g3faba7ffb95_2_204"
     },
@@ -108,12 +158,36 @@
       "prefix": "PMAX",
       "scope": "Performance Max",
       "kpi_ids": {
-        "revenue": ["g3faba7ffb95_2_215", "g3faba7ffb95_2_216", "g3faba7ffb95_2_217"],
-        "purchases": ["g3faba7ffb95_2_221", "g3faba7ffb95_2_222", "g3faba7ffb95_2_223"],
-        "cpa": ["g3faba7ffb95_2_227", "g3faba7ffb95_2_228", "g3faba7ffb95_2_229"],
-        "cost": ["g3faba7ffb95_2_233", "g3faba7ffb95_2_234", "g3faba7ffb95_2_235"],
-        "aov": ["g3faba7ffb95_2_239", "g3faba7ffb95_2_240", "g3faba7ffb95_2_241"],
-        "cpatc": ["g3faba7ffb95_2_245", "g3faba7ffb95_2_246", "g3faba7ffb95_2_247"]
+        "revenue": [
+          "g3faba7ffb95_2_215",
+          "g3faba7ffb95_2_216",
+          "g3faba7ffb95_2_217"
+        ],
+        "purchases": [
+          "g3faba7ffb95_2_221",
+          "g3faba7ffb95_2_222",
+          "g3faba7ffb95_2_223"
+        ],
+        "cpa": [
+          "g3faba7ffb95_2_227",
+          "g3faba7ffb95_2_228",
+          "g3faba7ffb95_2_229"
+        ],
+        "cost": [
+          "g3faba7ffb95_2_233",
+          "g3faba7ffb95_2_234",
+          "g3faba7ffb95_2_235"
+        ],
+        "aov": [
+          "g3faba7ffb95_2_239",
+          "g3faba7ffb95_2_240",
+          "g3faba7ffb95_2_241"
+        ],
+        "roas": [
+          "g3faba7ffb95_2_245",
+          "g3faba7ffb95_2_246",
+          "g3faba7ffb95_2_247"
+        ]
       }
     },
     "pmax_ytd": {
@@ -122,8 +196,8 @@
       "subtitle_id": "g3faba7ffb95_2_258",
       "table_id": "g3faba7ffb95_2_259",
       "chart_ids": {
-        "revenue_cpa": "g3faba7ffb95_2_260",
-        "purchases_cpatc": "g3faba7ffb95_2_261"
+        "revenue_yoy": "g3faba7ffb95_2_260",
+        "purchases_yoy": "g3faba7ffb95_2_261"
       },
       "insights_id": "g3faba7ffb95_2_264"
     },
@@ -135,12 +209,36 @@
       "prefix": "ISLAND",
       "scope": "Island Hopping",
       "kpi_ids": {
-        "revenue": ["g3faba7ffb95_2_275", "g3faba7ffb95_2_276", "g3faba7ffb95_2_277"],
-        "purchases": ["g3faba7ffb95_2_281", "g3faba7ffb95_2_282", "g3faba7ffb95_2_283"],
-        "cpa": ["g3faba7ffb95_2_287", "g3faba7ffb95_2_288", "g3faba7ffb95_2_289"],
-        "cost": ["g3faba7ffb95_2_293", "g3faba7ffb95_2_294", "g3faba7ffb95_2_295"],
-        "aov": ["g3faba7ffb95_2_299", "g3faba7ffb95_2_300", "g3faba7ffb95_2_301"],
-        "cpatc": ["g3faba7ffb95_2_305", "g3faba7ffb95_2_306", "g3faba7ffb95_2_307"]
+        "revenue": [
+          "g3faba7ffb95_2_275",
+          "g3faba7ffb95_2_276",
+          "g3faba7ffb95_2_277"
+        ],
+        "purchases": [
+          "g3faba7ffb95_2_281",
+          "g3faba7ffb95_2_282",
+          "g3faba7ffb95_2_283"
+        ],
+        "cpa": [
+          "g3faba7ffb95_2_287",
+          "g3faba7ffb95_2_288",
+          "g3faba7ffb95_2_289"
+        ],
+        "cost": [
+          "g3faba7ffb95_2_293",
+          "g3faba7ffb95_2_294",
+          "g3faba7ffb95_2_295"
+        ],
+        "aov": [
+          "g3faba7ffb95_2_299",
+          "g3faba7ffb95_2_300",
+          "g3faba7ffb95_2_301"
+        ],
+        "roas": [
+          "g3faba7ffb95_2_305",
+          "g3faba7ffb95_2_306",
+          "g3faba7ffb95_2_307"
+        ]
       }
     },
     "island_ytd": {
@@ -149,8 +247,8 @@
       "subtitle_id": "g3faba7ffb95_2_318",
       "table_id": "g3faba7ffb95_2_319",
       "chart_ids": {
-        "revenue_cpa": "g3faba7ffb95_2_320",
-        "purchases_cpatc": "g3faba7ffb95_2_321"
+        "revenue_yoy": "g3faba7ffb95_2_320",
+        "purchases_yoy": "g3faba7ffb95_2_321"
       },
       "insights_id": "g3faba7ffb95_2_324"
     },

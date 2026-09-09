@@ -9,7 +9,10 @@ from unittest.mock import patch
 import pandas as pd
 
 from main import run_text_report
-from report_generator.pipelines.olympic_pipeline import _parse_olympic_dates, _prepare_datasets
+from report_generator.pipelines.olympic_pipeline import (
+    _parse_olympic_dates,
+    _prepare_datasets,
+)
 from src.automated_sources import (
     AutomatedSourceError,
     SourcePeriod,
@@ -142,18 +145,80 @@ class OlympicFakeGA4Client:
         self.filters.append(dimension_filter)
         if "advertiserAdCost" in metrics:
             return [
-                _ga4_cost_row("20260801", "Performance Max - Greece", 100, 10, 1000, channel_group="Cross-network"),
-                _ga4_cost_row("20260801", "PMax - Domes Luxury", 20, 2, 200, channel_group="Cross-network"),
-                _ga4_cost_row("20260801", "Display - Remarketing - Greece", 5, 1, 50, channel_group="Display"),
-                _ga4_cost_row("20260801", "Search - Generic - Greece Holidays - Island Hopping", 30, 4, 400),
+                _ga4_cost_row(
+                    "20260801",
+                    "Performance Max - Greece",
+                    100,
+                    10,
+                    1000,
+                    channel_group="Cross-network",
+                ),
+                _ga4_cost_row(
+                    "20260801",
+                    "PMax - Domes Luxury",
+                    20,
+                    2,
+                    200,
+                    channel_group="Cross-network",
+                ),
+                _ga4_cost_row(
+                    "20260801",
+                    "Display - Remarketing - Greece",
+                    5,
+                    1,
+                    50,
+                    channel_group="Display",
+                ),
+                _ga4_cost_row(
+                    "20260801",
+                    "Search - Generic - Greece Holidays - Island Hopping",
+                    30,
+                    4,
+                    400,
+                ),
             ]
         return [
-            _ga4_event_row("20260801", "Performance Max - Greece", "purchase", 2, 500, channel_group="Cross-network"),
-            _ga4_event_row("20260801", "PMax - Domes Luxury", "add_to_cart", 3, 0, channel_group="Cross-network"),
-            _ga4_event_row("20260801", "Display - Remarketing - Greece", "add_to_cart", 2, 0, channel_group="Display"),
-            _ga4_event_row("20260801", "Search - Generic - Greece Holidays - Island Hopping", "purchase", 1, 100),
-            _ga4_event_row("20260801", "Search - Generic - Greece Holidays - Island Hopping", "add_to_cart", 4, 0),
-            _ga4_event_row("20250110", "Q125", "add_to_cart", 1, 0, channel_group="Display"),
+            _ga4_event_row(
+                "20260801",
+                "Performance Max - Greece",
+                "purchase",
+                2,
+                500,
+                channel_group="Cross-network",
+            ),
+            _ga4_event_row(
+                "20260801",
+                "PMax - Domes Luxury",
+                "add_to_cart",
+                3,
+                0,
+                channel_group="Cross-network",
+            ),
+            _ga4_event_row(
+                "20260801",
+                "Display - Remarketing - Greece",
+                "add_to_cart",
+                2,
+                0,
+                channel_group="Display",
+            ),
+            _ga4_event_row(
+                "20260801",
+                "Search - Generic - Greece Holidays - Island Hopping",
+                "purchase",
+                1,
+                100,
+            ),
+            _ga4_event_row(
+                "20260801",
+                "Search - Generic - Greece Holidays - Island Hopping",
+                "add_to_cart",
+                4,
+                0,
+            ),
+            _ga4_event_row(
+                "20250110", "Q125", "add_to_cart", 1, 0, channel_group="Display"
+            ),
         ]
 
 
@@ -162,11 +227,15 @@ class WightlinkDirectAggregateFakeGA4Client:
         if "advertiserAdCost" in metrics:
             return [
                 _ga4_cost_row("20260801", "Search - Brand", 100, 1000, 10000),
-                _ga4_cost_row("20260831", "Search - Generic - Routes", 200, 2000, 20000),
+                _ga4_cost_row(
+                    "20260831", "Search - Generic - Routes", 200, 2000, 20000
+                ),
             ]
         return [
             _ga4_event_row("20260801", "Search - Brand", "purchase", 10, 1000),
-            _ga4_event_row("20260831", "Search - Generic - Routes", "purchase", 20, 2000),
+            _ga4_event_row(
+                "20260831", "Search - Generic - Routes", "purchase", 20, 2000
+            ),
         ]
 
 
@@ -186,10 +255,26 @@ class FakeDataForSEOClient:
                                     "type": "google_trends_graph",
                                     "keywords": [keyword],
                                     "data": [
-                                        {"date_from": "2025-01-05", "date_to": "2025-01-11", "values": [30]},
-                                        {"date_from": "2025-04-05", "date_to": "2025-04-11", "values": [45]},
-                                        {"date_from": "2026-01-05", "date_to": "2026-01-11", "values": [40]},
-                                        {"date_from": "2026-04-05T00:00:00+00:00", "date_to": "2026-04-11", "values": [80]},
+                                        {
+                                            "date_from": "2025-01-05",
+                                            "date_to": "2025-01-11",
+                                            "values": [30],
+                                        },
+                                        {
+                                            "date_from": "2025-04-05",
+                                            "date_to": "2025-04-11",
+                                            "values": [45],
+                                        },
+                                        {
+                                            "date_from": "2026-01-05",
+                                            "date_to": "2026-01-11",
+                                            "values": [40],
+                                        },
+                                        {
+                                            "date_from": "2026-04-05T00:00:00+00:00",
+                                            "date_to": "2026-04-11",
+                                            "values": [80],
+                                        },
                                     ],
                                 }
                             ],
@@ -207,7 +292,9 @@ class DateToRejectingDataForSEOClient(FakeDataForSEOClient):
     def fetch_interest_over_time(self, *, keyword, location_name, date_from, date_to):
         self.calls.append(date_to)
         if date_to is not None:
-            raise AutomatedSourceError("DataForSEO Trends task failed: Invalid Field: 'date_to'.")
+            raise AutomatedSourceError(
+                "DataForSEO Trends task failed: Invalid Field: 'date_to'."
+            )
         return super().fetch_interest_over_time(
             keyword=keyword,
             location_name=location_name,
@@ -303,7 +390,9 @@ class AutomatedSourcesTests(unittest.TestCase):
 
         for campaign, expected in cases.items():
             with self.subTest(campaign=campaign):
-                self.assertEqual(classify_wendy_wu_aus_datastudio_destination(campaign), expected)
+                self.assertEqual(
+                    classify_wendy_wu_aus_datastudio_destination(campaign), expected
+                )
 
     def test_wendy_wu_uk_api_destinations_match_datastudio_buckets(self) -> None:
         cases = {
@@ -320,9 +409,13 @@ class AutomatedSourcesTests(unittest.TestCase):
 
         for campaign, expected in cases.items():
             with self.subTest(campaign=campaign):
-                self.assertEqual(classify_wendy_wu_uk_datastudio_destination(campaign), expected)
+                self.assertEqual(
+                    classify_wendy_wu_uk_datastudio_destination(campaign), expected
+                )
 
-    def test_olympic_api_source_matches_datastudio_channel_and_campaign_type_rules(self) -> None:
+    def test_olympic_api_source_matches_datastudio_channel_and_campaign_type_rules(
+        self,
+    ) -> None:
         fake_client = OlympicFakeGA4Client()
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
             "os.environ",
@@ -343,7 +436,9 @@ class AutomatedSourcesTests(unittest.TestCase):
             output = pd.read_csv(performance_path)
 
         self.assertIn("Display", str(fake_client.filters))
-        self.assertEqual(classify_olympic_datastudio_campaign_type("PMax - Domes Luxury"), "Other")
+        self.assertEqual(
+            classify_olympic_datastudio_campaign_type("PMax - Domes Luxury"), "Other"
+        )
         self.assertEqual(
             classify_olympic_datastudio_campaign_type(
                 "Search - Generic - Greece Holidays - Island Hopping"
@@ -358,10 +453,18 @@ class AutomatedSourcesTests(unittest.TestCase):
         self.assertEqual(float(island_hopping["Purchases"].sum()), 1.0)
         self.assertEqual(float(island_hopping["Revenue"].sum()), 100.0)
         self.assertEqual(float(island_hopping["Add to cart"].sum()), 4.0)
+        self.assertIn("ROAS", output.columns)
+        self.assertAlmostEqual(
+            float(island_hopping["ROAS"].iloc[0]),
+            float(island_hopping["Revenue"].iloc[0])
+            / float(island_hopping["Cost"].iloc[0]),
+        )
         self.assertEqual(float(other["Cost"].sum()), 25.0)
         self.assertEqual(float(other["Add to cart"].sum()), 5.0)
 
-    def test_olympic_uploaded_datastudio_csv_promotes_island_hopping_campaigns(self) -> None:
+    def test_olympic_uploaded_datastudio_csv_promotes_island_hopping_campaigns(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "olympic.csv"
             pd.DataFrame(
@@ -407,8 +510,15 @@ class AutomatedSourcesTests(unittest.TestCase):
             normalized.loc[normalized["Cost"] == 1000, "Campaign Type"].iloc[0],
             "Generic",
         )
+        self.assertIn("ROAS", normalized.columns)
+        self.assertAlmostEqual(
+            float(normalized.loc[normalized["Cost"] == 1000, "ROAS"].iloc[0]),
+            2.0,
+        )
 
-    def test_olympic_pipeline_promotes_island_hopping_before_channel_aggregation(self) -> None:
+    def test_olympic_pipeline_promotes_island_hopping_before_channel_aggregation(
+        self,
+    ) -> None:
         data = _prepare_datasets(
             pd.DataFrame(
                 [
@@ -447,7 +557,9 @@ class AutomatedSourcesTests(unittest.TestCase):
         self.assertEqual(float(breakdown.loc["Generic", "cost"]), 1000.0)
 
     def test_olympic_iso_dates_are_not_parsed_as_dayfirst_dates(self) -> None:
-        parsed = _parse_olympic_dates(pd.Series([f"2026-08-{day:02d}" for day in range(1, 13)]))
+        parsed = _parse_olympic_dates(
+            pd.Series([f"2026-08-{day:02d}" for day in range(1, 13)])
+        )
 
         self.assertEqual(parsed.min(), pd.Timestamp("2026-08-01"))
         self.assertEqual(parsed.max(), pd.Timestamp("2026-08-12"))
@@ -530,7 +642,10 @@ class AutomatedSourcesTests(unittest.TestCase):
 
             loaded = load_csv(path)
 
-        self.assertEqual(loaded["date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-04-01", "2026-04-02"])
+        self.assertEqual(
+            loaded["date"].dt.strftime("%Y-%m-%d").tolist(),
+            ["2026-04-01", "2026-04-02"],
+        )
 
     def test_trends_loader_handles_mixed_timezone_date_strings(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -544,7 +659,10 @@ class AutomatedSourcesTests(unittest.TestCase):
 
             loaded = TrendsLoader(tmpdir).load_from_directory()
 
-        self.assertEqual(loaded["date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-04-01", "2026-04-08"])
+        self.assertEqual(
+            loaded["date"].dt.strftime("%Y-%m-%d").tolist(),
+            ["2026-04-01", "2026-04-08"],
+        )
 
     def test_trend_summary_handles_object_month_start_values(self) -> None:
         current = pd.DataFrame(
@@ -590,15 +708,21 @@ class AutomatedSourcesTests(unittest.TestCase):
         )
 
         self.assertIsNotNone(summary)
-        self.assertEqual(summary["comparison"]["month_label"].tolist(), ["Jan", "Feb", "Mar", "Apr", "May", "Jun"])
+        self.assertEqual(
+            summary["comparison"]["month_label"].tolist(),
+            ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+        )
 
     def test_dataforseo_response_normalizes_graph_points(self) -> None:
-        frame = dataforseo_response_to_frame(FakeDataForSEOClient().fetch_interest_over_time(
-            keyword="japan holidays",
-            location_name="United Kingdom",
-            date_from=pd.Timestamp("2025-01-01"),
-            date_to=pd.Timestamp("2026-06-30"),
-        ), fallback_keyword="japan holidays")
+        frame = dataforseo_response_to_frame(
+            FakeDataForSEOClient().fetch_interest_over_time(
+                keyword="japan holidays",
+                location_name="United Kingdom",
+                date_from=pd.Timestamp("2025-01-01"),
+                date_to=pd.Timestamp("2026-06-30"),
+            ),
+            fallback_keyword="japan holidays",
+        )
 
         self.assertEqual(frame["term"].drop_duplicates().tolist(), ["japan holidays"])
         self.assertEqual(frame["value"].tolist(), [30.0, 45.0, 40.0, 80.0])
@@ -689,7 +813,14 @@ class AutomatedSourcesTests(unittest.TestCase):
             }
         )
         previous = pd.DataFrame(
-            columns=["date", "month_start", "term", "normalized_term", "value", "source_file"]
+            columns=[
+                "date",
+                "month_start",
+                "term",
+                "normalized_term",
+                "value",
+                "source_file",
+            ]
         )
 
         summary = build_trend_summary(
@@ -732,7 +863,9 @@ class AutomatedSourcesTests(unittest.TestCase):
                 trends_client=trends_client,
             )
 
-            raw_payload = (Path(tmpdir) / "raw_api" / "dataforseo" / "wendy_wu_tours.json").read_text(encoding="utf-8")
+            raw_payload = (
+                Path(tmpdir) / "raw_api" / "dataforseo" / "wendy_wu_tours.json"
+            ).read_text(encoding="utf-8")
             current_files = sorted(Path(paths.trends_ytd_current_dir).glob("*.csv"))
             current_values = pd.read_csv(current_files[0])["wendy wu tours"].tolist()
 
@@ -778,7 +911,19 @@ class AutomatedSourcesTests(unittest.TestCase):
 
             normalized = normalize_wendy_wu_performance_export(path)
 
-        self.assertEqual(normalized.columns.tolist(), ["Date", "Campaign Type", "Destination", "Sales Leads", "Cost", "Impressions", "Clicks", "Revenue"])
+        self.assertEqual(
+            normalized.columns.tolist(),
+            [
+                "Date",
+                "Campaign Type",
+                "Destination",
+                "Sales Leads",
+                "Cost",
+                "Impressions",
+                "Clicks",
+                "Revenue",
+            ],
+        )
         self.assertEqual(normalized["Campaign Type"].tolist(), ["Brand", "Demand Gen"])
 
     def test_headerless_wightlink_fixture_normalizes_and_infers_data_type(self) -> None:
@@ -793,7 +938,19 @@ class AutomatedSourcesTests(unittest.TestCase):
 
             normalized = normalize_wightlink_performance_export(path)
 
-        self.assertEqual(normalized.columns.tolist(), ["Date", "Campaign Type", "Data Type", "Purchases", "Purchase Revenue", "Cost", "Impressions", "Clicks"])
+        self.assertEqual(
+            normalized.columns.tolist(),
+            [
+                "Date",
+                "Campaign Type",
+                "Data Type",
+                "Purchases",
+                "Purchase Revenue",
+                "Cost",
+                "Impressions",
+                "Clicks",
+            ],
+        )
         self.assertEqual(normalized["Data Type"].tolist(), ["Routes", "Ferry"])
 
     def test_prepare_sources_writes_manifest_with_generated_files(self) -> None:
@@ -806,7 +963,10 @@ class AutomatedSourcesTests(unittest.TestCase):
             },
             clear=False,
         ):
-            with patch("src.automated_sources.GA4DataApiClient", return_value=CompleteMonthFakeGA4Client()):
+            with patch(
+                "src.automated_sources.GA4DataApiClient",
+                return_value=CompleteMonthFakeGA4Client(),
+            ):
                 paths = prepare_automated_source_inputs(
                     project_root=Path(tmpdir),
                     request_dir=Path(tmpdir) / "request",
@@ -850,7 +1010,9 @@ class AutomatedSourcesTests(unittest.TestCase):
 
             self.assertTrue(Path(output).exists())
 
-    def test_wightlink_monthly_source_validation_passes_on_complete_matching_source(self) -> None:
+    def test_wightlink_monthly_source_validation_passes_on_complete_matching_source(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
             "os.environ",
             {
@@ -897,7 +1059,9 @@ class AutomatedSourcesTests(unittest.TestCase):
         self.assertEqual(validation["period_date_max"], "2026-08-31")
         self.assertEqual(validation["direct_comparison"]["status"], "passed")
 
-    def test_wightlink_monthly_source_validation_rejects_partial_month_source(self) -> None:
+    def test_wightlink_monthly_source_validation_rejects_partial_month_source(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
             "os.environ",
             {
@@ -950,7 +1114,10 @@ class AutomatedSourcesTests(unittest.TestCase):
 
     def test_wightlink_trend_terms_are_fixed_for_api_pull(self) -> None:
         terms = resolve_trend_terms({"id": "wightlink"})
-        self.assertEqual(terms, ["Wightlink Ferries", "Isle of Wight Ferry", "Isle of Wight Holidays"])
+        self.assertEqual(
+            terms,
+            ["Wightlink Ferries", "Isle of Wight Ferry", "Isle of Wight Holidays"],
+        )
 
 
 def _ga4_cost_row(

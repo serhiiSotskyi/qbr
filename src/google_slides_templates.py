@@ -100,9 +100,11 @@ TEMPLATE_REGISTRY: dict[tuple[str, str], dict[str, str]] = {
         "required_roles": (
             "cover",
             "monthly_summary",
-            "monthly_ytd_table_chart",
-            "ytd_yoy",
-            "campaign_mix",
+            "monthly_summary_ytd_table",
+            "monthly_yoy_table",
+            "monthly_campaign_type_yoy",
+            "campaign_summary_yoy_charts",
+            "brand_section",
             "campaign_summary",
             "review_required_island_detail",
         ),
@@ -111,7 +113,9 @@ TEMPLATE_REGISTRY: dict[tuple[str, str], dict[str, str]] = {
 
 
 class GoogleSlidesTemplateRegistry:
-    def __init__(self, templates: dict[tuple[str, str], dict[str, str]] | None = None) -> None:
+    def __init__(
+        self, templates: dict[tuple[str, str], dict[str, str]] | None = None
+    ) -> None:
         self.templates = dict(templates or TEMPLATE_REGISTRY)
 
     def get_template(self, client_id: str, report_mode: str) -> TemplateConfig | None:
@@ -119,7 +123,9 @@ class GoogleSlidesTemplateRegistry:
         if not registry_entry:
             return None
         env_key = registry_entry["env_key"]
-        template_id = (os.environ.get(env_key) or DEFAULT_TEMPLATE_IDS.get(env_key, "")).strip()
+        template_id = (
+            os.environ.get(env_key) or DEFAULT_TEMPLATE_IDS.get(env_key, "")
+        ).strip()
         return TemplateConfig(
             key=registry_entry["key"],
             client_id=client_id,
@@ -127,7 +133,9 @@ class GoogleSlidesTemplateRegistry:
             env_key=env_key,
             default_template_id=DEFAULT_TEMPLATE_IDS.get(env_key, ""),
             template_id=template_id,
-            required_roles=tuple(registry_entry.get("required_roles") or DEFAULT_REQUIRED_ROLES),
+            required_roles=tuple(
+                registry_entry.get("required_roles") or DEFAULT_REQUIRED_ROLES
+            ),
         )
 
     def status(self, client_id: str, report_mode: str) -> dict[str, Any]:
@@ -146,15 +154,23 @@ class GoogleSlidesTemplateRegistry:
             "template_key": template.key,
             "template_env_key": template.env_key,
             "required_roles": list(template.required_roles),
-            "message": "Template configured." if template.configured else f"Missing {template.env_key}.",
+            "message": (
+                "Template configured."
+                if template.configured
+                else f"Missing {template.env_key}."
+            ),
         }
 
     def validate(self, client_id: str, report_mode: str) -> TemplateConfig:
         template = self.get_template(client_id, report_mode)
         if not template:
-            raise ValueError("Native Google Slides generation is not configured for this client/report mode.")
+            raise ValueError(
+                "Native Google Slides generation is not configured for this client/report mode."
+            )
         if not template.template_id:
-            raise ValueError(f"Missing Google Slides template ID for {template.env_key}.")
+            raise ValueError(
+                f"Missing Google Slides template ID for {template.env_key}."
+            )
         return template
 
 

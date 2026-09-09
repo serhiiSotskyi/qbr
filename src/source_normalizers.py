@@ -53,19 +53,25 @@ OLYMPIC_COLUMNS = [
     "Cost",
     "Add to cart",
     "CPA",
+    "ROAS",
     "Cost per ATC",
     "AOV",
 ]
+OLYMPIC_REQUIRED_COLUMNS = [column for column in OLYMPIC_COLUMNS if column != "ROAS"]
 
 
-def normalize_performance_csv_for_client(csv_path: str | Path, client_id: str) -> pd.DataFrame:
+def normalize_performance_csv_for_client(
+    csv_path: str | Path, client_id: str
+) -> pd.DataFrame:
     if client_id in {"wendy_wu", "wendy_wu_australia", "wendy_wu_uk"}:
         return normalize_wendy_wu_performance_export(csv_path)
     if client_id == "wightlink":
         return normalize_wightlink_performance_export(csv_path)
     if client_id == "olympic_holidays":
         return normalize_olympic_performance_export(csv_path)
-    raise ValueError(f"No performance normalizer is configured for client '{client_id}'.")
+    raise ValueError(
+        f"No performance normalizer is configured for client '{client_id}'."
+    )
 
 
 def normalize_wendy_wu_performance_export(csv_path: str | Path) -> pd.DataFrame:
@@ -73,7 +79,9 @@ def normalize_wendy_wu_performance_export(csv_path: str | Path) -> pd.DataFrame:
     df = _rename_columns(df, WENDY_WU_COLUMNS)
     missing = [column for column in WENDY_WU_REQUIRED if column not in df.columns]
     if missing:
-        raise ValueError(f"Wendy Wu performance CSV missing required columns: {missing}")
+        raise ValueError(
+            f"Wendy Wu performance CSV missing required columns: {missing}"
+        )
     if "Revenue" not in df.columns:
         df["Revenue"] = 0
     if "Campaign Type" in df.columns:
@@ -85,22 +93,42 @@ def normalize_wightlink_performance_export(csv_path: str | Path) -> pd.DataFrame
     df = _read_csv_with_headerless_fallback(csv_path, WIGHTLINK_HEADERLESS_COLUMNS)
     df = _rename_columns(df, WIGHTLINK_HEADERLESS_COLUMNS + WIGHTLINK_COLUMNS)
     if "Data Type" not in df.columns:
-        campaign_source = df["Campaign"] if "Campaign" in df.columns else df.get("Campaign Type", "")
-        df["Data Type"] = campaign_source.map(classify_wightlink_data_type) if hasattr(campaign_source, "map") else "Ferry"
+        campaign_source = (
+            df["Campaign"] if "Campaign" in df.columns else df.get("Campaign Type", "")
+        )
+        df["Data Type"] = (
+            campaign_source.map(classify_wightlink_data_type)
+            if hasattr(campaign_source, "map")
+            else "Ferry"
+        )
     missing = [column for column in WIGHTLINK_COLUMNS if column not in df.columns]
     if missing:
-        raise ValueError(f"Wightlink performance CSV missing required columns: {missing}")
+        raise ValueError(
+            f"Wightlink performance CSV missing required columns: {missing}"
+        )
     if "Campaign Type" in df.columns:
         df["Campaign Type"] = df["Campaign Type"].map(_canonical_campaign_type)
     return _coerce_order(df, WIGHTLINK_COLUMNS)
 
 
 def normalize_olympic_performance_export(csv_path: str | Path) -> pd.DataFrame:
-    df = _read_csv_with_headerless_fallback(csv_path, OLYMPIC_COLUMNS)
+    df = _read_csv_with_headerless_fallback(csv_path, OLYMPIC_REQUIRED_COLUMNS)
     df = _rename_columns(df, OLYMPIC_COLUMNS)
-    missing = [column for column in OLYMPIC_COLUMNS if column not in df.columns]
+    missing = [
+        column for column in OLYMPIC_REQUIRED_COLUMNS if column not in df.columns
+    ]
     if missing:
-        raise ValueError(f"Olympic Holidays performance CSV missing required columns: {missing}")
+        raise ValueError(
+            f"Olympic Holidays performance CSV missing required columns: {missing}"
+        )
+    if "ROAS" not in df.columns:
+        revenue = _number_series(df["Revenue"])
+        cost = _number_series(df["Cost"])
+        df["ROAS"] = 0.0
+        nonzero_cost = cost.ne(0)
+        df.loc[nonzero_cost, "ROAS"] = (
+            revenue.loc[nonzero_cost] / cost.loc[nonzero_cost]
+        )
     if "Campaign Type" in df.columns:
         df["Campaign Type"] = df["Campaign Type"].map(_canonical_campaign_type)
     if "Campaign" in df.columns:
@@ -111,12 +139,25 @@ def normalize_olympic_performance_export(csv_path: str | Path) -> pd.DataFrame:
 
 def classify_wightlink_data_type(campaign_name: Any) -> str:
     normalized = _normalize_text(campaign_name)
-    if any(term in normalized for term in ("route", "routes", "portsmouth", "fishbourne", "lymington", "yarmouth", "ryde")):
+    if any(
+        term in normalized
+        for term in (
+            "route",
+            "routes",
+            "portsmouth",
+            "fishbourne",
+            "lymington",
+            "yarmouth",
+            "ryde",
+        )
+    ):
         return "Routes"
     return "Ferry"
 
 
-def _read_csv_with_headerless_fallback(csv_path: str | Path, positional_columns: list[str]) -> pd.DataFrame:
+def _read_csv_with_headerless_fallback(
+    csv_path: str | Path, positional_columns: list[str]
+) -> pd.DataFrame:
     path = Path(csv_path)
     df = pd.read_csv(path)
     if df.empty:
@@ -159,6 +200,18 @@ def _coerce_order(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
         if column not in output.columns:
             output[column] = 0
     return output[columns].copy()
+
+
+def _number_series(values: pd.Series) -> pd.Series:
+    cleaned = (
+        values.astype(str)
+        .str.replace("£", "", regex=False)
+        .str.replace("$", "", regex=False)
+        .str.replace(",", "", regex=False)
+        .str.replace("%", "", regex=False)
+        .str.strip()
+    )
+    return pd.to_numeric(cleaned, errors="coerce").fillna(0.0)
 
 
 def _normalize_header(value: Any) -> str:
