@@ -14,7 +14,6 @@ import streamlit as st
 from app import (
     BASE_DIR,
     WENDY_WU_CLIENT_IDS,
-    build_request_inputs,
     create_claude_handoff_bundle,
     create_olympic_holidays_claude_handoff_bundle,
     create_package_bundle,
@@ -169,18 +168,18 @@ def main() -> None:
             trends_ytd_previous_dir,
             red_funnel_auction_path,
             red_funnel_prior_auction_path,
-        ) = build_request_inputs(
-            None,
-            auction_file,
-            [],
-            plan_workbook_file,
-            other_campaign_files,
-            [],
-            [],
-            red_funnel_auction_file,
-            red_funnel_prior_auction_file,
-            google_auction_file,
-            microsoft_auction_file,
+        ) = _build_request_inputs_fresh(
+            performance_file=None,
+            auction_file=auction_file,
+            trends_files=[],
+            plan_workbook_file=plan_workbook_file,
+            other_campaign_files=other_campaign_files,
+            trends_current_ytd_files=[],
+            trends_previous_ytd_files=[],
+            red_funnel_auction_file=red_funnel_auction_file,
+            red_funnel_prior_auction_file=red_funnel_prior_auction_file,
+            google_auction_file=google_auction_file,
+            microsoft_auction_file=microsoft_auction_file,
         )
         outputs_dir = request_dir / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -541,6 +540,38 @@ def _fresh_generation_functions(client_id: str, report_mode: str):
         report_main.run_report,
         report_main.run_text_report,
         slides_module.generate_native_google_slides,
+    )
+
+
+def _build_request_inputs_fresh(
+    *,
+    performance_file,
+    auction_file,
+    trends_files,
+    plan_workbook_file=None,
+    other_campaign_files=None,
+    trends_current_ytd_files=None,
+    trends_previous_ytd_files=None,
+    red_funnel_auction_file=None,
+    red_funnel_prior_auction_file=None,
+    google_auction_file=None,
+    microsoft_auction_file=None,
+):
+    """Resolve app.build_request_inputs at click time to avoid Streamlit stale imports."""
+    app_module = importlib.import_module("app")
+    app_module = importlib.reload(app_module)
+    return app_module.build_request_inputs(
+        performance_file=performance_file,
+        auction_file=auction_file,
+        trends_files=trends_files,
+        plan_workbook_file=plan_workbook_file,
+        other_campaign_files=other_campaign_files,
+        trends_current_ytd_files=trends_current_ytd_files,
+        trends_previous_ytd_files=trends_previous_ytd_files,
+        red_funnel_auction_file=red_funnel_auction_file,
+        red_funnel_prior_auction_file=red_funnel_prior_auction_file,
+        google_auction_file=google_auction_file,
+        microsoft_auction_file=microsoft_auction_file,
     )
 
 

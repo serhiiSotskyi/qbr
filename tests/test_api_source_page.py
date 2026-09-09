@@ -1,16 +1,42 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
 import pandas as pd
 
-from pages.API_Source_Test import _validate_parser_against_source, _validate_report_artifacts_against_source
+from pages.API_Source_Test import (
+    _build_request_inputs_fresh,
+    _validate_parser_against_source,
+    _validate_report_artifacts_against_source,
+)
 
 
 class ApiSourcePageTests(unittest.TestCase):
+    def test_api_source_request_input_helper_accepts_full_upload_contract(self) -> None:
+        result = _build_request_inputs_fresh(
+            performance_file=None,
+            auction_file=None,
+            trends_files=[],
+            plan_workbook_file=None,
+            other_campaign_files=[],
+            trends_current_ytd_files=[],
+            trends_previous_ytd_files=[],
+            red_funnel_auction_file=None,
+            red_funnel_prior_auction_file=None,
+            google_auction_file=None,
+            microsoft_auction_file=None,
+        )
+        try:
+            self.assertEqual(len(result), 10)
+            self.assertTrue(result[0].exists())
+            self.assertTrue(all(value is None for value in result[1:]))
+        finally:
+            shutil.rmtree(result[0], ignore_errors=True)
+
     def test_wightlink_monthly_report_artifacts_match_source_totals(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             artifact_path = Path(tmpdir) / "report_artifacts.json"
