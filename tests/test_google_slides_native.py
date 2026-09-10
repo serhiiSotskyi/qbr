@@ -1512,6 +1512,8 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_17"], "£20,000")
         self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_85"], "£10,000")
         self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_97"], "2.00")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_68"], "Revenue")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_86"], "Spend")
         self.assertEqual(payload["shape_text"]["OHBrandRevenueValue"], "£8,000")
         self.assertIn("MoM:", payload["shape_text"]["g3faba7ffb95_2_87"])
         self.assertEqual(len(payload["runtime_slide_templates"]), 2)
@@ -1546,6 +1548,106 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
         self.assertTrue(
             any("Island Hopping campaign type" in item for item in payload["warnings"])
         )
+
+    def test_monthly_payload_excludes_island_hopping_from_main_performance(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_data = root / "source_data"
+            source_data.mkdir(parents=True, exist_ok=True)
+            performance_csv = source_data / "performance.csv"
+            pd.DataFrame(
+                [
+                    {
+                        "Date": "1 Aug 2025",
+                        "Campaign Type": "Generic",
+                        "Campaign": "Search - Generic - Greece Holidays - Other Islands",
+                        "Purchases": 2,
+                        "Revenue": 100,
+                        "Cost": 20,
+                        "Add to cart": 10,
+                    },
+                    {
+                        "Date": "1 Jul 2026",
+                        "Campaign Type": "Generic",
+                        "Campaign": "Search - Generic - Greece Holidays - Other Islands",
+                        "Purchases": 3,
+                        "Revenue": 150,
+                        "Cost": 30,
+                        "Add to cart": 12,
+                    },
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Brand",
+                        "Campaign": "Search - Brand",
+                        "Purchases": 5,
+                        "Revenue": 100,
+                        "Cost": 10,
+                        "Add to cart": 20,
+                    },
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Generic",
+                        "Campaign": "Search - Generic - Greece Holidays - Other Islands",
+                        "Purchases": 4,
+                        "Revenue": 200,
+                        "Cost": 20,
+                        "Add to cart": 10,
+                    },
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Performance Max",
+                        "Campaign": "PMax - Greece",
+                        "Purchases": 1,
+                        "Revenue": 50,
+                        "Cost": 5,
+                        "Add to cart": 4,
+                    },
+                    {
+                        "Date": "1 Aug 2026",
+                        "Campaign Type": "Generic",
+                        "Campaign": "Search - Generic - Greece Holidays - Island Hopping",
+                        "Purchases": 1,
+                        "Revenue": 1000,
+                        "Cost": 100,
+                        "Add to cart": 2,
+                    },
+                ]
+            ).to_csv(performance_csv, index=False)
+            artifact = {
+                "client_id": "olympic_holidays",
+                "client_name": "Olympic Holidays",
+                "report_mode": "monthly",
+                "period": {"label": "Aug 2026", "subtitle": "Aug 2026"},
+                "source_files": {},
+                "slides": [],
+                "charts": [],
+            }
+
+            with patch(
+                "src.olympic_monthly_google_slides_builder.detect_latest_complete_month",
+                return_value=MonthInfo(2026, 8),
+            ):
+                payload = build_olympic_monthly_slides_payload(
+                    request_dir=root,
+                    artifact=artifact,
+                )
+
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_17"], "£350")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_67"], "£350")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_154"], "£200")
+        self.assertEqual(payload["shape_text"]["g3faba7ffb95_2_275"], "£1,000")
+        campaign_mix_channels = [
+            row[0] for row in payload["tables"]["g3faba7ffb95_2_138"]["values"][1:]
+        ]
+        self.assertNotIn("Island Hopping", campaign_mix_channels)
+        self.assertEqual(
+            payload["data_status"]["main_performance_excludes_campaign_type"],
+            "Island Hopping",
+        )
+        self.assertEqual(payload["data_status"]["island_hopping_rows"], 1)
+        self.assertFalse(any("not present" in item for item in payload["warnings"]))
 
     def test_monthly_native_slides_generate_table_chart_and_cost_style_requests(
         self,

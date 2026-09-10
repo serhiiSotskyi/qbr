@@ -15,7 +15,7 @@
     "tables": "Each summary card slide receives a generated YTD monthly table. Campaign type performance is selected-month only.",
     "charts": "Charts are rendered locally as high-resolution PNGs. Performance charts use YoY grouped bars only; CPA and Cost per ATC are not plotted as chart lines.",
     "spend_delta_style": "Cost/spend MoM and YoY comparison text must stay neutral grey, regardless of positive or negative change.",
-    "island_source_rule": "Island Hopping campaign slides are populated only when an Island Hopping campaign type exists in the performance CSV. Island destination/search-term slides remain review-required unless a separate island-detail source is added.",
+    "island_source_rule": "Rows whose campaign type or campaign name identifies Island Hopping are excluded from overall, Brand, Generic, Performance Max, Demand Gen, and campaign-mix performance. Island Hopping appears only on the Island Hopping slides. Island destination/search-term slides remain review-required unless a separate island-detail source is added.",
     "key_highlights": "Key highlights/insight boxes are removed from generated Olympic monthly decks to avoid stale template commentary.",
     "brand_section": "The generator adds a Brand section by duplicating the Generic template slides when the native template does not already include Brand slides."
   },

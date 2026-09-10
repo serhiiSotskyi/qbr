@@ -112,12 +112,12 @@ ISLAND_TABLE_COLUMNS = (
 )
 CARD_METRICS = ("revenue", "purchases", "cpa", "cost", "roas", "aov")
 CARD_SUBLABELS = {
-    "revenue": "Selected month revenue",
-    "purchases": "Selected month purchases",
-    "cpa": "Cost per purchase",
-    "cost": "Selected month spend",
+    "revenue": "Revenue",
+    "purchases": "Purchases",
+    "cpa": "CPA",
+    "cost": "Spend",
     "roas": "ROAS",
-    "aov": "Avg order value",
+    "aov": "AOV",
 }
 SUMMARY_TABLE_IDS = {
     "overall_cards": "OHOverallSummaryTable",
@@ -809,11 +809,12 @@ def _prepare_olympic_monthly_data(
 ) -> dict[str, Any]:
     df = _load_olympic_performance_csv(performance_csv)
     month = detect_latest_complete_month(df)
-    current = _filter_month(df, month)
-    previous = _filter_month(df, month.previous_month)
-    prior = _filter_month(df, MonthInfo(month.year - 1, month.month))
-    ytd = _filter_ytd(df, month.year, month.month)
-    prior_ytd = _filter_ytd(df, month.year - 1, month.month)
+    main_df = _exclude_island_hopping(df)
+    current = _filter_month(main_df, month)
+    previous = _filter_month(main_df, month.previous_month)
+    prior = _filter_month(main_df, MonthInfo(month.year - 1, month.month))
+    ytd = _filter_ytd(main_df, month.year, month.month)
+    prior_ytd = _filter_ytd(main_df, month.year - 1, month.month)
     matched_months = int(
         len(
             set(ytd["month_start"].dropna().dt.month.astype(int))
@@ -837,10 +838,12 @@ def _prepare_olympic_monthly_data(
         chart_key="overall",
     )
     sections = {
-        "Brand": _campaign_section_data("Brand", df, month, charts_dir, "brand"),
-        "Generic": _campaign_section_data("Generic", df, month, charts_dir, "generic"),
+        "Brand": _campaign_section_data("Brand", main_df, month, charts_dir, "brand"),
+        "Generic": _campaign_section_data(
+            "Generic", main_df, month, charts_dir, "generic"
+        ),
         "Performance Max": _campaign_section_data(
-            "Performance Max", df, month, charts_dir, "pmax"
+            "Performance Max", main_df, month, charts_dir, "pmax"
         ),
         "Island Hopping": _campaign_section_data(
             "Island Hopping", df, month, charts_dir, "island_hopping"
@@ -898,6 +901,10 @@ def _prepare_olympic_monthly_data(
             "selected_month": month.label,
             "tables_and_charts_period": period["ytd_label"],
             "cards_period": month.label,
+            "main_performance_excludes_campaign_type": "Island Hopping",
+            "island_hopping_rows": int(
+                len(df[df["campaign_type"].eq("Island Hopping")])
+            ),
         },
         "warnings": warnings,
     }
@@ -910,6 +917,9 @@ def _load_olympic_performance_csv(path: str | Path) -> pd.DataFrame:
         "date": "date",
         "campaign type": "campaign_type",
         "campaign_type": "campaign_type",
+        "campaign": "campaign",
+        "session campaign name": "campaign",
+        "sessioncampaignname": "campaign",
         "purchases": "purchases",
         "revenue": "revenue",
         "purchase revenue": "revenue",
@@ -962,10 +972,47 @@ def _load_olympic_performance_csv(path: str | Path) -> pd.DataFrame:
         working["campaign_type"].fillna("Other").astype(str).str.strip()
     )
     working.loc[working["campaign_type"].eq(""), "campaign_type"] = "Other"
+    working["campaign_type"] = working["campaign_type"].map(_canonical_campaign_type)
+    if "campaign" in working.columns:
+        island_hopping = working["campaign"].map(_is_island_hopping_campaign)
+        working.loc[island_hopping, "campaign_type"] = "Island Hopping"
     working["month_start"] = working["date"].dt.to_period("M").dt.to_timestamp()
     working["year"] = working["date"].dt.year
     working["month"] = working["date"].dt.month
     return working.sort_values("date").reset_index(drop=True)
+
+
+def _exclude_island_hopping(df: pd.DataFrame) -> pd.DataFrame:
+    return df[~df["campaign_type"].eq("Island Hopping")].copy()
+
+
+def _canonical_campaign_type(value: Any) -> str:
+    normalized = _normalise_column(value)
+    compact = normalized.replace(" ", "")
+    lookup = {
+        "brand": "Brand",
+        "generic": "Generic",
+        "generics": "Generic",
+        "performance max": "Performance Max",
+        "performancemax": "Performance Max",
+        "pmax": "Performance Max",
+        "demand gen": "Demand Gen",
+        "demandgen": "Demand Gen",
+        "discovery": "Demand Gen",
+        "island hopping": "Island Hopping",
+        "island hop": "Island Hopping",
+        "islandhopping": "Island Hopping",
+        "islandhoping": "Island Hopping",
+        "ilsandhopping": "Island Hopping",
+        "ilsandhoping": "Island Hopping",
+        "other": "Other",
+    }
+    return lookup.get(normalized, lookup.get(compact, str(value or "Other").strip()))
+
+
+def _is_island_hopping_campaign(value: Any) -> bool:
+    normalized = _normalise_column(value)
+    return "island hop" in normalized or "ilsand hop" in normalized
 
 
 def _campaign_section_data(
