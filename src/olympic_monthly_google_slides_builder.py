@@ -293,7 +293,10 @@ def generate_olympic_monthly_google_slides(
                 allowed_missing_ids=set(payload.get("generated_image_ids") or []),
             )
         )
-        requests_body.extend(_build_text_style_requests(payload))
+        style_object_ids = _page_element_ids(presentation) - {
+            str(object_id) for object_id in delete_ids
+        }
+        requests_body.extend(_build_text_style_requests(payload, style_object_ids))
 
         batch_update_request_count += len(requests_body)
         _send_batch_updates(client, copied_id, requests_body)
@@ -1723,26 +1726,71 @@ def _build_chart_requests(
     return requests_body
 
 
-def _build_text_style_requests(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _build_text_style_requests(
+    payload: Mapping[str, Any], existing_object_ids: set[str] | None = None
+) -> list[dict[str, Any]]:
     requests_body: list[dict[str, Any]] = []
-    requests_body.extend(_template_title_style_requests())
+    requests_body.extend(
+        _existing_style_requests(
+            _template_title_style_requests(), existing_object_ids=existing_object_ids
+        )
+    )
     for object_id in payload.get("title_text_ids") or []:
-        requests_body.append(_shape_text_color_request(str(object_id), WHITE_RGB))
+        _append_shape_text_color_request(
+            requests_body, str(object_id), WHITE_RGB, existing_object_ids
+        )
     for object_id in payload.get("subtitle_text_ids") or []:
-        requests_body.append(
-            _shape_text_color_request(str(object_id), MUTED_ON_DARK_RGB)
+        _append_shape_text_color_request(
+            requests_body,
+            str(object_id),
+            MUTED_ON_DARK_RGB,
+            existing_object_ids,
         )
     metric_delta_ids = dict(payload.get("metric_delta_ids") or {})
     cost_delta_ids = {
         object_id for object_id, metric in metric_delta_ids.items() if metric == "cost"
     }
     for object_id in cost_delta_ids:
-        requests_body.append(_shape_text_color_request(object_id, NEUTRAL_RGB))
+        _append_shape_text_color_request(
+            requests_body, object_id, NEUTRAL_RGB, existing_object_ids
+        )
     for object_id, text in payload["shape_text"].items():
         if str(text).startswith("MoM:") and object_id not in cost_delta_ids:
             rgb = _delta_text_rgb(str(text), metric_delta_ids.get(str(object_id), ""))
-            requests_body.append(_shape_text_color_request(str(object_id), rgb))
+            _append_shape_text_color_request(
+                requests_body, str(object_id), rgb, existing_object_ids
+            )
     return requests_body
+
+
+def _append_shape_text_color_request(
+    requests_body: list[dict[str, Any]],
+    object_id: str,
+    rgb: Mapping[str, float],
+    existing_object_ids: set[str] | None,
+) -> None:
+    if existing_object_ids is not None and object_id not in existing_object_ids:
+        return
+    requests_body.append(_shape_text_color_request(object_id, rgb))
+
+
+def _existing_style_requests(
+    requests_body: Sequence[Mapping[str, Any]],
+    *,
+    existing_object_ids: set[str] | None,
+) -> list[dict[str, Any]]:
+    if existing_object_ids is None:
+        return [dict(request) for request in requests_body]
+    filtered: list[dict[str, Any]] = []
+    for request in requests_body:
+        object_id = (
+            request.get("updateTextStyle", {}).get("objectId")
+            if isinstance(request, Mapping)
+            else None
+        )
+        if object_id in existing_object_ids:
+            filtered.append(dict(request))
+    return filtered
 
 
 def _template_title_style_requests() -> list[dict[str, Any]]:

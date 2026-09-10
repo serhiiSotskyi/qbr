@@ -1734,6 +1734,20 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
                 for request in fake_client.batch_requests
             )
         )
+        self.assertFalse(
+            any(
+                request.get("updateTextStyle", {}).get("objectId")
+                == "g3faba7ffb95_2_18"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertFalse(
+            any(
+                request.get("updateTextStyle", {}).get("objectId")
+                == "olympic_stale_revenue_card_header"
+                for request in fake_client.batch_requests
+            )
+        )
         self.assertEqual(len(fake_client.deleted_permissions), fake_client.upload_count)
 
 
