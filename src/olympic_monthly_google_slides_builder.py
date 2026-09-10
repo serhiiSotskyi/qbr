@@ -119,6 +119,7 @@ CARD_SUBLABELS = {
     "roas": "ROAS",
     "aov": "AOV",
 }
+STALE_CARD_HEADER_TEXTS = {"REVENUE", "PURCHASES", "CPA", "COST", "AOV", "COST/ATC"}
 SUMMARY_TABLE_IDS = {
     "overall_cards": "OHOverallSummaryTable",
     "brand_cards": "OHBrandSummaryTable",
@@ -256,7 +257,11 @@ def generate_olympic_monthly_google_slides(
 
         requests_body: list[dict[str, Any]] = []
         delete_ids = list(payload.get("delete_object_ids") or [])
-        delete_ids.extend(_object_ids_with_exact_text(presentation, {"Key Highlights"}))
+        delete_ids.extend(
+            _object_ids_with_exact_text(
+                presentation, {"Key Highlights"} | STALE_CARD_HEADER_TEXTS
+            )
+        )
         requests_body.extend(
             _build_delete_object_requests(
                 delete_ids,

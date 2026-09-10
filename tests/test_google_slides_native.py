@@ -1718,6 +1718,13 @@ class OlympicMonthlyNativeSlidesTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
+                request.get("deleteObject", {}).get("objectId")
+                == "olympic_stale_revenue_card_header"
+                for request in fake_client.batch_requests
+            )
+        )
+        self.assertTrue(
+            any(
                 request.get("updateTextStyle", {}).get("objectId")
                 == "g3faba7ffb95_2_87"
                 and request["updateTextStyle"]["style"]["foregroundColor"][
@@ -2913,6 +2920,13 @@ def _fake_olympic_monthly_presentation(existing_rows: int = 4) -> dict:
                 "text": {"textElements": [{"textRun": {"content": "Key Highlights\n"}}]}
             },
             "transform": _transform(70, 260),
+        }
+    )
+    page_elements.append(
+        {
+            "objectId": "olympic_stale_revenue_card_header",
+            "shape": {"text": {"textElements": [{"textRun": {"content": "REVENUE\n"}}]}},
+            "transform": _transform(70, 90),
         }
     )
     page_elements.extend(
